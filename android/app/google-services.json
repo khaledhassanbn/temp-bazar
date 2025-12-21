@@ -1,0 +1,126 @@
+{
+  "project_info": {
+    "project_number": "681758766010",
+    "project_id": "bazar-suez-app",
+    "storage_bucket": "bazar-suez-app.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:681758766010:android:f70e38dd29407b8d6e2383",
+        "android_client_info": {
+          "package_name": "com.example.bazaarsuezdriver"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "681758766010-un3m1p98rg7q1s16b8vsaej85jesf9dt.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBuSD2l5deFdKPfW944a40LlrZvu9Ukm6c"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "681758766010-un3m1p98rg7q1s16b8vsaej85jesf9dt.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "681758766010-8hguil2cbb7an3mr70q161f56vr6v4kn.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.example.bazarSuezApp"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:681758766010:android:a6ab367fb90d43206e2383",
+        "android_client_info": {
+          "package_name": "com.example.bazar_suez"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "681758766010-7806phk8rqevggru1fha2vbc1baa67hn.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.bazar_suez",
+            "certificate_hash": "621e48a096f02207e4a2aa2fb93be164b2dd69d1"
+          }
+        },
+        {
+          "client_id": "681758766010-un3m1p98rg7q1s16b8vsaej85jesf9dt.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBuSD2l5deFdKPfW944a40LlrZvu9Ukm6c"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "681758766010-un3m1p98rg7q1s16b8vsaej85jesf9dt.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "681758766010-8hguil2cbb7an3mr70q161f56vr6v4kn.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.example.bazarSuezApp"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:681758766010:android:6d75171f5a6017c36e2383",
+        "android_client_info": {
+          "package_name": "com.example.bazar_suez_app"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "681758766010-un3m1p98rg7q1s16b8vsaej85jesf9dt.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBuSD2l5deFdKPfW944a40LlrZvu9Ukm6c"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "681758766010-un3m1p98rg7q1s16b8vsaej85jesf9dt.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "681758766010-8hguil2cbb7an3mr70q161f56vr6v4kn.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.example.bazarSuezApp"
+              }
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

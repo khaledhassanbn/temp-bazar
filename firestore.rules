@@ -1,0 +1,189 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // ============================================================================
+    // HELPER FUNCTIONS
+    // ============================================================================
+    
+    // Check if user is authenticated
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    // Check if user is admin
+    function isAdmin() {
+      return isAuthenticated() && 
+             (request.auth.token.role == 'admin' || 
+              request.auth.token.userStatus == 'admin');
+    }
+    
+    // Check if store subscription is active
+    function isStoreActive(storeId) {
+      let store = get(/databases/$(database)/documents/markets/$(storeId));
+      let now = request.time;
+      let expiryDate = store.data.expiryDate;
+      return store.data.isActive == true && 
+             expiryDate != null && 
+             expiryDate > now;
+    }
+    
+    // Check if store can add products
+    function canStoreAddProducts(storeId) {
+      let store = get(/databases/$(database)/documents/markets/$(storeId));
+      return store.data.canAddProducts == true && isStoreActive(storeId);
+    }
+    
+    // Check if store can receive orders
+    function canStoreReceiveOrders(storeId) {
+      let store = get(/databases/$(database)/documents/markets/$(storeId));
+      return store.data.canReceiveOrders == true && isStoreActive(storeId);
+    }
+    
+    // Check if user owns the store
+    function isStoreOwner(storeId) {
+      let store = get(/databases/$(database)/documents/markets/$(storeId));
+      return isAuthenticated() && store.data.ownerUid == request.auth.uid;
+    }
+    
+    // ============================================================================
+    // MARKETS (STORES) COLLECTION
+    // ============================================================================
+    
+    match /markets/{storeId} {
+      // Allow read if store is visible (active subscription)
+      allow read: if resource.data.isVisible == true || 
+                     isStoreOwner(storeId) || 
+                     isAdmin();
+      
+      // Allow create: authenticated users only
+      allow create: if isAuthenticated() && 
+                       request.resource.data.ownerUid == request.auth.uid;
+      
+      // Allow update: owner or admin only
+      // BUT: Block updates to products/orders fields if subscription expired
+      allow update: if (isStoreOwner(storeId) || isAdmin()) && (
+        // Allow updates to subscription-related fields (for renewal)
+        request.resource.data.diff(resource.data).affectedKeys()
+          .hasOnly(['isActive', 'expiryDate', 'subscription', 'canAddProducts', 
+                   'canReceiveOrders', 'deactivatedAt', 'status', 'isVisible']) ||
+        // Allow other updates only if subscription is active
+        isStoreActive(storeId)
+      );
+      
+      // Allow delete: admin only
+      allow delete: if isAdmin();
+      
+      // ============================================================================
+      // PRODUCTS SUBCOLLECTION
+      // ============================================================================
+      
+      match /products/{productId} {
+        // Allow read: if store is visible
+        allow read: if resource.data.parentStoreId == storeId && 
+                       (get(/databases/$(database)/documents/markets/$(storeId)).data.isVisible == true ||
+                        isStoreOwner(storeId) ||
+                        isAdmin());
+        
+        // Allow create: only if store can add products (active subscription)
+        allow create: if isAuthenticated() && 
+                         isStoreOwner(storeId) && 
+                         canStoreAddProducts(storeId) &&
+                         request.resource.data.parentStoreId == storeId;
+        
+        // Allow update: only if store can add products (active subscription)
+        allow update: if isAuthenticated() && 
+                         isStoreOwner(storeId) && 
+                         canStoreAddProducts(storeId);
+        
+        // Allow delete: owner or admin
+        allow delete: if isStoreOwner(storeId) || isAdmin();
+      }
+      
+      // ============================================================================
+      // ORDERS SUBCOLLECTION
+      // ============================================================================
+      
+      match /orders/{orderId} {
+        // Allow read: store owner, admin, or order creator
+        allow read: if isAuthenticated() && (
+          isStoreOwner(storeId) || 
+          isAdmin() || 
+          resource.data.userId == request.auth.uid
+        );
+        
+        // Allow create: authenticated users (customers can place orders)
+        // BUT: Only if store can receive orders (active subscription)
+        allow create: if isAuthenticated() && 
+                         request.resource.data.storeId == storeId &&
+                         canStoreReceiveOrders(storeId);
+        
+        // Allow update: store owner (to update order status) or admin
+        // BUT: Only if store can receive orders (active subscription)
+        allow update: if isAuthenticated() && (
+          (isStoreOwner(storeId) && canStoreReceiveOrders(storeId)) || 
+          isAdmin()
+        );
+        
+        // Allow delete: admin only
+        allow delete: if isAdmin();
+      }
+      
+      // ============================================================================
+      // PAYMENTS SUBCOLLECTION
+      // ============================================================================
+      
+      match /payments/{paymentId} {
+        // Allow read: store owner or admin
+        allow read: if isAuthenticated() && (
+          isStoreOwner(storeId) || 
+          isAdmin()
+        );
+        
+        // Allow create: Cloud Functions only (via server timestamp)
+        // In practice, this is created by Paymob webhook
+        allow create: if false; // Only Cloud Functions can create
+        
+        // No updates or deletes allowed
+        allow update, delete: if false;
+      }
+    }
+    
+    // ============================================================================
+    // PACKAGES COLLECTION
+    // ============================================================================
+    
+    match /packages/{packageId} {
+      // Allow read: everyone (for pricing page)
+      allow read: if true;
+      
+      // Allow create: admin only
+      allow create: if isAdmin();
+      
+      // Allow update: admin only
+      allow update: if isAdmin();
+      
+      // Allow delete: admin only
+      allow delete: if isAdmin();
+    }
+    
+    // ============================================================================
+    // PLANS COLLECTION (Legacy - for backward compatibility)
+    // ============================================================================
+    
+    match /plans/{planId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+    
+    // ============================================================================
+    // DEFAULT DENY
+    // ============================================================================
+    
+    // Deny all other collections by default
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
+

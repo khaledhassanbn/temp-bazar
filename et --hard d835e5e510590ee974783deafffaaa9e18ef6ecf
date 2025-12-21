@@ -1,0 +1,101 @@
+[33mcommit ff72e574d716747345bfea6b4733fc2e01fe7bf8[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mmain[m[33m, [m[1;31morigin/main[m[33m)[m
+Author: Khaled hassan <khaledhassanbn@gmail.com>
+Date:   Fri Oct 17 15:35:04 2025 +0300
+
+    انتهاء من UI صفحة المنتج
+
+[33mcommit f73ddb3e8593d0cd28a9324d2e846c0acaca0833[m
+Author: Khaled hassan <khaledhassanbn@gmail.com>
+Date:   Wed Oct 15 17:45:04 2025 +0300
+
+    عرض المنتجات من قاعدة البيانات
+
+[33mcommit 7e69554bf354530af06b4fb0be42942e2927d1b3[m
+Author: Khaled hassan <khaledhassanbn@gmail.com>
+Date:   Wed Oct 15 10:22:37 2025 +0300
+
+    ضبط عرض بيانات المتجر فى صفحة المتجر
+
+[33mcommit d159cf6b266c88f84ed55dbb1a586274a1cdab57[m
+Author: Khaled hassan <khaledhassanbn@gmail.com>
+Date:   Wed Oct 15 08:51:53 2025 +0300
+
+    ضبط شكل صفحة المتجر  وشكل المنتجات
+
+[33mcommit 0691994e2d0b72aa3ab32a0c0b7b71c383265566[m
+Author: Khaled hassan <khaledhassanbn@gmail.com>
+Date:   Sat Oct 11 18:26:14 2025 +0300
+
+    زرار المشاركه والتواصل فى صفحة المتجر
+
+[33mcommit b1c6a19bba7570313355d448e6da5823983ad9a5[m
+Author: Khaled hassan <khaledhassanbn@gmail.com>
+Date:   Sat Oct 11 15:27:41 2025 +0300
+
+    تعديل نهائى لشكل شريط الفئات
+
+[33mcommit 391eb08b722fe83f9c82edf6f57df611c20f4d0a[m
+Author: Khaled hassan <khaledhassanbn@gmail.com>
+Date:   Sat Oct 11 14:16:40 2025 +0300
+
+    اضافة قوائم مربعه فى قائمة اختياراتك
+
+[33mcommit 485f750c7fe5289902a0e81f7f3507ec32870680[m
+Author: Khaled hassan <khaledhassanbn@gmail.com>
+Date:   Wed Oct 8 23:39:49 2025 +0300
+
+    ui صفحة المتجر متقسم لودجيت
+
+[33mcommit c577c31ddde3cf8608afd6be6cfd6ff455ed9683[m
+Author: Khaled hassan <khaledhassanbn@gmail.com>
+Date:   Wed Oct 8 23:12:54 2025 +0300
+
+    الشكل النهائى لصفحة المتجر قبل الودجت
+
+[33mcommit b24dea22189853e0756e3a14bacc66c72b712531[m
+Author: Khaled hassan <khaledhassanbn@gmail.com>
+Date:   Wed Oct 8 21:10:54 2025 +0300
+
+    ui صفحة المتجر بنسبة 90 فى الميه
+
+[33mcommit 64014c93763f824486463bc4a05126734d59c326[m
+Author: Khaled hassan <khaledhassanbn@gmail.com>
+Date:   Tue Oct 7 23:13:48 2025 +0300
+
+    تعديل رفع  صوره
+
+[33mcommit 3c15ddbcded4e32ed71e2ac46509f070299f0d39[m
+Author: Khaled hassan <khaledhassanbn@gmail.com>
+Date:   Mon Oct 6 19:41:57 2025 +0300
+
+    عرض المتاجر حسب id الفئه داخلها
+
+[33mcommit 6993604af806fe8be9995a06de6895564cf8bc25[m
+Author: Khaled hassan <khaledhassanbn@gmail.com>
+Date:   Mon Oct 6 17:34:32 2025 +0300
+
+    تعدل الكاتيجورى وتعديل اضافة المتجر فى الكاتجورى
+
+[33mcommit 3e2cbd17a98a2c172a4c8fa3536f13bb2a864f5d[m
+Author: Khaled hassan <khaledhassanbn@gmail.com>
+Date:   Sun Oct 5 16:29:10 2025 +0300
+
+    complete header category
+
+[33mcommit ec8e876c743c277ad4fc7b3825c6379108cbf046[m
+Author: Khaled hassan <khaledhassanbn@gmail.com>
+Date:   Sun Oct 5 09:54:56 2025 +0300
+
+    complete home market
+
+[33mcommit 59e0458e77d50a6c7feb06a0f7596750628ac056[m
+Author: Khaled hassan <khaledhassanbn@gmail.com>
+Date:   Sun Oct 5 09:45:16 2025 +0300
+
+    first commit
+
+[33mcommit d835e5e510590ee974783deafffaaa9e18ef6ecf[m
+Author: Khaled hassan <khaledhassanbn@gmail.com>
+Date:   Sun Oct 5 09:43:12 2025 +0300
+
+    Initial commit

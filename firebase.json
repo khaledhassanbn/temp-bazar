@@ -1,0 +1,52 @@
+{
+  "flutter": {
+    "platforms": {
+      "android": {
+        "default": {
+          "projectId": "bazar-suez-app",
+          "appId": "1:681758766010:android:a6ab367fb90d43206e2383",
+          "fileOutput": "android/app/google-services.json"
+        }
+      },
+      "dart": {
+        "lib/firebase_options.dart": {
+          "projectId": "bazar-suez-app",
+          "configurations": {
+            "android": "1:681758766010:android:a6ab367fb90d43206e2383",
+            "ios": "1:681758766010:ios:94d8413e2cd2c16f6e2383",
+            "macos": "1:681758766010:ios:94d8413e2cd2c16f6e2383",
+            "web": "1:681758766010:web:627406be6bfa653b6e2383",
+            "windows": "1:681758766010:web:b5e045173e273b0b6e2383"
+          }
+        }
+      }
+    }
+  },
+  "functions": [
+    {
+      "source": "functions",
+      "codebase": "default",
+      "ignore": [
+        "node_modules",
+        ".git",
+        "firebase-debug.log",
+        "firebase-debug.*.log",
+        "*.local"
+      ]
+    }
+  ],
+  "hosting": {
+    "public": "public",
+    "ignore": [
+      "firebase.json",
+      "**/.*",
+      "**/node_modules/**"
+    ],
+    "rewrites": [
+      {
+        "source": "**",
+        "destination": "/index.html"
+      }
+    ]
+  }
+}
