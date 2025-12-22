@@ -70,9 +70,30 @@ class CategoryStoreService {
           .collection('markets')
           .where(FieldPath.documentId, whereIn: chunk)
           .get();
-      stores.addAll(
-        query.docs.map((doc) => StoreModel.fromMap(doc.id, doc.data())),
-      );
+
+      // جلب الإحصائيات لكل متجر في هذا الجزء
+      final storeList = await Future.wait(query.docs.map((doc) async {
+        final data = doc.data();
+        try {
+          final statsDoc = await _firestore
+              .collection('markets')
+              .doc(doc.id)
+              .collection('statistics')
+              .doc('rating')
+              .get();
+          
+          if (statsDoc.exists) {
+            final statsData = statsDoc.data();
+            data['averageRating'] = statsData?['averageRating'];
+            data['totalReviews'] = statsData?['totalReviews'];
+          }
+        } catch (e) {
+          // تجاهل الخطأ واكمل بالقيم الافتراضية
+        }
+        return StoreModel.fromMap(doc.id, data);
+      }));
+
+      stores.addAll(storeList);
     }
     // Optional: sort stores as the same order of storeIds
     final Map<String, int> orderMap = {
@@ -83,6 +104,25 @@ class CategoryStoreService {
   }
   Future<List<StoreModel>> getAllStores() async {
     final query = await _firestore.collection('markets').get();
-    return query.docs.map((doc) => StoreModel.fromMap(doc.id, doc.data())).toList();
+    
+    return await Future.wait(query.docs.map((doc) async {
+      final data = doc.data();
+      try {
+        final statsDoc = await _firestore
+            .collection('markets')
+            .doc(doc.id)
+            .collection('statistics')
+            .doc('rating')
+            .get();
+        if (statsDoc.exists) {
+          final statsData = statsDoc.data();
+          data['averageRating'] = statsData?['averageRating'];
+          data['totalReviews'] = statsData?['totalReviews'];
+        }
+      } catch (e) {
+        // ignore
+      }
+      return StoreModel.fromMap(doc.id, data);
+    }));
   }
 }

@@ -24,6 +24,8 @@ class StoreModel {
   final WeeklyWorkingHours? workingHours; // مواعيد العمل
   final int numberOfProducts; // عدد المنتجات المسموح بها
   final DateTime createdAt;
+  final double averageRating;
+  final int totalReviews;
 
   StoreModel({
     required this.id,
@@ -46,6 +48,8 @@ class StoreModel {
     this.workingHours,
     required this.numberOfProducts,
     required this.createdAt,
+    this.averageRating = 0.0,
+    this.totalReviews = 0,
   });
 
   factory StoreModel.fromMap(String id, Map<String, dynamic> map) {
@@ -89,6 +93,8 @@ class StoreModel {
       workingHours: workingHours,
       numberOfProducts: map['numberOfProducts'] ?? 0,
       createdAt: (map['createdAt'] as Timestamp).toDate(),
+      averageRating: (map['averageRating'] ?? 0.0).toDouble(),
+      totalReviews: map['totalReviews'] ?? 0,
     );
   }
 
@@ -113,6 +119,8 @@ class StoreModel {
       'workingHours': workingHours?.toMap(),
       'numberOfProducts': numberOfProducts,
       'createdAt': Timestamp.fromDate(createdAt),
+      'averageRating': averageRating,
+      'totalReviews': totalReviews,
     };
   }
 }

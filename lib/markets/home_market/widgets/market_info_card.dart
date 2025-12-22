@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:share_plus/share_plus.dart';
+import 'package:go_router/go_router.dart';
 
 class MarketInfoCard extends StatelessWidget {
   final String marketName;
@@ -17,6 +18,7 @@ class MarketInfoCard extends StatelessWidget {
   final String? facebook;
   final String? instagram;
   final String? marketLink; // نستخدم رابط المتجر للمشاركة
+  final String? storeId; // معرف المتجر للتقييمات
 
   const MarketInfoCard({
     super.key,
@@ -31,6 +33,7 @@ class MarketInfoCard extends StatelessWidget {
     this.facebook,
     this.instagram,
     this.marketLink,
+    this.storeId,
   });
 
   // 🔹 تنسيق الأرقام (1000 → 1,000)
@@ -149,27 +152,51 @@ class MarketInfoCard extends StatelessWidget {
                       ),
                       const SizedBox(height: 6),
 
-                      // 🔹 التقييم
-                      Row(
-                        children: [
-                          const Icon(Icons.star, size: 18, color: Colors.amber),
-                          const SizedBox(width: 4),
-                          Text(
-                            rating.toStringAsFixed(1),
-                            style: const TextStyle(
-                              fontWeight: FontWeight.bold,
-                              fontSize: 14,
-                            ),
+                      // 🔹 التقييم (قابل للنقر لعرض التقييمات)
+                      GestureDetector(
+                        onTap: storeId != null
+                            ? () => context.push(
+                                  '/store-reviews?storeId=$storeId&storeName=${Uri.encodeComponent(marketName)}',
+                                )
+                            : null,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 4,
                           ),
-                          const SizedBox(width: 4),
-                          Text(
-                            '(+${_formatWithCommas(reviewCount)})',
-                            style: const TextStyle(
-                              color: Colors.grey,
-                              fontSize: 12,
-                            ),
+                          decoration: BoxDecoration(
+                            color: Colors.amber.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(8),
                           ),
-                        ],
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Icon(Icons.star, size: 18, color: Colors.amber),
+                              const SizedBox(width: 4),
+                              Text(
+                                rating.toStringAsFixed(1),
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 14,
+                                ),
+                              ),
+                              const SizedBox(width: 4),
+                              Text(
+                                '(+${_formatWithCommas(reviewCount)})',
+                                style: const TextStyle(
+                                  color: Colors.grey,
+                                  fontSize: 12,
+                                ),
+                              ),
+                              const SizedBox(width: 4),
+                              const Icon(
+                                Icons.chevron_left,
+                                size: 16,
+                                color: Colors.grey,
+                              ),
+                            ],
+                          ),
+                        ),
                       ),
                     ],
                   ),

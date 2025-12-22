@@ -128,4 +128,32 @@ class CategoryFilterViewModel extends ChangeNotifier {
     stores = [];
     notifyListeners();
   }
+
+  /// Select a category and fetch its stores (for home page)
+  Future<void> selectCategoryAndFetchStores(String categoryId) async {
+    selectedCategoryId = categoryId;
+    selectedSubCategoryId = null;
+    subCategories = [];
+    stores = [];
+
+    isLoading = true;
+    notifyListeners();
+
+    try {
+      final links = await _storeService.getStoreLinksForCategory(categoryId);
+      stores = await _storeService.getStoresByIds(links);
+    } finally {
+      isLoading = false;
+      notifyListeners();
+    }
+  }
+
+  /// Clear category filter (for home page)
+  void clearCategoryFilter() {
+    selectedCategoryId = null;
+    selectedSubCategoryId = null;
+    subCategories = [];
+    stores = [];
+    notifyListeners();
+  }
 }

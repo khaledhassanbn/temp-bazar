@@ -10,9 +10,9 @@ import '../../Markets_after_category/viewmodel/category_filter_viewmodel.dart';
 import '../../saved_locations/viewmodels/saved_locations_viewmodel.dart';
 import '../../saved_locations/widgets/location_app_bar_widget.dart';
 import '../../saved_locations/widgets/saved_locations_sheet.dart';
-import '../widgets/home_auto_scrolling_ads.dart';
-import '../widgets/home_categories_stores_section.dart';
-import '../widgets/best_rated_stores_section.dart';
+import '../widgets/home_promotional_banner.dart';
+import '../widgets/home_categories_icons.dart';
+import '../widgets/home_stores_section.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -67,7 +67,7 @@ class _HomePageState extends State<HomePage> {
     return Directionality(
       textDirection: TextDirection.rtl,
       child: Scaffold(
-        backgroundColor: Colors.white,
+        backgroundColor: const Color(0xFFF8F9FA),
         body: Stack(
           children: [
             // المحتوى الرئيسي
@@ -76,92 +76,61 @@ class _HomePageState extends State<HomePage> {
                 : CustomScrollView(
                     slivers: [
                       // =======================================================================
-                      // 🔹 SliverAppBar - تصميم مثل Talabat (برتقالي)
+                      // 🔹 SliverAppBar - تصميم حديث
                       // =======================================================================
                       SliverAppBar(
                         floating: true,
                         snap: true,
                         pinned: true,
-                        expandedHeight: 120,
-                        collapsedHeight: 120,
+                        expandedHeight: 130,
+                        collapsedHeight: 130,
                         backgroundColor: AppColors.mainColor,
                         elevation: 0,
                         surfaceTintColor: AppColors.mainColor,
                         flexibleSpace: FlexibleSpaceBar(
                           background: Container(
-                            color: AppColors.mainColor,
+                            decoration: BoxDecoration(
+                              gradient: LinearGradient(
+                                colors: [
+                                  AppColors.mainColor,
+                                  AppColors.mainColor.withOpacity(0.9),
+                                ],
+                                begin: Alignment.topCenter,
+                                end: Alignment.bottomCenter,
+                              ),
+                            ),
                             child: SafeArea(
                               child: Padding(
                                 padding: const EdgeInsets.symmetric(
                                   horizontal: 16,
-                                  vertical: 6,
+                                  vertical: 8,
                                 ),
                                 child: Column(
                                   mainAxisAlignment: MainAxisAlignment.center,
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
                                     // ---------------------------------------------------------------
-                                    // 🔹 عنوان التوصيل + أيقونة السلة
+                                    // 🔹 عنوان التوصيل + أيقونات
                                     // ---------------------------------------------------------------
                                     Row(
                                       children: [
+                                        // عنوان التوصيل
                                         const Expanded(
                                           child: LocationAppBarWidget(),
                                         ),
-                                        // أيقونة السلة
-                                        GestureDetector(
+                                        // أيقونة السلة (على اليسار)
+                                        _buildIconButton(
+                                          icon: Icons.shopping_cart_outlined,
+                                          badgeCount: cartViewModel.itemCount,
                                           onTap: () => context.go('/CartPage'),
-                                          child: Stack(
-                                            clipBehavior: Clip.none,
-                                            children: [
-                                              Container(
-                                                width: 40,
-                                                height: 40,
-                                                decoration: BoxDecoration(
-                                                  color: Colors.white.withOpacity(0.2),
-                                                  borderRadius: BorderRadius.circular(10),
-                                                ),
-                                                child: const Icon(
-                                                  Icons.shopping_cart_outlined,
-                                                  color: Colors.white,
-                                                  size: 22,
-                                                ),
-                                              ),
-                                              if (cartViewModel.itemCount > 0)
-                                                Positioned(
-                                                  left: -4,
-                                                  top: -4,
-                                                  child: Container(
-                                                    padding: const EdgeInsets.all(4),
-                                                    decoration: const BoxDecoration(
-                                                      color: Colors.red,
-                                                      shape: BoxShape.circle,
-                                                    ),
-                                                    constraints: const BoxConstraints(
-                                                      minWidth: 18,
-                                                      minHeight: 18,
-                                                    ),
-                                                    child: Text(
-                                                      '${cartViewModel.itemCount}',
-                                                      style: const TextStyle(
-                                                        color: Colors.white,
-                                                        fontSize: 10,
-                                                        fontWeight: FontWeight.bold,
-                                                      ),
-                                                      textAlign: TextAlign.center,
-                                                    ),
-                                                  ),
-                                                ),
-                                            ],
-                                          ),
                                         ),
                                       ],
                                     ),
                                     
-                                    const SizedBox(height: 10),
+                                    const SizedBox(height: 12),
                                     
                                     // ---------------------------------------------------------------
-                                    // 🔹 شريط البحث (أبيض على الخلفية البرتقالية)
+                                    // 🔹 شريط البحث
                                     // ---------------------------------------------------------------
                                     GestureDetector(
                                       onTap: () {
@@ -172,25 +141,32 @@ class _HomePageState extends State<HomePage> {
                                         }
                                       },
                                       child: Container(
-                                        height: 42,
+                                        height: 46,
                                         decoration: BoxDecoration(
                                           color: Colors.white,
-                                          borderRadius: BorderRadius.circular(8),
+                                          borderRadius: BorderRadius.circular(12),
+                                          boxShadow: [
+                                            BoxShadow(
+                                              color: Colors.black.withOpacity(0.1),
+                                              blurRadius: 8,
+                                              offset: const Offset(0, 2),
+                                            ),
+                                          ],
                                         ),
                                         child: Row(
                                           children: [
-                                            const SizedBox(width: 12),
+                                            const SizedBox(width: 14),
                                             Icon(
                                               Icons.search,
-                                              color: Colors.grey[500],
+                                              color: Colors.grey[400],
                                               size: 22,
                                             ),
-                                            const SizedBox(width: 8),
+                                            const SizedBox(width: 10),
                                             Expanded(
                                               child: Text(
-                                                "ابحث عن منتج أو متجر...",
+                                                "ابحث عن متجر أو منتج ...",
                                                 style: TextStyle(
-                                                  color: Colors.grey[500],
+                                                  color: Colors.grey[400],
                                                   fontSize: 14,
                                                 ),
                                               ),
@@ -216,22 +192,25 @@ class _HomePageState extends State<HomePage> {
                           children: [
                             const SizedBox(height: 16),
 
-                            // 🔹 إعلانات متحركة
-                            const HomeAutoScrollingAds(),
+                            // 🔹 بانر العروض الترويجية
+                            const HomePromotionalBanner()
+                                .animate()
+                                .fadeIn(duration: 400.ms)
+                                .slideY(begin: 0.1, end: 0),
 
-                            const SizedBox(height: 24),
+                            const SizedBox(height: 8),
 
-                            // ===================================================================
-                            // 🔹 أفضل المطاعم تصنيفاً
-                            // ===================================================================
-                            const BestRatedStoresSection(),
+                            // 🔹 أيقونات الفئات
+                            const HomeCategoriesIcons()
+                                .animate()
+                                .fadeIn(duration: 400.ms, delay: 100.ms),
 
-                            const SizedBox(height: 24),
+                            const SizedBox(height: 8),
 
-                            // ===================================================================
-                            // 🔹 الأقسام داخل الفئات
-                            // ===================================================================
-                            const HomeCategoriesStoresSection(),
+                            // 🔹 قسم المتاجر
+                            const HomeStoresSection()
+                                .animate()
+                                .fadeIn(duration: 400.ms, delay: 200.ms),
 
                             const SizedBox(height: 100),
                           ],
@@ -251,6 +230,60 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
+  /// بناء زر أيقونة
+  Widget _buildIconButton({
+    required IconData icon,
+    int badgeCount = 0,
+    required VoidCallback onTap,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          Container(
+            width: 42,
+            height: 42,
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.2),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Icon(
+              icon,
+              color: Colors.white,
+              size: 22,
+            ),
+          ),
+          if (badgeCount > 0)
+            Positioned(
+              left: -4,
+              top: -4,
+              child: Container(
+                padding: const EdgeInsets.all(4),
+                decoration: const BoxDecoration(
+                  color: Colors.red,
+                  shape: BoxShape.circle,
+                ),
+                constraints: const BoxConstraints(
+                  minWidth: 20,
+                  minHeight: 20,
+                ),
+                child: Text(
+                  '$badgeCount',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 11,
+                    fontWeight: FontWeight.bold,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
   /// طبقة الحجب عند عدم تحديد الموقع
   Widget _buildLocationBlockingOverlay() {
     return GestureDetector(
@@ -263,7 +296,14 @@ class _HomePageState extends State<HomePage> {
             padding: const EdgeInsets.all(24),
             decoration: BoxDecoration(
               color: Colors.white,
-              borderRadius: BorderRadius.circular(16),
+              borderRadius: BorderRadius.circular(20),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.2),
+                  blurRadius: 20,
+                  offset: const Offset(0, 10),
+                ),
+              ],
             ),
             child: Column(
               mainAxisSize: MainAxisSize.min,
@@ -272,20 +312,25 @@ class _HomePageState extends State<HomePage> {
                   width: 80,
                   height: 80,
                   decoration: BoxDecoration(
-                    color: AppColors.mainColor.withOpacity(0.1),
+                    gradient: LinearGradient(
+                      colors: [
+                        AppColors.mainColor,
+                        AppColors.mainColor.withOpacity(0.7),
+                      ],
+                    ),
                     shape: BoxShape.circle,
                   ),
-                  child: Icon(
+                  child: const Icon(
                     Icons.location_on,
                     size: 40,
-                    color: AppColors.mainColor,
+                    color: Colors.white,
                   ),
                 ),
                 const SizedBox(height: 20),
                 Text(
                   'أين تريد التوصيل؟',
                   style: TextStyle(
-                    fontSize: 20,
+                    fontSize: 22,
                     fontWeight: FontWeight.bold,
                     color: Colors.grey[800],
                   ),
@@ -309,8 +354,9 @@ class _HomePageState extends State<HomePage> {
                       foregroundColor: Colors.white,
                       padding: const EdgeInsets.symmetric(vertical: 14),
                       shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8),
+                        borderRadius: BorderRadius.circular(12),
                       ),
+                      elevation: 4,
                     ),
                     child: const Text(
                       'اختر الموقع',

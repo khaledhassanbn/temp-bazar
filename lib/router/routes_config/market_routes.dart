@@ -7,10 +7,26 @@ import 'package:bazar_suez/markets/mangement_market/pages/manage_products_page.d
 import 'package:bazar_suez/markets/my_order/pages/MarketOrdersPage.dart';
 import 'package:bazar_suez/markets/my_order/pages/PastOrdersPage.dart';
 import 'package:bazar_suez/markets/statistics/pages/sales_stats_page.dart';
+import 'package:bazar_suez/markets/user_orders/pages/user_orders_page.dart';
+import 'package:bazar_suez/markets/store_reviews/pages/store_reviews_page.dart';
 import 'package:go_router/go_router.dart';
 import 'route_utils.dart';
 
 final marketRoutes = [
+  // صفحة طلبات المستخدم
+  GoRoute(
+    path: '/user-orders',
+    builder: (context, state) => const UserOrdersPage(),
+  ),
+  // صفحة تقييمات المتجر
+  GoRoute(
+    path: '/store-reviews',
+    builder: (context, state) {
+      final storeId = state.uri.queryParameters['storeId'] ?? '';
+      final storeName = state.uri.queryParameters['storeName'] ?? 'متجر';
+      return StoreReviewsPage(storeId: storeId, storeName: storeName);
+    },
+  ),
   GoRoute(
     path: '/HomeMarketPage',
     builder: (context, state) {

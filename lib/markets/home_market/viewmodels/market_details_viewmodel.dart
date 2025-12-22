@@ -134,7 +134,27 @@ class MarketDetailsViewModel extends ChangeNotifier {
       if (!doc.exists) {
         _errorMessage = 'لم يتم العثور على المتجر';
       } else {
-        _store = StoreModel.fromMap(doc.id, doc.data() as Map<String, dynamic>);
+        final data = doc.data() as Map<String, dynamic>;
+        
+        // جلب إحصائيات التقييم من الساب-كولكشن
+        try {
+          final statsDoc = await _firestore
+              .collection('markets')
+              .doc(doc.id)
+              .collection('statistics')
+              .doc('rating')
+              .get();
+          
+          if (statsDoc.exists) {
+            final statsData = statsDoc.data();
+            data['averageRating'] = statsData?['averageRating'];
+            data['totalReviews'] = statsData?['totalReviews'];
+          }
+        } catch (e) {
+          debugPrint('خطأ في جلب إحصائيات التقييم: $e');
+        }
+
+        _store = StoreModel.fromMap(doc.id, data);
         // ابدأ بث الفئات حسب الهيكل الجديد (من جذر products)
         startCategoriesStream();
       }

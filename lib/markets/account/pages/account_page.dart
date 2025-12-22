@@ -318,7 +318,7 @@ class _AccountPageState extends State<AccountPage> {
           _MenuTileData(
             icon: Icons.receipt_long_outlined,
             label: 'طلباتي السابقة',
-            onTap: () => _showSnack('لا توجد طلبات للمستخدم في الوقت الحالي'),
+            onTap: () => context.push('/user-orders'),
           ),
           _MenuTileData(
             icon: Icons.confirmation_num_outlined,

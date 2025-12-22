@@ -44,6 +44,7 @@ String generateOrderId(String marketId) {
 
 class _CartPageState extends State<CartPage> {
   String? _marketName;
+  String? _marketLogo;
   int _cartItemCount = 0;
   final GlobalKey<CartUserInfoSectionState> _userInfoKey =
       GlobalKey<CartUserInfoSectionState>();
@@ -54,7 +55,7 @@ class _CartPageState extends State<CartPage> {
     _fetchMarketName();
   }
 
-  /// جلب اسم المتجر من Firestore
+  /// جلب بيانات المتجر من Firestore
   Future<void> _fetchMarketName() async {
     final cartViewModel = Provider.of<CartViewModel>(context, listen: false);
     if (cartViewModel.isEmpty) {
@@ -74,6 +75,7 @@ class _CartPageState extends State<CartPage> {
         final data = doc.data();
         setState(() {
           _marketName = data?['name'] ?? 'المتجر';
+          _marketLogo = data?['logoUrl'];
         });
       }
     } catch (e) {
@@ -473,6 +475,9 @@ class _CartPageState extends State<CartPage> {
         'orderId': orderId,
         'userId':
             currentUser?.uid ?? '', // إضافة معرف المستخدم في المستوى العلوي
+        'storeId': marketId, // معرف المتجر للتقييم
+        'storeName': _marketName ?? 'متجر', // اسم المتجر للعرض
+        'storeLogo': _marketLogo, // شعار المتجر للعرض
         'createdAt': FieldValue.serverTimestamp(),
         'status': 'pending', // حالة الطلب
         'customerInfo': {
