@@ -57,9 +57,43 @@ class DeliveryRequestService {
         .where('marketId', isEqualTo: marketId)
         .where('status', isEqualTo: 'rejected')
         .snapshots()
-        .map((snapshot) => snapshot.docs
-            .map((doc) => {'id': doc.id, ...doc.data()})
-            .toList());
+        .map(
+          (snapshot) => snapshot.docs
+              .map((doc) => {'id': doc.id, ...doc.data()})
+              .toList(),
+        );
+  }
+
+  /// ✅ stream all delivery requests for a specific market
+  /// يُستخدم لعرض حالة الطلب ورقم المندوب داخل تطبيق التاجر/الزبون
+  Stream<List<Map<String, dynamic>>> streamRequestsForMarket(
+    String marketId,
+  ) {
+    return _firestore
+        .collection('request delivery')
+        .where('marketId', isEqualTo: marketId)
+        .snapshots()
+        .map(
+          (snapshot) => snapshot.docs
+              .map((doc) => {'id': doc.id, ...doc.data()})
+              .toList(),
+        );
+  }
+
+  /// ✅ stream all delivery requests for a specific customer (user)
+  /// تستخدم فى صفحة طلبات المستخدم لعرض حالة مكتب الشحن
+  Stream<List<Map<String, dynamic>>> streamRequestsForCustomer(
+    String customerId,
+  ) {
+    return _firestore
+        .collection('request delivery')
+        .where('customerId', isEqualTo: customerId)
+        .snapshots()
+        .map(
+          (snapshot) => snapshot.docs
+              .map((doc) => {'id': doc.id, ...doc.data()})
+              .toList(),
+        );
   }
 
   // حذف طلب توصيل بعد معالجته

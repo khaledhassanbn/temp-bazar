@@ -9,10 +9,10 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
-import 'package:bazar_suez/markets/my_order/widget/OrderCollapsibleHeader.dart';
-import 'package:bazar_suez/markets/my_order/widget/OrderCard.dart';
-import 'package:bazar_suez/markets/my_order/widget/OrderStats.dart';
-import 'package:bazar_suez/markets/my_order/viewmodels/MarketOrdersViewModel.dart';
+import 'package:bazar_suez/markets/order_of_markets/widget/OrderCollapsibleHeader.dart';
+import 'package:bazar_suez/markets/order_of_markets/widget/OrderCard.dart';
+import 'package:bazar_suez/markets/order_of_markets/widget/OrderStats.dart';
+import 'package:bazar_suez/markets/order_of_markets/viewmodels/MarketOrdersViewModel.dart';
 
 class MarketOrdersPage extends StatefulWidget {
   final String marketId;

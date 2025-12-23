@@ -345,6 +345,15 @@ class _CreateStoreModernPageState extends State<CreateStoreModernPage> {
                                 },
                                 activeColor: AppColors.mainColor,
                               ),
+                              SwitchListTile(
+                                title: const Text("تفعيل التجديد التلقائي"),
+                                subtitle: const Text(
+                                  "عند توفر رصيد كافٍ سيتم التجديد تلقائياً قبل انتهاء الترخيص",
+                                ),
+                                value: vm.autoRenewEnabled,
+                                activeColor: AppColors.mainColor,
+                                onChanged: (v) => vm.setAutoRenewEnabled(v),
+                              ),
                               const SizedBox(height: 24),
 
                               // ✅ زرار إنشاء المتجر

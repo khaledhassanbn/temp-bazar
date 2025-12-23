@@ -3,6 +3,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:bazar_suez/theme/app_color.dart';
 import '../services/user_orders_service.dart';
 import '../widgets/user_order_card.dart';
+import 'package:bazar_suez/markets/order_of_markets/services/delivery_request_service.dart';
 
 /// صفحة طلبات المستخدم السابقة
 class UserOrdersPage extends StatefulWidget {
@@ -15,6 +16,8 @@ class UserOrdersPage extends StatefulWidget {
 class _UserOrdersPageState extends State<UserOrdersPage> {
   final UserOrdersService _ordersService = UserOrdersService();
   final FirebaseAuth _auth = FirebaseAuth.instance;
+  final DeliveryRequestService _deliveryRequestService =
+      DeliveryRequestService();
 
   @override
   Widget build(BuildContext context) {
@@ -22,13 +25,8 @@ class _UserOrdersPageState extends State<UserOrdersPage> {
 
     if (user == null) {
       return Scaffold(
-        appBar: AppBar(
-          title: const Text('طلباتك'),
-          centerTitle: true,
-        ),
-        body: const Center(
-          child: Text('يجب تسجيل الدخول لعرض طلباتك'),
-        ),
+        appBar: AppBar(title: const Text('طلباتك'), centerTitle: true),
+        body: const Center(child: Text('يجب تسجيل الدخول لعرض طلباتك')),
       );
     }
 
@@ -101,28 +99,47 @@ class _UserOrdersPageState extends State<UserOrdersPage> {
                     const SizedBox(height: 8),
                     Text(
                       'ابدأ بتصفح المتاجر واطلب الآن!',
-                      style: TextStyle(
-                        fontSize: 14,
-                        color: Colors.grey[600],
-                      ),
+                      style: TextStyle(fontSize: 14, color: Colors.grey[600]),
                     ),
                   ],
                 ),
               );
             }
 
-            return ListView.builder(
-              padding: const EdgeInsets.symmetric(vertical: 16),
-              itemCount: orders.length,
-              itemBuilder: (context, index) {
-                final order = orders[index];
-                final orderId = order['documentId'] as String? ?? '';
+            // 🔁 الاستماع لطلبات التوصيل الخاصة بهذا المستخدم
+            return StreamBuilder<List<Map<String, dynamic>>>(
+              stream: _deliveryRequestService.streamRequestsForCustomer(
+                user.uid,
+              ),
+              builder: (context, deliverySnapshot) {
+                final deliveryRequests = deliverySnapshot.data ?? [];
 
-                return UserOrderCard(
-                  order: order,
-                  orderId: orderId,
-                  onRatingSubmitted: () {
-                    setState(() {});
+                // map: orderDocumentId -> deliveryRequest
+                final Map<String, Map<String, dynamic>> deliveryByOrderId = {};
+                for (final req in deliveryRequests) {
+                  final orderDocumentId =
+                      req['orderDocumentId'] as String? ?? '';
+                  if (orderDocumentId.isEmpty) continue;
+                  deliveryByOrderId[orderDocumentId] = req;
+                }
+
+                return ListView.builder(
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  itemCount: orders.length,
+                  itemBuilder: (context, index) {
+                    final order = orders[index];
+                    final orderId = order['documentId'] as String? ?? '';
+
+                    final deliveryInfo = deliveryByOrderId[orderId];
+
+                    return UserOrderCard(
+                      order: order,
+                      orderId: orderId,
+                      deliveryInfo: deliveryInfo,
+                      onRatingSubmitted: () {
+                        setState(() {});
+                      },
+                    );
                   },
                 );
               },

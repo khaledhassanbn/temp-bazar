@@ -7,25 +7,46 @@ import 'store_rating_dialog.dart';
 import 'delivery_rating_dialog.dart';
 import 'package:go_router/go_router.dart';
 import 'package:bazar_suez/services/review_service.dart';
+import 'package:flutter/services.dart';
 
 /// كارت عرض طلب المستخدم
 class UserOrderCard extends StatelessWidget {
   final Map<String, dynamic> order;
   final String orderId;
   final VoidCallback onRatingSubmitted;
+  final Map<String, dynamic>?
+  deliveryInfo; // بيانات الطلب من تطبيق المكاتب (إن وجدت)
 
   const UserOrderCard({
     super.key,
     required this.order,
     required this.orderId,
     required this.onRatingSubmitted,
+    this.deliveryInfo,
   });
 
   @override
   Widget build(BuildContext context) {
-    final status = order['status'] as String? ?? 'pending';
-    final statusArabic = UserOrdersService.getStatusArabic(status);
-    final statusColor = Color(UserOrdersService.getStatusColor(status));
+    final statusFromOrder = order['status'] as String? ?? 'pending';
+
+    // لو فيه طلب توصيل (request delivery) لهذا الطلب، نستخدم حالته
+    final String effectiveStatus;
+    final String statusArabic;
+    final Color statusColor;
+
+    if (deliveryInfo != null && deliveryInfo!['status'] != null) {
+      effectiveStatus = deliveryInfo!['status'] as String? ?? statusFromOrder;
+      statusArabic = UserOrdersService.getDeliveryStatusArabic(effectiveStatus);
+      statusColor = Color(
+        UserOrdersService.getDeliveryStatusColor(effectiveStatus),
+      );
+    } else {
+      effectiveStatus = statusFromOrder;
+      statusArabic = UserOrdersService.getLegacyStatusArabic(effectiveStatus);
+      statusColor = Color(
+        UserOrdersService.getLegacyStatusColor(effectiveStatus),
+      );
+    }
 
     final createdAt = order['createdAt'] as Timestamp?;
     final dateStr = createdAt != null
@@ -37,30 +58,34 @@ class UserOrderCard extends StatelessWidget {
     String marketName = 'متجر';
     String? marketLogo;
     String marketId = ''; // default empty
-    
+
     // محاولة جلب معلومات المتجر من المنتج الأول
     if (items.isNotEmpty) {
       final firstItem = items[0] as Map<String, dynamic>?;
       marketLogo = firstItem?['productImage'] as String?;
-      
+
       // البحث عن storeId في المنتج
-      marketId = firstItem?['storeId'] as String? ??
+      marketId =
+          firstItem?['storeId'] as String? ??
           firstItem?['marketId'] as String? ??
           firstItem?['marketLink'] as String? ??
           '';
     }
-    
+
     // البحث عن اسم المتجر في الحقول المختلفة
-    marketName = order['storeName'] as String? ??
+    marketName =
+        order['storeName'] as String? ??
         order['marketName'] as String? ??
         'متجر';
-    
+
     // البحث عن storeId في الطلب نفسه (أولوية أعلى)
     if (order['storeId'] != null && (order['storeId'] as String).isNotEmpty) {
       marketId = order['storeId'] as String;
-    } else if (order['marketId'] != null && (order['marketId'] as String).isNotEmpty) {
+    } else if (order['marketId'] != null &&
+        (order['marketId'] as String).isNotEmpty) {
       marketId = order['marketId'] as String;
-    } else if (order['marketLink'] != null && (order['marketLink'] as String).isNotEmpty) {
+    } else if (order['marketLink'] != null &&
+        (order['marketLink'] as String).isNotEmpty) {
       marketId = order['marketLink'] as String;
     }
 
@@ -70,8 +95,35 @@ class UserOrderCard extends StatelessWidget {
     final hasRated = storeRating != null;
     final userRating = storeRating?['rating'] as int?;
 
-    final isCompleted = status.toLowerCase() == 'completed';
-    
+    final isCompleted = effectiveStatus.toLowerCase() == 'completed';
+
+    // ================== بيانات المندوب المعروضة للزبون ==================
+    String driverName = '';
+    String driverPhone = '';
+
+    // 1) لو الطلب داخل نظام المكاتب → نستخدم بيانات المندوب من request delivery
+    if (deliveryInfo != null) {
+      driverName = (deliveryInfo!['assignedDriverName'] ?? '').toString();
+      driverPhone = (deliveryInfo!['assignedDriverPhone'] ?? '').toString();
+    }
+    // 2) لو مفيش DeliveryInfo، لكن التاجر اختار "هسلمه بنفسى"
+    //    نكتشف ذلك من حالة الطلب: delivered / تم التسليم للطيار
+    else if (effectiveStatus.toLowerCase() == 'delivered' ||
+        statusArabic == 'تم التسليم للطيار') {
+      // نحاول إيجاد رقم هاتف المتجر من الطلب
+      final dynamic rawStorePhone =
+          order['marketPhone'] ??
+          order['storePhone'] ??
+          order['store_phone'] ??
+          order['phone'] ??
+          order['market_phone'];
+
+      final String storePhone = rawStorePhone?.toString() ?? '';
+      // نعرض على الأقل "مندوب المتجر" حتى لو لم يتوفر رقم الهاتف
+      driverName = 'مندوب المتجر';
+      driverPhone = storePhone;
+    }
+
     // التحقق من إمكانية التقييم (يجب أن يكون هناك storeId)
     final canRate = isCompleted && marketId.isNotEmpty;
 
@@ -105,10 +157,7 @@ class UserOrderCard extends StatelessWidget {
               children: [
                 Text(
                   dateStr,
-                  style: TextStyle(
-                    fontSize: 13,
-                    color: Colors.grey[600],
-                  ),
+                  style: TextStyle(fontSize: 13, color: Colors.grey[600]),
                 ),
                 Container(
                   padding: const EdgeInsets.symmetric(
@@ -132,6 +181,92 @@ class UserOrderCard extends StatelessWidget {
             ),
           ),
 
+          // معلومات المندوب عندما يكون الطلب فى نظام الشحن
+          // تُعرض فقط إذا لم يتم تسليم الطلب بعد
+          if ((driverName.isNotEmpty || driverPhone.isNotEmpty) &&
+              effectiveStatus.toLowerCase() != 'completed')
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              child: Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 10,
+                ),
+                decoration: BoxDecoration(
+                  // نفس درجة لون حالة الطلب فى الأعلى لمزيد من الاتساق البصري
+                  color: statusColor.withOpacity(0.08),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: statusColor.withOpacity(0.35)),
+                ),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 32,
+                      height: 32,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: Colors.orange.withOpacity(0.15),
+                      ),
+                      child: const Icon(
+                        Icons.delivery_dining,
+                        color: Colors.orange,
+                        size: 18,
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          if (driverName.isNotEmpty)
+                            Text(
+                              'المندوب: $driverName',
+                              style: const TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          if (driverPhone.isNotEmpty)
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: Text(
+                                    'هاتف المندوب: $driverPhone',
+                                    style: const TextStyle(
+                                      fontSize: 13,
+                                      color: Colors.black87,
+                                    ),
+                                  ),
+                                ),
+                                IconButton(
+                                  icon: const Icon(
+                                    Icons.copy,
+                                    size: 18,
+                                    color: Colors.blue,
+                                  ),
+                                  onPressed: () {
+                                    Clipboard.setData(
+                                      ClipboardData(text: driverPhone),
+                                    );
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(
+                                        content: Text(
+                                          'تم نسخ رقم هاتف المندوب',
+                                        ),
+                                      ),
+                                    );
+                                  },
+                                ),
+                              ],
+                            ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+
           // معلومات المتجر
           Padding(
             padding: const EdgeInsets.all(16),
@@ -151,10 +286,8 @@ class UserOrderCard extends StatelessWidget {
                           child: Image.network(
                             marketLogo,
                             fit: BoxFit.cover,
-                            errorBuilder: (_, __, ___) => const Icon(
-                              Icons.store,
-                              color: Colors.grey,
-                            ),
+                            errorBuilder: (_, __, ___) =>
+                                const Icon(Icons.store, color: Colors.grey),
                           ),
                         )
                       : const Icon(Icons.store, color: Colors.grey),
@@ -175,10 +308,7 @@ class UserOrderCard extends StatelessWidget {
                       const SizedBox(height: 4),
                       Text(
                         'رمز الطلب: ${order['orderId'] ?? orderId}',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: Colors.grey[600],
-                        ),
+                        style: TextStyle(fontSize: 12, color: Colors.grey[600]),
                       ),
                     ],
                   ),
@@ -189,10 +319,7 @@ class UserOrderCard extends StatelessWidget {
                     Icon(Icons.expand_more, color: Colors.grey[400]),
                     Text(
                       '${items.length} منتج',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: Colors.grey[600],
-                      ),
+                      style: TextStyle(fontSize: 12, color: Colors.grey[600]),
                     ),
                   ],
                 ),
@@ -266,7 +393,8 @@ class UserOrderCard extends StatelessWidget {
                 // زر اطلب مجدداً
                 OutlinedButton(
                   onPressed: marketId.isNotEmpty
-                      ? () => context.push('/HomeMarketPage?marketLink=$marketId')
+                      ? () =>
+                            context.push('/HomeMarketPage?marketLink=$marketId')
                       : null,
                   style: OutlinedButton.styleFrom(
                     shape: RoundedRectangleBorder(
@@ -333,44 +461,51 @@ class UserOrderCard extends StatelessWidget {
                     ],
                   )
                 : canRate
-                    ? GestureDetector(
-                        onTap: () => _showRatingDialog(context, marketId, marketName, marketLogo),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(vertical: 10),
-                          decoration: BoxDecoration(
-                            color: AppColors.mainColor,
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                          child: const Center(
-                            child: Text(
-                              'قيّم الطلب',
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontSize: 14,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
+                ? GestureDetector(
+                    onTap: () => _showRatingDialog(
+                      context,
+                      marketId,
+                      marketName,
+                      marketLogo,
+                    ),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(vertical: 10),
+                      decoration: BoxDecoration(
+                        color: AppColors.mainColor,
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: const Center(
+                        child: Text(
+                          'قيّم الطلب',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 14,
+                            fontWeight: FontWeight.bold,
                           ),
                         ),
-                      )
-                    : isCompleted && marketId.isEmpty
-                        ? Center(
-                            child: Text(
-                              'لا يمكن التقييم - معرف المتجر غير متوفر',
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: Colors.grey[500],
-                              ),
-                            ),
-                          )
-                        : const SizedBox.shrink(),
+                      ),
+                    ),
+                  )
+                : isCompleted && marketId.isEmpty
+                ? Center(
+                    child: Text(
+                      'لا يمكن التقييم - معرف المتجر غير متوفر',
+                      style: TextStyle(fontSize: 12, color: Colors.grey[500]),
+                    ),
+                  )
+                : const SizedBox.shrink(),
           ),
         ],
       ),
     );
   }
 
-  void _showRatingDialog(BuildContext context, String storeId, String storeName, String? storeLogo) {
+  void _showRatingDialog(
+    BuildContext context,
+    String storeId,
+    String storeName,
+    String? storeLogo,
+  ) {
     final reviewService = ReviewService();
 
     showModalBottomSheet(

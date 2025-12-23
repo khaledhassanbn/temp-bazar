@@ -38,9 +38,14 @@ class MarketOrdersViewModel extends ChangeNotifier {
   String? error;
   Timer? _timer;
   StreamSubscription? _rejectedRequestsSubscription;
+  StreamSubscription? _deliveryRequestsSubscription;
   
   // تخزين رسائل الرفض لعرضها للتاجر
   final Map<String, String> rejectedMessages = {};
+
+  // تخزين بيانات طلب التوصيل لكل طلب (من مجموعة request delivery)
+  // key = orderDocumentId
+  final Map<String, Map<String, dynamic>> deliveryRequestsByOrderId = {};
 
   // ======== Init ========
   void init() {
@@ -51,6 +56,7 @@ class MarketOrdersViewModel extends ChangeNotifier {
     _setupOrdersStream();
     _fetchMarketLocation();
     _listenToRejectedRequests();
+    _listenToDeliveryRequests();
   }
 
   // ======== Listen to rejected delivery requests ========
@@ -84,6 +90,24 @@ class MarketOrdersViewModel extends ChangeNotifier {
           }
         }
       }
+    });
+  }
+
+  // الاستماع لكل طلبات التوصيل الخاصة بهذا المتجر
+  void _listenToDeliveryRequests() {
+    _deliveryRequestsSubscription = _deliveryRequestService
+        .streamRequestsForMarket(marketId)
+        .listen((requests) {
+      deliveryRequestsByOrderId.clear();
+
+      for (final request in requests) {
+        final orderDocumentId = request['orderDocumentId'] as String?;
+        if (orderDocumentId == null || orderDocumentId.isEmpty) continue;
+        deliveryRequestsByOrderId[orderDocumentId] = request;
+      }
+
+      // تحديث الـ UI لعرض حالة الطلب / بيانات المندوب فوراً
+      notifyListeners();
     });
   }
 
@@ -190,7 +214,24 @@ class MarketOrdersViewModel extends ChangeNotifier {
       final customerInfo = data['customerInfo'] as Map<String, dynamic>? ?? {};
       final items = data['items'] as List<dynamic>? ?? [];
 
-      String status = _convertStatusToArabic(data['status'] ?? 'قيد المراجعة');
+      // جلب بيانات طلب التوصيل (إن وجد) لهذا الطلب
+      final deliveryInfo = deliveryRequestsByOrderId[doc.id];
+
+      // أولوية عرض الحالة:
+      // 1) لو فيه طلب توصيل → نستخدم حالة تطبيق المكاتب (request delivery)
+      // 2) لو مفيش → نستخدم حالة الطلب الأصلية الخاصة بالتاجر
+      final String status;
+      final String? rawStatusFromDelivery =
+          deliveryInfo != null ? deliveryInfo['status'] as String? : null;
+      final String? rawStatusFromOrder = data['status'] as String?;
+
+      if (rawStatusFromDelivery != null) {
+        status = _convertDeliveryStatusToArabic(rawStatusFromDelivery);
+      } else {
+        status = _convertLegacyStatusToArabic(
+          rawStatusFromOrder ?? 'قيد المراجعة',
+        );
+      }
 
       DateTime orderTime;
       Timestamp? createdAtTimestamp;
@@ -259,6 +300,12 @@ class MarketOrdersViewModel extends ChangeNotifier {
         'customerAddress': customerInfo['address'] ?? '',
         'customerLocation': clientLoc, // جديد
         'status': status,
+        // بيانات المندوب من وثيقة request delivery (إن وُجدت)
+        'assignedDriverName':
+            deliveryInfo != null ? deliveryInfo['assignedDriverName'] ?? '' : '',
+        'assignedDriverPhone': deliveryInfo != null
+            ? deliveryInfo['assignedDriverPhone'] ?? ''
+            : '',
         'orderTime': orderTime,
         'createdAt': createdAtTimestamp, // إضافة createdAt لعرض التاريخ
         'totalPrice': (data['totalAmount'] ?? 0.0).toDouble(),
@@ -284,15 +331,26 @@ class MarketOrdersViewModel extends ChangeNotifier {
     }
   }
 
-  // ======== Status Translation ========
-  String _convertStatusToArabic(String status) {
+  // ======== Status Translation (Legacy store statuses) ========
+  // تستخدم قبل إرسال الطلب لمكتب الشحن (تطبيق التاجر القديم)
+  String _convertLegacyStatusToArabic(String status) {
+    // لو القيمة أصلاً عربية ومعروفة نرجعها كما هى
     if (status == 'قيد المراجعة' ||
         status == 'تم استلام الطلب' ||
         status == 'جارى تسليم للدليفري' ||
         status == 'تم التسليم للطيار' ||
-        status == 'تم رفض الطلب') {
+        status == 'تم رفض الطلب' ||
+        status == 'في انتظار قبول المكتب' ||
+        status == 'تم قبوله من المكتب' ||
+        status == 'تم تعيين مندوب' ||
+        status == 'المندوب قبل الطلب' ||
+        status == 'تم استلام الطلب من المتجر' ||
+        status == 'الطلب مكتمل' ||
+        status == 'المندوب رفض الطلب' ||
+        status == 'الزبون رفض الاستلام') {
       return status;
     }
+
     switch (status.toLowerCase()) {
       case 'pending':
         return 'قيد المراجعة';
@@ -304,6 +362,56 @@ class MarketOrdersViewModel extends ChangeNotifier {
         return 'تم التسليم للطيار';
       case 'rejected':
         return 'تم رفض الطلب';
+      default:
+        return status;
+    }
+  }
+
+  // ======== Status Translation (Delivery app statuses) ========
+  // تستخدم بعد إنشاء مستند فى request delivery لهذا الطلب
+  String _convertDeliveryStatusToArabic(String status) {
+    // لو القيمة أصلاً عربية ومعروفة نرجعها كما هى
+    if (status == 'في انتظار قبول المكتب' ||
+        status == 'تم قبوله من المكتب' ||
+        status == 'تم تعيين مندوب' ||
+        status == 'المندوب قبل الطلب' ||
+        status == 'تم استلام الطلب من المتجر' ||
+        status == 'الطلب مكتمل' ||
+        status == 'المندوب رفض الطلب' ||
+        status == 'الزبون رفض الاستلام' ||
+        status == 'تم رفض الطلب من المكتب' ||
+        status == 'في انتظار قبول المكتب' ||
+        status == 'تم قبوله من المكتب' ||
+        status == 'تم تعيين مندوب' ||
+        status == 'المندوب قبل الطلب' ||
+        status == 'تم استلام الطلب من المتجر' ||
+        status == 'الطلب مكتمل' ||
+        status == 'المندوب رفض الطلب' ||
+        status == 'الزبون رفض الاستلام') {
+      return status;
+    }
+
+    switch (status.toLowerCase()) {
+      // الحالات الخاصة بتطبيق المكاتب (request delivery)
+      // مثلما هى فى الجدول الذى أرسلته
+      case 'pending': // طلب جديد - فى انتظار قبول المكتب
+        return 'في انتظار قبول المكتب';
+      case 'accepted': // تم قبوله من المكتب - بإنتظار تعيين مندوب
+        return 'تم قبوله من المكتب';
+      case 'assigned': // تم تعيين مندوب
+        return 'تم تعيين مندوب';
+      case 'driver_accepted': // المندوب قبل الطلب - بإنتظار الاستلام من المتجر
+        return 'المندوب قبل الطلب';
+      case 'picked_up': // تم استلام الطلب من المتجر - المندوب فى الطريق للزبون
+        return 'تم استلام الطلب من المتجر';
+      case 'completed': // تم التسليم
+        return 'الطلب مكتمل';
+      case 'driver_rejected': // المندوب رفض الطلب / تم تعيين مندوب آخر
+        return 'المندوب رفض الطلب';
+      case 'customer_rejected': // الزبون رفض الاستلام
+        return 'الزبون رفض الاستلام';
+      case 'rejected': // رفض نهائى من المكتب
+        return 'تم رفض الطلب من المكتب';
       default:
         return status;
     }
@@ -481,6 +589,7 @@ class MarketOrdersViewModel extends ChangeNotifier {
   void disposeViewModel() {
     _timer?.cancel();
     _rejectedRequestsSubscription?.cancel();
+    _deliveryRequestsSubscription?.cancel();
     scrollController.dispose();
   }
 }

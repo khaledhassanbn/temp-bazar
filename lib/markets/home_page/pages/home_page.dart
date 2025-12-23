@@ -13,6 +13,8 @@ import '../../saved_locations/widgets/saved_locations_sheet.dart';
 import '../widgets/home_promotional_banner.dart';
 import '../widgets/home_categories_icons.dart';
 import '../widgets/home_stores_section.dart';
+import '../../license/services/license_service.dart';
+import '../../license/models/license_status.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -23,6 +25,9 @@ class HomePage extends StatefulWidget {
 
 class _HomePageState extends State<HomePage> {
   final TextEditingController searchController = TextEditingController();
+  final LicenseService _licenseService = LicenseService();
+  LicenseStatus? _licenseStatus;
+  bool _licenseLoading = false;
 
   @override
   void initState() {
@@ -40,6 +45,8 @@ class _HomePageState extends State<HomePage> {
         final categoryIds = categoryVm.categories.map((c) => c.id).toList();
         await filterVm.fetchStoresForAllCategories(categoryIds, limit: 8);
       }
+
+      _loadLicenseStatus();
     });
   }
 
@@ -192,6 +199,14 @@ class _HomePageState extends State<HomePage> {
                           children: [
                             const SizedBox(height: 16),
 
+                            if (_shouldShowLicenseBanner)
+                              _buildLicenseBanner()
+                                  .animate()
+                                  .fadeIn(duration: 300.ms),
+
+                            if (_shouldShowLicenseBanner)
+                              const SizedBox(height: 12),
+
                             // 🔹 بانر العروض الترويجية
                             const HomePromotionalBanner()
                                 .animate()
@@ -279,6 +294,66 @@ class _HomePageState extends State<HomePage> {
                 ),
               ),
             ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _loadLicenseStatus() async {
+    if (_licenseLoading) return;
+    setState(() => _licenseLoading = true);
+    try {
+      final marketId = await _licenseService.resolveCurrentUserMarketId();
+      if (marketId == null) {
+        setState(() => _licenseLoading = false);
+        return;
+      }
+      final status = await _licenseService.fetchStatus(marketId);
+      if (!mounted) return;
+      setState(() {
+        _licenseStatus = status;
+        _licenseLoading = false;
+      });
+    } catch (_) {
+      if (mounted) {
+        setState(() => _licenseLoading = false);
+      }
+    }
+  }
+
+  bool get _shouldShowLicenseBanner {
+    if (_licenseStatus == null) return false;
+    final days = _licenseStatus!.remainingDays;
+    return days > 0 && days <= 3;
+  }
+
+  Widget _buildLicenseBanner() {
+    final days = _licenseStatus?.remainingDays ?? 0;
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Colors.orange.shade50,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.orange.shade200),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.warning_amber_rounded, color: Colors.orange),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              'متبقي $days يوم قبل انتهاء ترخيص متجرك. جدد الآن.',
+              style: const TextStyle(
+                color: Color(0xFF92400E),
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+          TextButton(
+            onPressed: () => context.go('/license-status'),
+            child: const Text('اذهب'),
+          ),
         ],
       ),
     );

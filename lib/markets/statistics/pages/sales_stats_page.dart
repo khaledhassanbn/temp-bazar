@@ -3,7 +3,7 @@ import 'package:bazar_suez/markets/statistics/model/sales_data_model.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:bazar_suez/markets/my_order/pages/PastOrdersPage.dart';
+import 'package:bazar_suez/markets/order_of_markets/pages/PastOrdersPage.dart';
 
 import '../widgets/header.dart';
 import '../widgets/tab_button.dart';

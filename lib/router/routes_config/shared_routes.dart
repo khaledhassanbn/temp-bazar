@@ -10,6 +10,7 @@ import 'package:bazar_suez/markets/wallet/pages/wallet_page.dart';
 import 'package:bazar_suez/markets/wallet/pages/deposit_request_page.dart';
 import 'package:bazar_suez/markets/wallet/pages/admin_wallet_requests_page.dart';
 import 'package:bazar_suez/markets/saved_locations/pages/delivery_addresses_page.dart';
+import 'package:bazar_suez/markets/license/pages/license_status_page.dart';
 import 'package:go_router/go_router.dart';
 
 final sharedRoutes = [
@@ -18,9 +19,22 @@ final sharedRoutes = [
   GoRoute(path: '/Search', builder: (_, __) => const SearchPage()),
   GoRoute(path: '/CategoriesGrid', builder: (_, __) => CategoriesGridPage()),
   GoRoute(path: '/CartPage', builder: (_, __) => const CartPage()),
-  GoRoute(path: '/pricingpage', builder: (_, __) => const PricingPage()),
+  GoRoute(
+    path: '/pricingpage',
+    builder: (context, state) {
+      final marketId = state.uri.queryParameters['marketId'];
+      return PricingPage(marketId: marketId);
+    },
+  ),
   GoRoute(path: '/request-ads', builder: (_, __) => const RequestAdsPage()),
   GoRoute(path: '/AccountPage', builder: (_, __) => const AccountPage()),
+  GoRoute(
+    path: '/license-status',
+    builder: (context, state) {
+      final marketId = state.uri.queryParameters['marketId'];
+      return LicenseStatusPage(marketId: marketId);
+    },
+  ),
   GoRoute(path: '/wallet', builder: (_, __) => const WalletPage()),
   GoRoute(
     path: '/deposit-request',

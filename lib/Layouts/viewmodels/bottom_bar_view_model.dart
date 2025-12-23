@@ -2,7 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
 
 import '../../services/user_market_service.dart';
-import '../../markets/my_order/services/OrderService.dart';
+import '../../markets/order_of_markets/services/OrderService.dart';
 
 class BottomBarViewModel extends ChangeNotifier {
   final UserMarketService _userMarketService;

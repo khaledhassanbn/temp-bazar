@@ -42,6 +42,10 @@ import { paymobWebhook } from "./paymob/webhook";
 import { checkExpiredSubscriptions } from "./subscriptions/checkExpired";
 import { checkStoreStatus } from "./subscriptions/checkStatus";
 import { renewStoreSubscription } from "./subscriptions/renewSubscription";
+import { addDaysToStoreSubscription } from "./subscriptions/addDays";
+import { suspendStoreSubscription } from "./subscriptions/suspendSubscription";
+import { autoRenewSubscriptions } from "./subscriptions/autoRenew";
+import { sendExpiryAlerts } from "./subscriptions/expiryAlerts";
 import { createPackage, updatePackage, deletePackage } from "./packages/crud";
 import { facebookDataDeletion } from "./facebook/dataDeletion";
 import { deleteExpiredAdsImages } from "./ads/deleteExpiredImages";
@@ -76,6 +80,24 @@ export const checkExpiredSubscriptionsScheduled = functions.scheduler.onSchedule
     memory: "512MiB",
   },
   checkExpiredSubscriptions
+);
+
+export const autoRenewSubscriptionsScheduled = functions.scheduler.onSchedule(
+  {
+    schedule: "0 * * * *", // Every hour
+    timeZone: "Africa/Cairo",
+    memory: "512MiB",
+  },
+  autoRenewSubscriptions
+);
+
+export const licenseExpiryAlertsScheduled = functions.scheduler.onSchedule(
+  {
+    schedule: "0 8 * * *", // Daily at 8 AM Cairo
+    timeZone: "Africa/Cairo",
+    memory: "256MiB",
+  },
+  sendExpiryAlerts
 );
 
 // ---------------------------------------------------------------------------
@@ -124,6 +146,24 @@ export const renewStoreSubscriptionCallable = onCall(
   },
   async (request) => {
     return await renewStoreSubscription(request);
+  }
+);
+
+export const addDaysToStoreSubscriptionCallable = onCall(
+  {
+    memory: "256MiB",
+  },
+  async (request) => {
+    return await addDaysToStoreSubscription(request);
+  }
+);
+
+export const suspendStoreSubscriptionCallable = onCall(
+  {
+    memory: "256MiB",
+  },
+  async (request) => {
+    return await suspendStoreSubscription(request);
   }
 );
 

@@ -95,7 +95,7 @@ class StoresService {
   ) async {
     try {
       final result = await _functions
-          .httpsCallable('addDaysToStoreSubscription')
+          .httpsCallable('addDaysToStoreSubscriptionCallable')
           .call({'storeId': storeId, 'days': days});
 
       return {
@@ -115,7 +115,7 @@ class StoresService {
   Future<Map<String, dynamic>> suspendSubscription(String storeId) async {
     try {
       final result = await _functions
-          .httpsCallable('suspendStoreSubscription')
+          .httpsCallable('suspendStoreSubscriptionCallable')
           .call({'storeId': storeId});
 
       return {

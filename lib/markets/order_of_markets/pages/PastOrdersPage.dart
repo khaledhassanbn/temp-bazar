@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
-import 'package:bazar_suez/markets/my_order/widget/OrderCollapsibleHeader.dart';
-import 'package:bazar_suez/markets/my_order/widget/OrderCardWithoutActions.dart';
-import 'package:bazar_suez/markets/my_order/viewmodels/PastOrdersViewModel.dart';
+import 'package:bazar_suez/markets/order_of_markets/widget/OrderCollapsibleHeader.dart';
+import 'package:bazar_suez/markets/order_of_markets/widget/OrderCardWithoutActions.dart';
+import 'package:bazar_suez/markets/order_of_markets/viewmodels/PastOrdersViewModel.dart';
 
 class PastOrdersPage extends StatefulWidget {
   final String marketId;

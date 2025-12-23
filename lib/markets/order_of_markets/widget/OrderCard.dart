@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:bazar_suez/theme/app_color.dart';
-import 'package:bazar_suez/markets/my_order/widget/OrderActionButtons.dart';
+import 'package:bazar_suez/markets/order_of_markets/widget/OrderActionButtons.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:flutter/services.dart';
@@ -53,6 +53,10 @@ class OrderCard extends StatelessWidget {
     );
     final extraOptions = List<Map<String, dynamic>>.from(order['extraOptions']);
     final GeoPoint? clientLocation = order['customerLocation'] as GeoPoint?;
+    final String assignedDriverName =
+        (order['assignedDriverName'] ?? '').toString();
+    final String assignedDriverPhone =
+        (order['assignedDriverPhone'] ?? '').toString();
 
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
@@ -350,6 +354,114 @@ class OrderCard extends StatelessWidget {
               ],
             ),
           ),
+
+          // ================== Driver Info (مندوب التوصيل) ==================
+          if (assignedDriverName.isNotEmpty ||
+              assignedDriverPhone.isNotEmpty)
+            Container(
+              margin: const EdgeInsets.symmetric(vertical: 10),
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.grey.shade300),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Container(
+                        width: 36,
+                        height: 36,
+                        decoration: BoxDecoration(
+                          color: Colors.orange.withOpacity(0.12),
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(
+                          Icons.delivery_dining,
+                          color: Colors.orange,
+                          size: 20,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      const Text(
+                        "معلومات المندوب",
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 16,
+                          color: Colors.black87,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  Table(
+                    columnWidths: const {
+                      0: FixedColumnWidth(90),
+                      1: FlexColumnWidth(),
+                    },
+                    defaultVerticalAlignment: TableCellVerticalAlignment.middle,
+                    children: [
+                      if (assignedDriverName.isNotEmpty)
+                        _infoRow(
+                          "اسم المندوب",
+                          Text(
+                            assignedDriverName,
+                            style: const TextStyle(
+                              fontSize: 14,
+                              color: Colors.black87,
+                            ),
+                          ),
+                        ),
+                      if (assignedDriverPhone.isNotEmpty)
+                        _infoRow(
+                          "هاتف المندوب",
+                          Row(
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  assignedDriverPhone,
+                                  style: const TextStyle(
+                                    fontSize: 14,
+                                    color: Colors.black87,
+                                  ),
+                                ),
+                              ),
+                              InkWell(
+                                borderRadius: BorderRadius.circular(8),
+                                onTap: () {
+                                  Clipboard.setData(
+                                    ClipboardData(text: assignedDriverPhone),
+                                  );
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(
+                                      content:
+                                          Text('تم نسخ رقم هاتف المندوب'),
+                                    ),
+                                  );
+                                },
+                                child: Container(
+                                  padding: const EdgeInsets.all(6),
+                                  decoration: BoxDecoration(
+                                    color: Colors.blue.withOpacity(0.1),
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  child: const Icon(
+                                    Icons.copy,
+                                    color: Colors.blue,
+                                    size: 18,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
 
           // ================== Order Details ==================
           const Text(

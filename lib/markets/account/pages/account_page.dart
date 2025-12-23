@@ -191,9 +191,9 @@ class _AccountPageState extends State<AccountPage> {
           _MenuTileData(
             icon: Icons.verified_user_outlined,
             label: 'إدارة الترخيص',
-            subtitle: 'خطط وباقات المتجر',
+            subtitle: 'الباقات والتجديد التلقائي',
             onTap: () => context.go(
-              '/pricingpage${market?.id != null ? '?marketId=${market!.id}' : ''}',
+              '/license-status${market?.id != null ? '?marketId=${market!.id}' : ''}',
             ),
           ),
         ],
@@ -793,20 +793,16 @@ class _MenuTile extends StatelessWidget {
 class _InfoCard extends StatelessWidget {
   final String title;
   final String description;
-  final String? badgeText;
   final IconData? leadingIcon;
   final Color? leadingColor;
-  final String? leadingImage;
   final Widget? trailing;
   final VoidCallback onTap;
 
   const _InfoCard({
     required this.title,
     required this.description,
-    this.badgeText,
     this.leadingIcon,
     this.leadingColor,
-    this.leadingImage,
     this.trailing,
     required this.onTap,
   });
@@ -827,49 +823,20 @@ class _InfoCard extends StatelessWidget {
         ),
         child: Row(
           children: [
-            if (leadingImage != null)
-              ClipRRect(
-                borderRadius: BorderRadius.circular(16),
-                child: Image.asset(
-                  leadingImage!,
-                  width: 72,
-                  height: 72,
-                  fit: BoxFit.cover,
-                ),
-              )
-            else
-              CircleAvatar(
-                radius: 36,
-                backgroundColor: leadingColor ?? Colors.white.withOpacity(0.15),
-                child: Icon(
-                  leadingIcon ?? Icons.info_outline,
-                  color: Colors.white,
-                  size: 30,
-                ),
+            CircleAvatar(
+              radius: 36,
+              backgroundColor: leadingColor ?? Colors.white.withOpacity(0.15),
+              child: Icon(
+                leadingIcon ?? Icons.info_outline,
+                color: Colors.white,
+                size: 30,
               ),
+            ),
             const SizedBox(width: 16),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
-                  if (badgeText != null)
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 10,
-                        vertical: 4,
-                      ),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.25),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Text(
-                        badgeText!,
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ),
                   const SizedBox(height: 6),
                   Text(
                     title,

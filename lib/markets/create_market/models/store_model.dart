@@ -21,6 +21,12 @@ class StoreModel {
   final bool isVisible; // إظهار المتجر
   final DateTime? expiredAt; // تاريخ انتهاء الصلاحية
   final DateTime? renewedAt; // تاريخ التجديد
+  final DateTime? licenseStartAt;
+  final DateTime? licenseEndAt;
+  final int? licenseDurationDays;
+  final bool licenseAutoRenew;
+  final DateTime? licenseLastRenewedAt;
+  final String? currentPackageId;
   final WeeklyWorkingHours? workingHours; // مواعيد العمل
   final int numberOfProducts; // عدد المنتجات المسموح بها
   final DateTime createdAt;
@@ -45,6 +51,12 @@ class StoreModel {
     required this.isVisible,
     this.expiredAt,
     this.renewedAt,
+    this.licenseStartAt,
+    this.licenseEndAt,
+    this.licenseDurationDays,
+    this.licenseAutoRenew = false,
+    this.licenseLastRenewedAt,
+    this.currentPackageId,
     this.workingHours,
     required this.numberOfProducts,
     required this.createdAt,
@@ -90,6 +102,18 @@ class StoreModel {
       renewedAt: map['renewedAt'] != null
           ? (map['renewedAt'] as Timestamp).toDate()
           : null,
+      licenseStartAt: map['licenseStartAt'] != null
+          ? (map['licenseStartAt'] as Timestamp).toDate()
+          : null,
+      licenseEndAt: map['licenseEndAt'] != null
+          ? (map['licenseEndAt'] as Timestamp).toDate()
+          : null,
+      licenseDurationDays: map['licenseDurationDays'] as int?,
+      licenseAutoRenew: map['licenseAutoRenew'] == true,
+      licenseLastRenewedAt: map['licenseLastRenewedAt'] != null
+          ? (map['licenseLastRenewedAt'] as Timestamp).toDate()
+          : null,
+      currentPackageId: map['currentPackageId'] as String?,
       workingHours: workingHours,
       numberOfProducts: map['numberOfProducts'] ?? 0,
       createdAt: (map['createdAt'] as Timestamp).toDate(),
@@ -116,6 +140,16 @@ class StoreModel {
       'isVisible': isVisible,
       'expiredAt': expiredAt != null ? Timestamp.fromDate(expiredAt!) : null,
       'renewedAt': renewedAt != null ? Timestamp.fromDate(renewedAt!) : null,
+      'licenseStartAt':
+          licenseStartAt != null ? Timestamp.fromDate(licenseStartAt!) : null,
+      'licenseEndAt':
+          licenseEndAt != null ? Timestamp.fromDate(licenseEndAt!) : null,
+      'licenseDurationDays': licenseDurationDays,
+      'licenseAutoRenew': licenseAutoRenew,
+      'licenseLastRenewedAt': licenseLastRenewedAt != null
+          ? Timestamp.fromDate(licenseLastRenewedAt!)
+          : null,
+      'currentPackageId': currentPackageId,
       'workingHours': workingHours?.toMap(),
       'numberOfProducts': numberOfProducts,
       'createdAt': Timestamp.fromDate(createdAt),

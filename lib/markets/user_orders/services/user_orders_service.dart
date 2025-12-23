@@ -37,8 +37,65 @@ class UserOrdersService {
         .get();
   }
 
-  /// تحويل حالة الطلب للعربية
-  static String getStatusArabic(String status) {
+  // ======== حالات التطبيق القديم (قبل مكتب الشحن) ========
+  static String getLegacyStatusArabic(String status) {
+    // لو القيمة أصلاً عربية، نرجعها كما هي
+    if (status == 'قيد المراجعة' ||
+        status == 'تم استلام الطلب' ||
+        status == 'جارى تسليم للدليفري' ||
+        status == 'تم التسليم للطيار' ||
+        status == 'تم رفض الطلب') {
+      return status;
+    }
+
+    switch (status.toLowerCase()) {
+      case 'pending':
+        return 'قيد المراجعة';
+      case 'accepted':
+        return 'تم استلام الطلب';
+      case 'preparing':
+        return 'جارى تسليم للدليفري';
+      case 'delivered':
+        return 'تم التسليم للطيار';
+      case 'rejected':
+        return 'تم رفض الطلب';
+      default:
+        return status;
+    }
+  }
+
+  static int getLegacyStatusColor(String status) {
+    switch (status.toLowerCase()) {
+      case 'pending':
+        return 0xFFFFA000; // برتقالي
+      case 'accepted':
+        return 0xFF2196F3; // أزرق
+      case 'preparing':
+        return 0xFFFFA000; // برتقالي
+      case 'delivered':
+        return 0xFF4CAF50; // أخضر
+      case 'rejected':
+        return 0xFFF44336; // أحمر
+      default:
+        return 0xFF9E9E9E; // رمادي
+    }
+  }
+
+  // ======== حالات تطبيق مكتب الشحن / المندوب (request delivery) ========
+  static String getDeliveryStatusArabic(String status) {
+    // لو القيمة عربية بالفعل
+    if (status == 'في انتظار قبول المكتب' ||
+        status == 'تم قبوله من المكتب' ||
+        status == 'تم تعيين مندوب' ||
+        status == 'المندوب قبل الطلب' ||
+        status == 'تم استلام الطلب' ||
+        status == 'تم التسليم' ||
+        status == 'رفض من المندوب' ||
+        status == 'الزبون رفض الاستلام' ||
+        status == 'مرفوض نهائياً') {
+      return status;
+    }
+
     switch (status.toLowerCase()) {
       case 'pending':
         return 'في انتظار قبول المكتب';
@@ -49,7 +106,8 @@ class UserOrdersService {
       case 'driver_accepted':
         return 'المندوب قبل الطلب';
       case 'picked_up':
-        return 'تم استلام الطلب';
+        // استلم المندوب الطلب من التاجر وهو الآن فى الطريق للزبون
+        return 'المندوب في الطريق';
       case 'completed':
         return 'تم التسليم';
       case 'driver_rejected':
@@ -63,8 +121,7 @@ class UserOrdersService {
     }
   }
 
-  /// الحصول على لون حالة الطلب
-  static int getStatusColor(String status) {
+  static int getDeliveryStatusColor(String status) {
     switch (status.toLowerCase()) {
       case 'pending':
         return 0xFFFFA000; // برتقالي

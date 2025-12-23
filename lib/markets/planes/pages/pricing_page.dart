@@ -6,10 +6,12 @@ import '../viewmodels/pricing_viewmodel.dart';
 import '../models/package.dart';
 import '../services/pending_payment_service.dart';
 import '../../wallet/services/wallet_service.dart';
+import '../../license/services/license_service.dart';
 import '../../../theme/app_color.dart';
 
 class PricingPage extends StatefulWidget {
-  const PricingPage({super.key});
+  final String? marketId;
+  const PricingPage({super.key, this.marketId});
 
   @override
   State<PricingPage> createState() => _PricingPageState();
@@ -19,6 +21,7 @@ class _PricingPageState extends State<PricingPage> {
   int highlightedIndex = 0;
   final TextEditingController _discountController = TextEditingController();
   late final PricingViewModel _viewModel;
+  final LicenseService _licenseService = LicenseService();
 
   @override
   void dispose() {
@@ -46,7 +49,10 @@ class _PricingPageState extends State<PricingPage> {
         user.uid,
       );
 
-      if (pendingPayment != null && pendingPayment.isValid && mounted) {
+      if (pendingPayment != null &&
+          pendingPayment.isValid &&
+          mounted &&
+          widget.marketId == null) {
         // الانتظار حتى يتم بناء الصفحة بالكامل ثم التوجيه التلقائي
         WidgetsBinding.instance.addPostFrameCallback((_) async {
           if (mounted) {
@@ -112,6 +118,7 @@ class _PricingPageState extends State<PricingPage> {
                     return PackageCard(
                       package: package,
                       isHighlighted: index == highlightedIndex,
+                      onSelect: (pkg) => _handlePackageSelection(context, pkg),
                     );
                   }
                   // حقل كود الخصم + زر "ابدأ" بعد الباقات
@@ -199,120 +206,6 @@ class _PricingPageState extends State<PricingPage> {
       ),
     );
   }
-}
-
-class PackageCard extends StatelessWidget {
-  final Package package;
-  final bool isHighlighted;
-
-  const PackageCard({
-    super.key,
-    required this.package,
-    this.isHighlighted = false,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final bool isHighlighted = this.isHighlighted;
-
-    return AnimatedContainer(
-      duration: const Duration(milliseconds: 300),
-      curve: Curves.easeInOut,
-      margin: const EdgeInsets.symmetric(vertical: 8),
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: isHighlighted ? AppColors.mainColor : Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black12,
-            blurRadius: 6,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Column(
-        children: [
-          // اسم الباقة
-          Text(
-            package.name,
-            style: TextStyle(
-              fontSize: 24,
-              fontWeight: FontWeight.bold,
-              color: isHighlighted ? Colors.white : AppColors.mainColor,
-            ),
-          ),
-          const SizedBox(height: 10),
-
-          // عدد الأيام
-          Text(
-            "${package.days} يوم",
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.w600,
-              color: isHighlighted ? Colors.white70 : Colors.black87,
-            ),
-          ),
-          const SizedBox(height: 10),
-
-          // السعر
-          Text(
-            "${package.price.toStringAsFixed(0)} ج.م",
-            style: TextStyle(
-              fontSize: 32,
-              fontWeight: FontWeight.bold,
-              color: isHighlighted ? Colors.white : AppColors.mainColor,
-            ),
-          ),
-          const SizedBox(height: 20),
-
-          // عرض المميزات
-          if (package.features.isNotEmpty) ...[
-            ...package.features.map((feature) {
-              return Padding(
-                padding: const EdgeInsets.symmetric(vertical: 6),
-                child: Row(
-                  children: [
-                    Icon(
-                      Icons.check_circle,
-                      color: isHighlighted ? Colors.white : AppColors.mainColor,
-                      size: 20,
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        feature,
-                        style: TextStyle(
-                          fontSize: 14,
-                          color: isHighlighted ? Colors.white : Colors.black87,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              );
-            }),
-            const SizedBox(height: 20),
-          ],
-
-          // زر الاختيار
-          ElevatedButton(
-            onPressed: () => _handlePackageSelection(context, package),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: isHighlighted
-                  ? Colors.white
-                  : AppColors.mainColor,
-              foregroundColor: isHighlighted
-                  ? AppColors.mainColor
-                  : Colors.white,
-              padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 12),
-            ),
-            child: const Text("اختر الباقة", style: TextStyle(fontSize: 18)),
-          ),
-        ],
-      ),
-    );
-  }
 
   Future<void> _handlePackageSelection(
     BuildContext context,
@@ -329,7 +222,42 @@ class PackageCard extends StatelessWidget {
     final walletService = WalletService();
     final pendingPaymentService = PendingPaymentService();
 
-    // التحقق من وجود دفع معلق نشط
+    // إذا كنا في وضع ترقية متجر قائم
+    if (widget.marketId != null && widget.marketId!.isNotEmpty) {
+      try {
+        showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (_) => const Center(child: CircularProgressIndicator()),
+        );
+        await _licenseService.renewWithPackage(
+          marketId: widget.marketId!,
+          package: package,
+          userId: user.uid,
+        );
+        if (!context.mounted) return;
+        Navigator.of(context, rootNavigator: true).pop();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('تم التجديد/الترقية إلى باقة ${package.name}'),
+          ),
+        );
+        context.go('/license-status?marketId=${widget.marketId}');
+      } catch (e) {
+        if (context.mounted &&
+            Navigator.of(context, rootNavigator: true).canPop()) {
+          Navigator.of(context, rootNavigator: true).pop();
+        }
+        if (context.mounted) {
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(SnackBar(content: Text(e.toString())));
+        }
+      }
+      return;
+    }
+
+    // التحقق من وجود دفع معلق نشط لإنشاء متجر جديد
     final existingPayment = await pendingPaymentService.getPendingPayment(
       user.uid,
     );
@@ -523,5 +451,121 @@ class PackageCard extends StatelessWidget {
         ).showSnackBar(SnackBar(content: Text('فشل الدفع: ${e.toString()}')));
       }
     }
+  }
+}
+
+class PackageCard extends StatelessWidget {
+  final Package package;
+  final bool isHighlighted;
+  final void Function(Package) onSelect;
+
+  const PackageCard({
+    super.key,
+    required this.package,
+    this.isHighlighted = false,
+    required this.onSelect,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final bool isHighlighted = this.isHighlighted;
+
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 300),
+      curve: Curves.easeInOut,
+      margin: const EdgeInsets.symmetric(vertical: 8),
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: isHighlighted ? AppColors.mainColor : Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black12,
+            blurRadius: 6,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        children: [
+          // اسم الباقة
+          Text(
+            package.name,
+            style: TextStyle(
+              fontSize: 24,
+              fontWeight: FontWeight.bold,
+              color: isHighlighted ? Colors.white : AppColors.mainColor,
+            ),
+          ),
+          const SizedBox(height: 10),
+
+          // عدد الأيام
+          Text(
+            "${package.days} يوم",
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.w600,
+              color: isHighlighted ? Colors.white70 : Colors.black87,
+            ),
+          ),
+          const SizedBox(height: 10),
+
+          // السعر
+          Text(
+            "${package.price.toStringAsFixed(0)} ج.م",
+            style: TextStyle(
+              fontSize: 32,
+              fontWeight: FontWeight.bold,
+              color: isHighlighted ? Colors.white : AppColors.mainColor,
+            ),
+          ),
+          const SizedBox(height: 20),
+
+          // عرض المميزات
+          if (package.features.isNotEmpty) ...[
+            ...package.features.map((feature) {
+              return Padding(
+                padding: const EdgeInsets.symmetric(vertical: 6),
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.check_circle,
+                      color: isHighlighted ? Colors.white : AppColors.mainColor,
+                      size: 20,
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        feature,
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: isHighlighted ? Colors.white : Colors.black87,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            }),
+            const SizedBox(height: 20),
+          ],
+
+          // زر الاختيار
+          ElevatedButton(
+            onPressed: () => onSelect(package),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: isHighlighted
+                  ? Colors.white
+                  : AppColors.mainColor,
+              foregroundColor: isHighlighted
+                  ? AppColors.mainColor
+                  : Colors.white,
+              padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 12),
+            ),
+            child: const Text("اختر الباقة", style: TextStyle(fontSize: 18)),
+          ),
+        ],
+      ),
+    );
   }
 }

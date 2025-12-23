@@ -7,6 +7,8 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
+import '../../license/services/license_service.dart';
+import '../../license/models/license_status.dart';
 
 class WalletPage extends StatefulWidget {
   const WalletPage({super.key});
@@ -18,22 +20,34 @@ class WalletPage extends StatefulWidget {
 class _WalletPageState extends State<WalletPage> {
   final WalletService _walletService = WalletService();
   final FirebaseAuth _auth = FirebaseAuth.instance;
+  final LicenseService _licenseService = LicenseService();
   double _balance = 0.0;
   bool _isLoading = true;
+  LicenseStatus? _licenseStatus;
+  String? _marketId;
 
   @override
   void initState() {
     super.initState();
-    _loadBalance();
+    _loadData();
   }
 
-  Future<void> _loadBalance() async {
+  Future<void> _loadData() async {
     final user = _auth.currentUser;
     if (user != null) {
       final balance = await _walletService.getWalletBalance(user.uid);
+      final marketId = await _licenseService.resolveCurrentUserMarketId();
+      LicenseStatus? license;
+      if (marketId != null) {
+        try {
+          license = await _licenseService.fetchStatus(marketId);
+        } catch (_) {}
+      }
       setState(() {
         _balance = balance;
         _isLoading = false;
+        _licenseStatus = license;
+        _marketId = marketId;
       });
     }
   }
@@ -72,7 +86,7 @@ class _WalletPageState extends State<WalletPage> {
           centerTitle: true,
         ),
         body: RefreshIndicator(
-          onRefresh: _loadBalance,
+          onRefresh: _loadData,
           color: AppColors.mainColor,
           child: SingleChildScrollView(
             physics: const AlwaysScrollableScrollPhysics(),
@@ -85,6 +99,8 @@ class _WalletPageState extends State<WalletPage> {
                 const SizedBox(height: 24),
                 // Charge Button
                 _buildChargeButton(),
+                const SizedBox(height: 16),
+                _buildLicenseCard(),
                 const SizedBox(height: 24),
                 // Transactions Section
                 const Text(
@@ -157,7 +173,7 @@ class _WalletPageState extends State<WalletPage> {
       onPressed: () async {
         final result = await context.push('/deposit-request');
         if (result == true) {
-          _loadBalance();
+          _loadData();
         }
       },
       style: ElevatedButton.styleFrom(
@@ -173,6 +189,70 @@ class _WalletPageState extends State<WalletPage> {
           fontWeight: FontWeight.bold,
           color: Colors.white,
         ),
+      ),
+    );
+  }
+
+  Widget _buildLicenseCard() {
+    if (_marketId == null) {
+      return const SizedBox.shrink();
+    }
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.security, color: AppColors.mainColor),
+              const SizedBox(width: 8),
+              const Text(
+                'ترخيص المتجر',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+              ),
+              const Spacer(),
+              TextButton(
+                onPressed: () =>
+                    context.go('/license-status?marketId=$_marketId'),
+                child: const Text('التفاصيل'),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Text(
+            _licenseStatus == null
+                ? 'جارِ تحميل حالة الترخيص...'
+                : 'أيام متبقية: ${_licenseStatus!.remainingDays}',
+            style: const TextStyle(color: Color(0xFF4B5563)),
+          ),
+          if (_licenseStatus != null) ...[
+            SwitchListTile(
+              contentPadding: EdgeInsets.zero,
+              title: const Text('التجديد التلقائي'),
+              value: _licenseStatus!.autoRenewEnabled,
+              activeColor: AppColors.mainColor,
+              onChanged: (value) async {
+                await _licenseService.toggleAutoRenew(
+                  marketId: _marketId!,
+                  enabled: value,
+                );
+                await _loadData();
+              },
+            ),
+          ],
+        ],
       ),
     );
   }

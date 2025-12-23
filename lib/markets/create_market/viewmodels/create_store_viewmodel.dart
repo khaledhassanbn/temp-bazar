@@ -23,9 +23,9 @@ class CreateStoreViewModel extends ChangeNotifier {
   LatLng? location; // ← نخزن الإحداثيات فقط
   File? logoFile;
   File? coverFile;
-  DateTime? createdAt;
   bool loading = false;
   bool showAddress = false;
+  bool autoRenewEnabled = true;
 
   // حقول الفئات
   String? selectedCategoryId;
@@ -126,29 +126,34 @@ class CreateStoreViewModel extends ChangeNotifier {
     notifyListeners();
   }
 
-  // حساب تاريخ انتهاء الصلاحية بناء على المدة المختارة
-  DateTime? calculateExpiredAt(DateTime createdAt) {
-    // استخدام packageDays من الدفع المعلق إذا كان موجوداً
-    if (packageDays != null && packageDays! > 0) {
-      return createdAt.add(Duration(days: packageDays!));
-    }
+  /// يعين حالة التجديد التلقائي (تستخدم في صفحات الترخيص/المحفظة)
+  void setAutoRenewEnabled(bool value) {
+    autoRenewEnabled = value;
+    notifyListeners();
+  }
 
-    // استخدام selectedDuration كبديل
-    if (selectedDuration == null) return null;
+  int _resolveDurationDays() {
+    if (packageDays != null && packageDays! > 0) {
+      return packageDays!;
+    }
 
     switch (selectedDuration) {
       case 'شهر':
-        // مؤقتاً للتجربة: دقيقتين بس
-        return createdAt.add(const Duration(minutes: 2));
+        return 30;
       case '3 شهور':
-        return DateTime(createdAt.year, createdAt.month + 3, createdAt.day);
+        return 90;
       case '6 شهور':
-        return DateTime(createdAt.year, createdAt.month + 6, createdAt.day);
+        return 180;
       case 'سنة':
-        return DateTime(createdAt.year + 1, createdAt.month, createdAt.day);
+        return 365;
       default:
-        return null;
+        return 30; // fallback شهر واحد
     }
+  }
+
+  DateTime _calculateLicenseEnd(DateTime startAt) {
+    final durationDays = _resolveDurationDays();
+    return startAt.add(Duration(days: durationDays));
   }
 
   // التحقق من صحة رابط المتجر
@@ -202,6 +207,29 @@ class CreateStoreViewModel extends ChangeNotifier {
       final currentUser = FirebaseAuth.instance.currentUser;
       final userEmail = currentUser?.email ?? '';
 
+      // جلب بيانات الدفع المعلق أولاً قبل حساب تاريخ انتهاء الترخيص
+      // حتى نستخدم عدد الأيام الصحيح من الباقة
+      dynamic cachedPendingPayment;
+      if (currentUser != null) {
+        try {
+          cachedPendingPayment = await _pendingPaymentService.getPendingPayment(
+            currentUser.uid,
+          );
+          if (cachedPendingPayment != null && cachedPendingPayment.isValid) {
+            // تحديث بيانات الباقة في ViewModel
+            packageId = cachedPendingPayment.packageId;
+            packageDays = cachedPendingPayment.days;
+          }
+        } catch (e) {
+          print('خطأ في جلب بيانات الدفع المعلق: $e');
+        }
+      }
+
+      final now = serverTime;
+      // الآن سيتم استخدام packageDays الصحيح من الباقة
+      final licenseEndAt = _calculateLicenseEnd(now);
+      final durationDays = _resolveDurationDays();
+
       final payload = {
         'name': name,
         'description': description,
@@ -217,11 +245,27 @@ class CreateStoreViewModel extends ChangeNotifier {
         'storeStatus': true, // حالة المتجر - افتراضياً true
         'status': 'active', // حالة العرض - افتراضياً active
         'isVisible': true, // إظهار المتجر - افتراضياً true
-        'expiredAt': calculateExpiredAt(serverTime) != null
-            ? Timestamp.fromDate(calculateExpiredAt(serverTime)!)
-            : null, // تاريخ انتهاء الصلاحية بناء على المدة المختارة
-        'renewedAt': null, // تاريخ التجديد - افتراضياً null
-        'createdAt': Timestamp.fromDate(serverTime), // استخدام وقت السيرفر
+        'expiredAt': Timestamp.fromDate(licenseEndAt), // الحقل القديم للتوافق
+        'renewedAt': null, // تاريخ التجديد - افتراضياً null (قديم للتوافق)
+        'createdAt': Timestamp.fromDate(now), // استخدام وقت السيرفر
+        // حقول الترخيص الجديدة
+        'ownerId': FirebaseAuth.instance.currentUser?.uid,
+        'licenseStartAt': Timestamp.fromDate(now),
+        'licenseEndAt': Timestamp.fromDate(licenseEndAt),
+        'licenseDurationDays': durationDays,
+        'licenseAutoRenew': autoRenewEnabled,
+        'licenseLastRenewedAt': null,
+        'currentPackageId': packageId,
+        'isActive': true,
+        'canAddProducts': true,
+        'canReceiveOrders': true,
+        'subscription': {
+          'packageName': null,
+          'startDate': Timestamp.fromDate(now),
+          'endDate': Timestamp.fromDate(licenseEndAt),
+          'durationDays': durationDays,
+        },
+        'expiryDate': Timestamp.fromDate(licenseEndAt), // لتوافق وظائف السحابة الحالية
         'numberOfProducts': numberOfProducts, // عدد المنتجات المسموح بها
         // معلومات الفئات
         'categoryId': selectedCategoryId,
@@ -239,20 +283,27 @@ class CreateStoreViewModel extends ChangeNotifier {
       );
 
       // ربط الدفع المعلق بالمتجر إذا كان موجوداً
-      if (currentUser != null) {
+      if (currentUser != null && cachedPendingPayment != null && cachedPendingPayment.isValid) {
         try {
-          final pendingPayment = await _pendingPaymentService.getPendingPayment(
-            currentUser.uid,
+          await _pendingPaymentService.linkPaymentToStore(
+            cachedPendingPayment.id,
+            docId,
           );
-          if (pendingPayment != null && pendingPayment.isValid) {
-            await _pendingPaymentService.linkPaymentToStore(
-              pendingPayment.id,
-              docId,
-            );
-            // تحديث بيانات الباقة في ViewModel
-            packageId = pendingPayment.packageId;
-            packageDays = pendingPayment.days;
-          }
+          await FirebaseFirestore.instance
+              .collection('markets')
+              .doc(docId)
+              .set({
+            'currentPackageId': cachedPendingPayment.packageId,
+            'currentPackageName': cachedPendingPayment.packageName,
+            'licenseDurationDays': cachedPendingPayment.days,
+            'subscription': {
+              'packageId': cachedPendingPayment.packageId,
+              'packageName': cachedPendingPayment.packageName,
+              'startDate': Timestamp.fromDate(now),
+              'endDate': Timestamp.fromDate(licenseEndAt),
+              'durationDays': cachedPendingPayment.days,
+            },
+          }, SetOptions(merge: true));
         } catch (e) {
           // لا نفشل إنشاء المتجر لو فشل ربط الدفع
           print('خطأ في ربط الدفع المعلق: $e');
