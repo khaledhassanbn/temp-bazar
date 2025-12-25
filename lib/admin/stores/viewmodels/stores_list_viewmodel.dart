@@ -6,7 +6,7 @@ class StoresListViewModel extends ChangeNotifier {
   final StoresService _service = StoresService();
 
   // متغيرات الفرز والبحث
-  String _sortBy = 'name'; // name, expiryDate, productCount, status
+  String _sortBy = 'name'; // name, licenseEndAt, productCount, status
   bool _isAscending = true;
   String _searchQuery = '';
   String _filterStatus = 'all'; // all, active, inactive
@@ -85,9 +85,9 @@ class StoresListViewModel extends ChangeNotifier {
             (dataB['name'] ?? '').toString(),
           );
           break;
-        case 'expiryDate':
-          final dateA = dataA['expiryDate'] as Timestamp?;
-          final dateB = dataB['expiryDate'] as Timestamp?;
+        case 'licenseEndAt':
+          final dateA = dataA['licenseEndAt'] as Timestamp?;
+          final dateB = dataB['licenseEndAt'] as Timestamp?;
           if (dateA == null && dateB == null) {
             comparison = 0;
           } else if (dateA == null) {

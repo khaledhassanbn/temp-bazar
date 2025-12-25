@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:cloud_functions/cloud_functions.dart';
 import 'package:provider/provider.dart';
 import 'package:bazar_suez/authentication/guards/AuthGuard.dart';
 import 'package:go_router/go_router.dart';
@@ -15,9 +14,6 @@ class ManagePackagesPage extends StatefulWidget {
 
 class _ManagePackagesPageState extends State<ManagePackagesPage> {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
-  final FirebaseFunctions _functions = FirebaseFunctions.instanceFor(
-    region: 'europe-west1',
-  );
 
   @override
   Widget build(BuildContext context) {
@@ -317,10 +313,8 @@ class _ManagePackagesPageState extends State<ManagePackagesPage> {
         builder: (context) => const Center(child: CircularProgressIndicator()),
       );
 
-      // Call Cloud Function to delete
-      await _functions.httpsCallable('deletePackageCallable').call({
-        'packageId': packageId,
-      });
+      // حذف الباقة مباشرة من Firestore
+      await _firestore.collection('packages').doc(packageId).delete();
 
       if (context.mounted) {
         Navigator.pop(context); // Close loading
@@ -537,14 +531,14 @@ class _ManagePackagesPageState extends State<ManagePackagesPage> {
                         const Center(child: CircularProgressIndicator()),
                   );
 
-                  // Call Cloud Function to update
-                  await _functions.httpsCallable('updatePackageCallable').call({
-                    'packageId': packageId,
+                  // تحديث الباقة مباشرة في Firestore
+                  await _firestore.collection('packages').doc(packageId).update({
                     'name': nameController.text.trim(),
-                    'days': int.tryParse(daysController.text),
+                    'days': int.tryParse(daysController.text) ?? 0,
                     'price': price,
                     'features': features,
                     'orderIndex': int.tryParse(orderIndexController.text) ?? 0,
+                    'updatedAt': Timestamp.now(),
                   });
 
                   // Dispose controllers

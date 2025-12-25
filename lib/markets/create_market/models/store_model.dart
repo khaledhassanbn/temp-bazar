@@ -19,13 +19,10 @@ class StoreModel {
   final bool storeStatus; // حالة المتجر
   final StoreStatus status; // حالة العرض (expired/active)
   final bool isVisible; // إظهار المتجر
-  final DateTime? expiredAt; // تاريخ انتهاء الصلاحية
-  final DateTime? renewedAt; // تاريخ التجديد
   final DateTime? licenseStartAt;
   final DateTime? licenseEndAt;
   final int? licenseDurationDays;
   final bool licenseAutoRenew;
-  final DateTime? licenseLastRenewedAt;
   final String? currentPackageId;
   final WeeklyWorkingHours? workingHours; // مواعيد العمل
   final int numberOfProducts; // عدد المنتجات المسموح بها
@@ -49,13 +46,10 @@ class StoreModel {
     required this.storeStatus,
     required this.status,
     required this.isVisible,
-    this.expiredAt,
-    this.renewedAt,
     this.licenseStartAt,
     this.licenseEndAt,
     this.licenseDurationDays,
     this.licenseAutoRenew = false,
-    this.licenseLastRenewedAt,
     this.currentPackageId,
     this.workingHours,
     required this.numberOfProducts,
@@ -80,6 +74,14 @@ class StoreModel {
       }
     }
 
+    DateTime? _readDate(dynamic v) {
+      if (v is Timestamp) return v.toDate();
+      if (v is DateTime) return v;
+      return null;
+    }
+
+    final subscription = map['subscription'] as Map<String, dynamic>? ?? {};
+
     return StoreModel(
       id: id,
       name: map['name'] ?? '',
@@ -96,23 +98,11 @@ class StoreModel {
       storeStatus: map['storeStatus'] ?? true,
       status: status,
       isVisible: map['isVisible'] ?? true,
-      expiredAt: map['expiredAt'] != null
-          ? (map['expiredAt'] as Timestamp).toDate()
-          : null,
-      renewedAt: map['renewedAt'] != null
-          ? (map['renewedAt'] as Timestamp).toDate()
-          : null,
-      licenseStartAt: map['licenseStartAt'] != null
-          ? (map['licenseStartAt'] as Timestamp).toDate()
-          : null,
-      licenseEndAt: map['licenseEndAt'] != null
-          ? (map['licenseEndAt'] as Timestamp).toDate()
-          : null,
-      licenseDurationDays: map['licenseDurationDays'] as int?,
+      // قراءة التواريخ من الحقول الموحدة أو من الحقول القديمة كـ Fallback
+      licenseStartAt: _readDate(map['licenseStartAt']),
+      licenseEndAt: _readDate(map['licenseEndAt']),
+      licenseDurationDays: (map['licenseDurationDays'] ?? 0) as int?,
       licenseAutoRenew: map['licenseAutoRenew'] == true,
-      licenseLastRenewedAt: map['licenseLastRenewedAt'] != null
-          ? (map['licenseLastRenewedAt'] as Timestamp).toDate()
-          : null,
       currentPackageId: map['currentPackageId'] as String?,
       workingHours: workingHours,
       numberOfProducts: map['numberOfProducts'] ?? 0,
@@ -138,17 +128,13 @@ class StoreModel {
       'storeStatus': storeStatus,
       'status': status.name,
       'isVisible': isVisible,
-      'expiredAt': expiredAt != null ? Timestamp.fromDate(expiredAt!) : null,
-      'renewedAt': renewedAt != null ? Timestamp.fromDate(renewedAt!) : null,
+      // نكتفي فقط بحقلي البداية والنهاية كما طلب المستخدم
       'licenseStartAt':
           licenseStartAt != null ? Timestamp.fromDate(licenseStartAt!) : null,
       'licenseEndAt':
           licenseEndAt != null ? Timestamp.fromDate(licenseEndAt!) : null,
       'licenseDurationDays': licenseDurationDays,
       'licenseAutoRenew': licenseAutoRenew,
-      'licenseLastRenewedAt': licenseLastRenewedAt != null
-          ? Timestamp.fromDate(licenseLastRenewedAt!)
-          : null,
       'currentPackageId': currentPackageId,
       'workingHours': workingHours?.toMap(),
       'numberOfProducts': numberOfProducts,
@@ -157,4 +143,26 @@ class StoreModel {
       'totalReviews': totalReviews,
     };
   }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // License Helper Methods
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  /// Returns true if the store's license has expired
+  bool get isLicenseExpired {
+    if (licenseEndAt == null) return true;
+    return DateTime.now().isAfter(licenseEndAt!);
+  }
+
+  /// Returns the number of days until license expiry (negative if already expired)
+  int get daysUntilExpiry {
+    if (licenseEndAt == null) return 0;
+    return licenseEndAt!.difference(DateTime.now()).inDays;
+  }
+
+  /// Returns true if license is about to expire (within 7 days) but not yet expired
+  bool get isLicenseWarning => daysUntilExpiry <= 7 && daysUntilExpiry >= 0;
+
+  /// Returns true if the store has an active (non-expired) license
+  bool get hasActiveLicense => !isLicenseExpired;
 }

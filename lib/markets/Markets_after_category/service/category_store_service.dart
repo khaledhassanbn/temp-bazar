@@ -100,12 +100,16 @@ class CategoryStoreService {
       for (int i = 0; i < storeIds.length; i++) storeIds[i]: i,
     };
     stores.sort((a, b) => (orderMap[a.id] ?? 0).compareTo(orderMap[b.id] ?? 0));
+
+    // Filter out expired stores (only show stores with active licenses)
+    stores.removeWhere((store) => store.isLicenseExpired);
+
     return stores;
   }
   Future<List<StoreModel>> getAllStores() async {
     final query = await _firestore.collection('markets').get();
     
-    return await Future.wait(query.docs.map((doc) async {
+    final allStores = await Future.wait(query.docs.map((doc) async {
       final data = doc.data();
       try {
         final statsDoc = await _firestore
@@ -124,5 +128,8 @@ class CategoryStoreService {
       }
       return StoreModel.fromMap(doc.id, data);
     }));
+
+    // Filter out expired stores (only show stores with active licenses)
+    return allStores.where((store) => store.hasActiveLicense).toList();
   }
 }

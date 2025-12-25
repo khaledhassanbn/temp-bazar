@@ -35,7 +35,7 @@ class StoreSortBar extends StatelessWidget {
                   _buildSortChip('الاسم', 'name', Icons.sort_by_alpha),
                   _buildSortChip(
                     'تاريخ الانتهاء',
-                    'expiryDate',
+                    'licenseEndAt',
                     Icons.calendar_today,
                   ),
                   _buildSortChip('الفئات', 'productCount', Icons.category),

@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:cloud_functions/cloud_functions.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:provider/provider.dart';
 import 'package:bazar_suez/authentication/guards/AuthGuard.dart';
 import 'package:go_router/go_router.dart';
@@ -24,9 +24,7 @@ class _CreatePackagePageState extends State<CreatePackagePage> {
   ];
 
   bool _isLoading = false;
-  final FirebaseFunctions _functions = FirebaseFunctions.instanceFor(
-    region: 'europe-west1',
-  );
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
   @override
   void dispose() {
@@ -93,13 +91,14 @@ class _CreatePackagePageState extends State<CreatePackagePage> {
 
       final orderIndex = int.tryParse(_orderIndexController.text) ?? 0;
 
-      // استدعاء Cloud Function لإنشاء الباقة
-      await _functions.httpsCallable('createPackageCallable').call({
+      // إنشاء الباقة مباشرة في Firestore
+      await _firestore.collection('packages').add({
         'name': _nameController.text.trim(),
         'days': int.parse(_daysController.text),
         'price': price,
         'features': features,
         'orderIndex': orderIndex,
+        'createdAt': Timestamp.now(),
       });
 
       if (mounted) {

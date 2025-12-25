@@ -6,7 +6,6 @@ class LicenseStatus {
   final DateTime? endAt;
   final int durationDays;
   final bool autoRenewEnabled;
-  final DateTime? lastRenewedAt;
   final String? currentPackageId;
   final String? currentPackageName;
 
@@ -16,7 +15,6 @@ class LicenseStatus {
     required this.endAt,
     required this.durationDays,
     required this.autoRenewEnabled,
-    required this.lastRenewedAt,
     required this.currentPackageId,
     required this.currentPackageName,
   });
@@ -41,14 +39,14 @@ class LicenseStatus {
 
     return LicenseStatus(
       marketId: marketId,
-      startAt: _readDate(data['licenseStartAt']) ?? _readDate(subscription['startDate']),
-      endAt: _readDate(data['licenseEndAt']) ?? _readDate(data['expiryDate']),
-      durationDays: (data['licenseDurationDays'] ?? subscription['durationDays'] ?? 0) as int,
+      startAt: _readDate(data['licenseStartAt']),
+      endAt: _readDate(data['licenseEndAt']),
+      durationDays: (data['licenseDurationDays'] ?? 0) as int,
       autoRenewEnabled: data['licenseAutoRenew'] == true,
-      lastRenewedAt: _readDate(data['licenseLastRenewedAt']),
-      currentPackageId: data['currentPackageId'] as String? ?? subscription['packageId'] as String?,
-      currentPackageName: data['currentPackageName'] as String? ?? subscription['packageName'] as String?,
+      currentPackageId: data['currentPackageId'] as String?,
+      currentPackageName: data['currentPackageName'] as String?,
     );
   }
 }
+
 

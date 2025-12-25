@@ -4,6 +4,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import '../../planes/models/package.dart';
 import '../../wallet/services/wallet_service.dart';
 import '../models/license_status.dart';
+import '../../create_market/models/store_model.dart';
 
 class LicenseService {
   final FirebaseFirestore _firestore;
@@ -43,6 +44,15 @@ class LicenseService {
     return LicenseStatus.fromDoc(marketId, data);
   }
 
+  Future<StoreModel> fetchStore(String marketId) async {
+    final doc = await _firestore.collection('markets').doc(marketId).get();
+    final data = doc.data();
+    if (!doc.exists || data == null) {
+      throw Exception('المتجر غير موجود');
+    }
+    return StoreModel.fromMap(marketId, data);
+  }
+
   Future<double> fetchBalance(String userId) {
     return _walletService.getWalletBalance(userId);
   }
@@ -78,24 +88,20 @@ class LicenseService {
         return now;
       }
 
-      final currentEnd = _readDate(data['licenseEndAt'] ?? data['expiryDate']);
+      final currentEnd = _readDate(data['licenseEndAt']);
       final base = currentEnd.isAfter(now) ? currentEnd : now;
       final newEnd = base.add(Duration(days: package.days));
 
       txn.update(ref, {
+        // الحقول الرئيسية للترخيص فقط
+        'licenseStartAt': Timestamp.fromDate(now),
         'licenseEndAt': Timestamp.fromDate(newEnd),
-        'expiryDate': Timestamp.fromDate(newEnd),
         'licenseDurationDays': package.days,
-        'licenseLastRenewedAt': Timestamp.fromDate(now),
+        'licenseAutoRenew': data['licenseAutoRenew'] ?? false,
+        // معلومات الباقة
         'currentPackageId': package.id,
         'currentPackageName': package.name,
-        'subscription': {
-          'packageName': package.name,
-          'packageId': package.id,
-          'startDate': Timestamp.fromDate(now),
-          'endDate': Timestamp.fromDate(newEnd),
-          'durationDays': package.days,
-        },
+        // حالة المتجر
         'isActive': true,
         'canAddProducts': true,
         'canReceiveOrders': true,

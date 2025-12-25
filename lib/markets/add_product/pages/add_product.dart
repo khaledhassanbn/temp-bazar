@@ -5,6 +5,7 @@ import 'package:bazar_suez/widgets/app_field.dart';
 import 'package:bazar_suez/widgets/custom_back_button.dart';
 import 'package:bazar_suez/widgets/primary_button.dart';
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:smooth_page_indicator/smooth_page_indicator.dart';
@@ -374,6 +375,13 @@ class _AddProductModernPageState extends State<AddProductModernPage> {
                   ),
                   child: Consumer<AddProductViewModel>(
                     builder: (context, vm, _) {
+                      // ========================================
+                      // التحقق من صلاحية ترخيص المتجر
+                      // ========================================
+                      if (vm.selectedStore != null && vm.selectedStore!.isLicenseExpired) {
+                        return _buildLicenseExpiredMessage(context, vm.selectedStore!);
+                      }
+
                       return Column(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
@@ -852,6 +860,81 @@ class _AddProductModernPageState extends State<AddProductModernPage> {
             ],
           ),
         ),
+      ),
+    );
+  }
+
+  /// Widget displayed when store license is expired
+  Widget _buildLicenseExpiredMessage(BuildContext context, store) {
+    return Padding(
+      padding: const EdgeInsets.all(24),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(24),
+            decoration: BoxDecoration(
+              color: Colors.red.shade50,
+              shape: BoxShape.circle,
+            ),
+            child: Icon(
+              Icons.lock_outline,
+              size: 64,
+              color: Colors.red.shade400,
+            ),
+          ),
+          const SizedBox(height: 24),
+          Text(
+            'انتهت صلاحية الترخيص',
+            style: TextStyle(
+              fontSize: 22,
+              fontWeight: FontWeight.bold,
+              color: Colors.red.shade700,
+            ),
+          ),
+          const SizedBox(height: 12),
+          Text(
+            'لا يمكنك إضافة منتجات جديدة حتى تجدد ترخيص المتجر',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: 16,
+              color: Colors.grey.shade600,
+            ),
+          ),
+          const SizedBox(height: 8),
+          if (store.licenseEndAt != null)
+            Text(
+              'انتهى في: ${store.licenseEndAt!.day}/${store.licenseEndAt!.month}/${store.licenseEndAt!.year}',
+              style: TextStyle(
+                fontSize: 14,
+                color: Colors.grey.shade500,
+              ),
+            ),
+          const SizedBox(height: 32),
+          ElevatedButton.icon(
+            onPressed: () {
+              context.push('/PricingPage');
+            },
+            icon: const Icon(Icons.refresh),
+            label: const Text('تجديد الترخيص الآن'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.mainColor,
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(30),
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
+          TextButton(
+            onPressed: () => context.pop(),
+            child: Text(
+              'العودة',
+              style: TextStyle(color: Colors.grey.shade600),
+            ),
+          ),
+        ],
       ),
     );
   }

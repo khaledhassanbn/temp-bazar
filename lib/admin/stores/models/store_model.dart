@@ -5,8 +5,8 @@ class StoreModel {
   final String name;
   final String? phone;
   final bool isActive;
-  final DateTime? expiryDate;
-  final Map<String, dynamic>? subscription;
+  final DateTime? licenseStartAt;
+  final DateTime? licenseEndAt;
   final int? totalProducts;
   final Map<String, dynamic>? userData;
 
@@ -15,23 +15,30 @@ class StoreModel {
     required this.name,
     this.phone,
     required this.isActive,
-    this.expiryDate,
-    this.subscription,
+    this.licenseStartAt,
+    this.licenseEndAt,
     this.totalProducts,
     this.userData,
   });
 
   factory StoreModel.fromDocument(DocumentSnapshot doc) {
     final data = doc.data() as Map<String, dynamic>;
+    
+    DateTime? _readDate(dynamic v) {
+      if (v is Timestamp) return v.toDate();
+      if (v is DateTime) return v;
+      return null;
+    }
+
+    final subscription = data['subscription'] as Map<String, dynamic>?;
+
     return StoreModel(
       id: doc.id,
       name: data['name']?.toString() ?? 'بدون اسم',
       phone: data['phone']?.toString(),
       isActive: data['isActive'] == true,
-      expiryDate: data['expiryDate'] != null
-          ? (data['expiryDate'] as Timestamp).toDate()
-          : null,
-      subscription: data['subscription'] as Map<String, dynamic>?,
+      licenseStartAt: _readDate(data['licenseStartAt']),
+      licenseEndAt: _readDate(data['licenseEndAt']),
       totalProducts: data['totalProducts'] as int?,
     );
   }
@@ -42,26 +49,20 @@ class StoreModel {
       'name': name,
       'phone': phone,
       'isActive': isActive,
-      'expiryDate': expiryDate != null ? Timestamp.fromDate(expiryDate!) : null,
-      'subscription': subscription,
+      'licenseStartAt': licenseStartAt != null ? Timestamp.fromDate(licenseStartAt!) : null,
+      'licenseEndAt': licenseEndAt != null ? Timestamp.fromDate(licenseEndAt!) : null,
       'totalProducts': totalProducts,
     };
   }
 
   // حساب الأيام المتبقية
   int get daysRemaining {
-    if (expiryDate == null) return 0;
+    if (licenseEndAt == null) return 0;
     final now = DateTime.now();
-    if (expiryDate!.isAfter(now)) {
-      return expiryDate!.difference(now).inDays;
+    if (licenseEndAt!.isAfter(now)) {
+      return licenseEndAt!.difference(now).inDays;
     }
     return 0;
-  }
-
-  // الحصول على اسم الباقة
-  String get planName {
-    if (subscription == null) return 'غير محدد';
-    return subscription?['packageName']?.toString() ?? 'غير محدد';
   }
 
   // الحصول على اسم المستخدم

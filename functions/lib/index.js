@@ -4,10 +4,8 @@
  *
  * This module provides:
  * - Paymob webhook integration for subscription renewals
- * - Scheduled function to check and disable expired subscriptions
- * - Store status checking API
- * - Package management (CRUD) for admin users
  * - Facebook Data Deletion callback
+ * - Scheduled function for cleanup and auto-renewal
  */
 var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
     if (k2 === undefined) k2 = k;
@@ -43,7 +41,7 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.facebookDataDeletionRequest = exports.deletePackageCallable = exports.updatePackageCallable = exports.createPackageCallable = exports.suspendStoreSubscriptionCallable = exports.addDaysToStoreSubscriptionCallable = exports.renewStoreSubscriptionCallable = exports.checkStoreStatusCallable = exports.cleanupExpiredPendingPaymentsScheduled = exports.deleteExpiredAdsImagesScheduled = exports.licenseExpiryAlertsScheduled = exports.autoRenewSubscriptionsScheduled = exports.checkExpiredSubscriptionsScheduled = exports.paymobWebhookHandler = void 0;
+exports.facebookDataDeletionRequest = exports.cleanupExpiredPendingPaymentsScheduled = exports.deleteExpiredAdsImagesScheduled = exports.autoRenewSubscriptionsScheduled = exports.paymobWebhookHandler = void 0;
 // ---------------------------------------------------------------------------
 // INITIALIZE FIREBASE ADMIN
 // ---------------------------------------------------------------------------
@@ -67,17 +65,9 @@ if (!fbAppSecret) {
 // IMPORT OTHER MODULES
 // ---------------------------------------------------------------------------
 const functions = __importStar(require("firebase-functions/v2"));
-const https_1 = require("firebase-functions/v2/https");
 const v2_1 = require("firebase-functions/v2");
 const webhook_1 = require("./paymob/webhook");
-const checkExpired_1 = require("./subscriptions/checkExpired");
-const checkStatus_1 = require("./subscriptions/checkStatus");
-const renewSubscription_1 = require("./subscriptions/renewSubscription");
-const addDays_1 = require("./subscriptions/addDays");
-const suspendSubscription_1 = require("./subscriptions/suspendSubscription");
 const autoRenew_1 = require("./subscriptions/autoRenew");
-const expiryAlerts_1 = require("./subscriptions/expiryAlerts");
-const crud_1 = require("./packages/crud");
 const dataDeletion_1 = require("./facebook/dataDeletion");
 const deleteExpiredImages_1 = require("./ads/deleteExpiredImages");
 const cleanupExpired_1 = require("./pendingPayments/cleanupExpired");
@@ -96,83 +86,23 @@ exports.paymobWebhookHandler = functions.https.onRequest({
     memory: "512MiB",
 }, webhook_1.paymobWebhook);
 // ---------------------------------------------------------------------------
-// SCHEDULED FUNCTION - Checks and disables expired subscriptions
+// SCHEDULED FUNCTIONS
 // ---------------------------------------------------------------------------
-exports.checkExpiredSubscriptionsScheduled = functions.scheduler.onSchedule({
-    schedule: "0 * * * *", // Every hour
-    timeZone: "Africa/Cairo",
-    memory: "512MiB",
-}, checkExpired_1.checkExpiredSubscriptions);
 exports.autoRenewSubscriptionsScheduled = functions.scheduler.onSchedule({
     schedule: "0 * * * *", // Every hour
     timeZone: "Africa/Cairo",
     memory: "512MiB",
 }, autoRenew_1.autoRenewSubscriptions);
-exports.licenseExpiryAlertsScheduled = functions.scheduler.onSchedule({
-    schedule: "0 8 * * *", // Daily at 8 AM Cairo
-    timeZone: "Africa/Cairo",
-    memory: "256MiB",
-}, expiryAlerts_1.sendExpiryAlerts);
-// ---------------------------------------------------------------------------
-// SCHEDULED FUNCTION - Deletes images of expired ads
-// ---------------------------------------------------------------------------
 exports.deleteExpiredAdsImagesScheduled = functions.scheduler.onSchedule({
     schedule: "0 2 * * *", // Every day at 2:00 AM
     timeZone: "Africa/Cairo",
     memory: "512MiB",
 }, deleteExpiredImages_1.deleteExpiredAdsImages);
-// ---------------------------------------------------------------------------
-// SCHEDULED FUNCTION - Cleans up expired pending payments (24 hours)
-// ---------------------------------------------------------------------------
 exports.cleanupExpiredPendingPaymentsScheduled = functions.scheduler.onSchedule({
     schedule: "0 * * * *", // Every hour
     timeZone: "Africa/Cairo",
     memory: "512MiB",
 }, cleanupExpired_1.cleanupExpiredPendingPayments);
-// ---------------------------------------------------------------------------
-// CALLABLE FUNCTION - Check store subscription status
-// ---------------------------------------------------------------------------
-exports.checkStoreStatusCallable = (0, https_1.onCall)({
-    memory: "256MiB",
-}, async (request) => {
-    return await (0, checkStatus_1.checkStoreStatus)(request);
-});
-// ---------------------------------------------------------------------------
-// SUBSCRIPTION RENEWAL (Admin Only)
-// ---------------------------------------------------------------------------
-exports.renewStoreSubscriptionCallable = (0, https_1.onCall)({
-    memory: "256MiB",
-}, async (request) => {
-    return await (0, renewSubscription_1.renewStoreSubscription)(request);
-});
-exports.addDaysToStoreSubscriptionCallable = (0, https_1.onCall)({
-    memory: "256MiB",
-}, async (request) => {
-    return await (0, addDays_1.addDaysToStoreSubscription)(request);
-});
-exports.suspendStoreSubscriptionCallable = (0, https_1.onCall)({
-    memory: "256MiB",
-}, async (request) => {
-    return await (0, suspendSubscription_1.suspendStoreSubscription)(request);
-});
-// ---------------------------------------------------------------------------
-// PACKAGE MANAGEMENT (Admin Only)
-// ---------------------------------------------------------------------------
-exports.createPackageCallable = (0, https_1.onCall)({
-    memory: "256MiB",
-}, async (request) => {
-    return await (0, crud_1.createPackage)(request);
-});
-exports.updatePackageCallable = (0, https_1.onCall)({
-    memory: "256MiB",
-}, async (request) => {
-    return await (0, crud_1.updatePackage)(request);
-});
-exports.deletePackageCallable = (0, https_1.onCall)({
-    memory: "256MiB",
-}, async (request) => {
-    return await (0, crud_1.deletePackage)(request);
-});
 // ---------------------------------------------------------------------------
 // FACEBOOK DATA DELETION CALLBACK
 // ---------------------------------------------------------------------------

@@ -1,6 +1,8 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 // استيراد الودجات اللي قسمناها
 import 'package:bazar_suez/markets/home_market/widgets/market_cover_section.dart';
@@ -9,6 +11,7 @@ import 'package:bazar_suez/markets/home_market/widgets/market_appbar.dart';
 import 'package:bazar_suez/markets/home_market/widgets/market_product_section.dart';
 import 'package:bazar_suez/markets/home_market/widgets/floating_cart_bar.dart';
 import 'package:bazar_suez/markets/home_market/viewmodels/market_details_viewmodel.dart';
+import 'package:bazar_suez/markets/license/widgets/license_warning_banner.dart';
 
 class MarketAnimatedPage extends StatefulWidget {
   final String? marketLink;
@@ -35,11 +38,36 @@ class _MarketAnimatedPageState extends State<MarketAnimatedPage>
   bool _isProgrammaticScroll = false;
   bool _isScrolling = false;
   Timer? _scrollDebounceTimer;
+  String? _userMarketId;
+
+  /// يتحقق إذا كان المستخدم الحالي هو صاحب المتجر
+  bool _isStoreOwner(String storeId) {
+    return _userMarketId != null && _userMarketId == storeId;
+  }
+
+  Future<void> _loadUserMarketId() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
+    try {
+      final doc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid)
+          .get();
+      final data = doc.data();
+      if (data != null) {
+        _userMarketId = data['market_id'] as String? ??
+            data['marketId'] as String? ??
+            (data['market'] is Map ? data['market']['id'] as String? : null);
+        if (mounted) setState(() {});
+      }
+    } catch (_) {}
+  }
 
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 1, vsync: this);
+    _loadUserMarketId(); // تحميل معرف متجر المستخدم
 
     _scrollController.addListener(() {
       if (!_scrollController.hasClients) return;
@@ -139,8 +167,18 @@ class _MarketAnimatedPageState extends State<MarketAnimatedPage>
             final bool isMerged = scrollOffset >= mergePoint;
             final vm = context.watch<MarketDetailsViewModel>();
 
+            // ═══════════════════════════════════════════════════════════════
+            // 🔒 التحقق من صلاحية الترخيص للمستخدمين الآخرين
+            // إذا كان الترخيص منتهياً والزائر ليس صاحب المتجر = عرض صفحة غير متاح
+            // ═══════════════════════════════════════════════════════════════
+            if (vm.store != null && 
+                vm.store!.isLicenseExpired && 
+                !_isStoreOwner(vm.store!.id)) {
+              return _buildStoreUnavailablePage(context, vm.store!);
+            }
+
             // 🔹 ترتيب الفئات (الأكثر مبيعاً -> العروض -> الباقي)
-            List<MarketCategoryModel> _orderedCategories() {
+            List<MarketCategoryModel> orderedCategories() {
               String normalizeArabic(String input) {
                 final diacritics = RegExp('[\u064B-\u0652]');
                 return input
@@ -183,7 +221,7 @@ class _MarketAnimatedPageState extends State<MarketAnimatedPage>
               return ordered;
             }
 
-            final ordered = _orderedCategories();
+            final ordered = orderedCategories();
 
             // تحديث TabController عند تغير عدد الفئات
             final int desiredLength = ordered.isEmpty ? 1 : ordered.length;
@@ -273,6 +311,9 @@ class _MarketAnimatedPageState extends State<MarketAnimatedPage>
                   },
                 ),
                 const FloatingCartBar(),
+                // === Overlay حجب الصفحة عند انتهاء الترخيص (لصاحب المتجر فقط) ===
+                if (vm.store != null && _isStoreOwner(vm.store!.id))
+                  LicenseExpiredOverlay(store: vm.store!),
               ],
             );
           },
@@ -288,5 +329,100 @@ class _MarketAnimatedPageState extends State<MarketAnimatedPage>
     _tabController.dispose();
     _scrollOffsetNotifier.dispose();
     super.dispose();
+  }
+
+  /// صفحة تظهر للمستخدمين الآخرين عندما يكون ترخيص المتجر منتهياً
+  Widget _buildStoreUnavailablePage(BuildContext context, store) {
+    return Scaffold(
+      backgroundColor: const Color(0xFFF8F9FA),
+      appBar: AppBar(
+        backgroundColor: Colors.white,
+        elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, color: Colors.black87),
+          onPressed: () => Navigator.of(context).pop(),
+        ),
+        title: Text(
+          store.name ?? 'المتجر',
+          style: const TextStyle(
+            color: Colors.black87,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        centerTitle: true,
+      ),
+      body: Center(
+        child: Padding(
+          padding: const EdgeInsets.all(32),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              // أيقونة المتجر المغلق
+              Container(
+                width: 120,
+                height: 120,
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade100,
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  Icons.store_mall_directory_outlined,
+                  size: 60,
+                  color: Colors.grey.shade400,
+                ),
+              ),
+              const SizedBox(height: 32),
+              // العنوان
+              const Text(
+                'المتجر غير متاح حالياً',
+                style: TextStyle(
+                  fontSize: 24,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF2C3E50),
+                ),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 16),
+              // الوصف
+              Text(
+                'هذا المتجر غير متاح للزيارة في الوقت الحالي.\nيرجى المحاولة لاحقاً.',
+                style: TextStyle(
+                  fontSize: 16,
+                  color: Colors.grey.shade600,
+                  height: 1.5,
+                ),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 40),
+              // زر العودة للصفحة الرئيسية
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton.icon(
+                  onPressed: () {
+                    Navigator.of(context).popUntil((route) => route.isFirst);
+                  },
+                  icon: const Icon(Icons.home_outlined),
+                  label: const Text(
+                    'العودة للصفحة الرئيسية',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF4E99B4),
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 }

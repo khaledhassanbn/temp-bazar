@@ -377,6 +377,7 @@ class _AccountPageState extends State<AccountPage> {
 
   Future<void> _signOut() async {
     if (_isSigningOut) return;
+    if (!mounted) return;
     setState(() => _isSigningOut = true);
     try {
       await FirebaseAuth.instance.signOut();

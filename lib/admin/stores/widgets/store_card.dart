@@ -31,25 +31,20 @@ class StoreCard extends StatelessWidget {
             // حساب الأيام المتبقية
             int daysRemaining = 0;
             bool isActive = data['isActive'] == true;
-            DateTime? expiryDate;
+            DateTime? licenseEndAt;
 
-            if (data['expiryDate'] != null) {
-              expiryDate = (data['expiryDate'] as Timestamp).toDate();
+            if (data['licenseEndAt'] != null) {
+              licenseEndAt = (data['licenseEndAt'] as Timestamp).toDate();
               final now = DateTime.now();
-              if (expiryDate.isAfter(now)) {
-                daysRemaining = expiryDate.difference(now).inDays;
+              if (licenseEndAt.isAfter(now)) {
+                daysRemaining = licenseEndAt.difference(now).inDays;
               } else {
                 daysRemaining = 0;
               }
             }
 
             // الحصول على اسم الباقة
-            String planName = 'غير محدد';
-            if (data['subscription'] != null) {
-              final subscription =
-                  data['subscription'] as Map<String, dynamic>?;
-              planName = subscription?['packageName'] ?? 'غير محدد';
-            }
+            String planName = data['currentPackageName'] ?? 'غير محدد';
 
             // تحديد لون الحالة
             Color statusColor = isActive ? Colors.green : Colors.red;

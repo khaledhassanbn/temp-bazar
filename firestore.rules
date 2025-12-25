@@ -22,10 +22,10 @@ service cloud.firestore {
     function isStoreActive(storeId) {
       let store = get(/databases/$(database)/documents/markets/$(storeId));
       let now = request.time;
-      let expiryDate = store.data.expiryDate;
+      let licenseEndAt = store.data.licenseEndAt;
       return store.data.isActive == true && 
-             expiryDate != null && 
-             expiryDate > now;
+             licenseEndAt != null && 
+             licenseEndAt > now;
     }
     
     // Check if store can add products
@@ -65,7 +65,8 @@ service cloud.firestore {
       allow update: if (isStoreOwner(storeId) || isAdmin()) && (
         // Allow updates to subscription-related fields (for renewal)
         request.resource.data.diff(resource.data).affectedKeys()
-          .hasOnly(['isActive', 'expiryDate', 'subscription', 'canAddProducts', 
+          .hasOnly(['isActive', 'licenseStartAt', 'licenseEndAt', 'licenseDurationDays', 
+                   'licenseAutoRenew', 'canAddProducts', 'currentPackageId', 'currentPackageName',
                    'canReceiveOrders', 'deactivatedAt', 'status', 'isVisible']) ||
         // Allow other updates only if subscription is active
         isStoreActive(storeId)

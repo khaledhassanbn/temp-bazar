@@ -245,28 +245,18 @@ class CreateStoreViewModel extends ChangeNotifier {
         'storeStatus': true, // حالة المتجر - افتراضياً true
         'status': 'active', // حالة العرض - افتراضياً active
         'isVisible': true, // إظهار المتجر - افتراضياً true
-        'expiredAt': Timestamp.fromDate(licenseEndAt), // الحقل القديم للتوافق
-        'renewedAt': null, // تاريخ التجديد - افتراضياً null (قديم للتوافق)
         'createdAt': Timestamp.fromDate(now), // استخدام وقت السيرفر
-        // حقول الترخيص الجديدة
-        'ownerId': FirebaseAuth.instance.currentUser?.uid,
+        // الحقول الرئيسية للترخيص
         'licenseStartAt': Timestamp.fromDate(now),
         'licenseEndAt': Timestamp.fromDate(licenseEndAt),
         'licenseDurationDays': durationDays,
         'licenseAutoRenew': autoRenewEnabled,
-        'licenseLastRenewedAt': null,
-        'currentPackageId': packageId,
+        'ownerId': FirebaseAuth.instance.currentUser?.uid,
         'isActive': true,
         'canAddProducts': true,
         'canReceiveOrders': true,
-        'subscription': {
-          'packageName': null,
-          'startDate': Timestamp.fromDate(now),
-          'endDate': Timestamp.fromDate(licenseEndAt),
-          'durationDays': durationDays,
-        },
-        'expiryDate': Timestamp.fromDate(licenseEndAt), // لتوافق وظائف السحابة الحالية
-        'numberOfProducts': numberOfProducts, // عدد المنتجات المسموح بها
+        'currentPackageId': packageId,
+        'numberOfProducts': numberOfProducts,
         // معلومات الفئات
         'categoryId': selectedCategoryId,
         'categoryNameAr': selectedCategoryNameAr,
@@ -296,13 +286,6 @@ class CreateStoreViewModel extends ChangeNotifier {
             'currentPackageId': cachedPendingPayment.packageId,
             'currentPackageName': cachedPendingPayment.packageName,
             'licenseDurationDays': cachedPendingPayment.days,
-            'subscription': {
-              'packageId': cachedPendingPayment.packageId,
-              'packageName': cachedPendingPayment.packageName,
-              'startDate': Timestamp.fromDate(now),
-              'endDate': Timestamp.fromDate(licenseEndAt),
-              'durationDays': cachedPendingPayment.days,
-            },
           }, SetOptions(merge: true));
         } catch (e) {
           // لا نفشل إنشاء المتجر لو فشل ربط الدفع

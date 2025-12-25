@@ -14,7 +14,8 @@ import '../widgets/home_promotional_banner.dart';
 import '../widgets/home_categories_icons.dart';
 import '../widgets/home_stores_section.dart';
 import '../../license/services/license_service.dart';
-import '../../license/models/license_status.dart';
+import '../../license/widgets/license_warning_banner.dart';
+import '../../create_market/models/store_model.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -26,27 +27,30 @@ class HomePage extends StatefulWidget {
 class _HomePageState extends State<HomePage> {
   final TextEditingController searchController = TextEditingController();
   final LicenseService _licenseService = LicenseService();
-  LicenseStatus? _licenseStatus;
+  StoreModel? _myStore;
   bool _licenseLoading = false;
 
   @override
   void initState() {
     super.initState();
 
+    // 🔹 تحميل حالة الترخيص فوراً (بشكل مستقل)
+    _loadLicenseStatus();
+
     // 🔹 تحميل الفئات عند فتح الصفحة
     Future.microtask(() async {
+      if (!mounted) return;
       final categoryVm = Provider.of<CategoryViewModel>(context, listen: false);
       final filterVm = Provider.of<CategoryFilterViewModel>(context, listen: false);
       
       await categoryVm.fetchCategories();
+      if (!mounted) return;
       
       // Load stores for all categories for home page display
       if (categoryVm.categories.isNotEmpty) {
         final categoryIds = categoryVm.categories.map((c) => c.id).toList();
         await filterVm.fetchStoresForAllCategories(categoryIds, limit: 8);
       }
-
-      _loadLicenseStatus();
     });
   }
 
@@ -199,12 +203,12 @@ class _HomePageState extends State<HomePage> {
                           children: [
                             const SizedBox(height: 16),
 
-                            if (_shouldShowLicenseBanner)
-                              _buildLicenseBanner()
+                            if (_myStore != null)
+                              LicenseWarningBanner(store: _myStore!)
                                   .animate()
                                   .fadeIn(duration: 300.ms),
 
-                            if (_shouldShowLicenseBanner)
+                            if (_myStore != null && (_myStore!.daysUntilExpiry <= 3 || _myStore!.isLicenseExpired))
                               const SizedBox(height: 12),
 
                             // 🔹 بانر العروض الترويجية
@@ -301,17 +305,19 @@ class _HomePageState extends State<HomePage> {
 
   Future<void> _loadLicenseStatus() async {
     if (_licenseLoading) return;
+    if (!mounted) return;
     setState(() => _licenseLoading = true);
     try {
       final marketId = await _licenseService.resolveCurrentUserMarketId();
+      if (!mounted) return;
       if (marketId == null) {
         setState(() => _licenseLoading = false);
         return;
       }
-      final status = await _licenseService.fetchStatus(marketId);
+      final store = await _licenseService.fetchStore(marketId);
       if (!mounted) return;
       setState(() {
-        _licenseStatus = status;
+        _myStore = store;
         _licenseLoading = false;
       });
     } catch (_) {
@@ -319,44 +325,6 @@ class _HomePageState extends State<HomePage> {
         setState(() => _licenseLoading = false);
       }
     }
-  }
-
-  bool get _shouldShowLicenseBanner {
-    if (_licenseStatus == null) return false;
-    final days = _licenseStatus!.remainingDays;
-    return days > 0 && days <= 3;
-  }
-
-  Widget _buildLicenseBanner() {
-    final days = _licenseStatus?.remainingDays ?? 0;
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 16),
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: Colors.orange.shade50,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.orange.shade200),
-      ),
-      child: Row(
-        children: [
-          const Icon(Icons.warning_amber_rounded, color: Colors.orange),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Text(
-              'متبقي $days يوم قبل انتهاء ترخيص متجرك. جدد الآن.',
-              style: const TextStyle(
-                color: Color(0xFF92400E),
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ),
-          TextButton(
-            onPressed: () => context.go('/license-status'),
-            child: const Text('اذهب'),
-          ),
-        ],
-      ),
-    );
   }
 
   /// طبقة الحجب عند عدم تحديد الموقع
