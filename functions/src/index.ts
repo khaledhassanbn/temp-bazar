@@ -5,6 +5,7 @@
  * - Paymob webhook integration for subscription renewals
  * - Facebook Data Deletion callback
  * - Scheduled function for cleanup and auto-renewal
+ * - Order notifications (new order, status changes)
  */
 
 // ---------------------------------------------------------------------------
@@ -40,6 +41,10 @@ import { autoRenewSubscriptions } from "./subscriptions/autoRenew";
 import { facebookDataDeletion } from "./facebook/dataDeletion";
 import { deleteExpiredAdsImages } from "./ads/deleteExpiredImages";
 import { cleanupExpiredPendingPayments } from "./pendingPayments/cleanupExpired";
+
+// Order Notifications
+import { sendNewOrderNotification } from "./notifications/sendOrderNotification";
+import { sendOrderStatusNotification, sendPastOrderNotification } from "./notifications/sendStatusNotification";
 
 // ---------------------------------------------------------------------------
 // GLOBAL OPTIONS
@@ -105,3 +110,16 @@ export const facebookDataDeletionRequest = functions.https.onRequest(
     await facebookDataDeletion(req, res, fbAppSecret as string);
   }
 );
+
+// ---------------------------------------------------------------------------
+// ORDER NOTIFICATIONS
+// ---------------------------------------------------------------------------
+
+// إشعار للتاجر عند وصول طلب جديد
+export { sendNewOrderNotification };
+
+// إشعار عند تغيير حالة الطلب (accepted, rejected, completed)
+export { sendOrderStatusNotification };
+
+// إشعار للعميل عند نقل الطلب إلى past_order (completed)
+export { sendPastOrderNotification };

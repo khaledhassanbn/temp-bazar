@@ -13,6 +13,7 @@ import 'package:bazar_suez/markets/order_of_markets/widget/OrderCollapsibleHeade
 import 'package:bazar_suez/markets/order_of_markets/widget/OrderCard.dart';
 import 'package:bazar_suez/markets/order_of_markets/widget/OrderStats.dart';
 import 'package:bazar_suez/markets/order_of_markets/viewmodels/MarketOrdersViewModel.dart';
+import 'package:bazar_suez/services/fcm_service.dart';
 
 class MarketOrdersPage extends StatefulWidget {
   final String marketId;
@@ -173,6 +174,18 @@ class _MarketOrdersPageState extends State<MarketOrdersPage>
       lowerBound: 0.95,
       upperBound: 1.0,
     )..repeat(reverse: true);
+
+    // حفظ FCM token للمتجر لاستقبال إشعارات الطلبات الجديدة
+    _saveFcmToken();
+  }
+
+  /// حفظ FCM token للمتجر
+  Future<void> _saveFcmToken() async {
+    try {
+      await FcmService().saveTokenForStore(widget.marketId);
+    } catch (e) {
+      debugPrint('⚠️ Error saving FCM token: $e');
+    }
   }
 
   // helper methods moved to ViewModel

@@ -7,6 +7,7 @@ import '../../../theme/app_color.dart';
 import '../../grid_of_categories/ViewModel/ViewModel.dart';
 import '../../cart/viewmodels/cart_view_model.dart';
 import '../../Markets_after_category/viewmodel/category_filter_viewmodel.dart';
+import '../../Markets_after_category/widget/search_bar_widget.dart';
 import '../../saved_locations/viewmodels/saved_locations_viewmodel.dart';
 import '../../saved_locations/widgets/location_app_bar_widget.dart';
 import '../../saved_locations/widgets/saved_locations_sheet.dart';
@@ -26,13 +27,17 @@ class HomePage extends StatefulWidget {
 
 class _HomePageState extends State<HomePage> {
   final TextEditingController searchController = TextEditingController();
+  final ScrollController _scrollController = ScrollController();
   final LicenseService _licenseService = LicenseService();
   StoreModel? _myStore;
   bool _licenseLoading = false;
+  bool _showHeader = true;
+  double _lastOffset = 0;
 
   @override
   void initState() {
     super.initState();
+    _scrollController.addListener(_scrollListener);
 
     // 🔹 تحميل حالة الترخيص فوراً (بشكل مستقل)
     _loadLicenseStatus();
@@ -54,9 +59,20 @@ class _HomePageState extends State<HomePage> {
     });
   }
 
+  void _scrollListener() {
+    final offset = _scrollController.offset;
+    if (offset > _lastOffset && _showHeader) {
+      setState(() => _showHeader = false);
+    } else if (offset < _lastOffset && !_showHeader) {
+      setState(() => _showHeader = true);
+    }
+    _lastOffset = offset;
+  }
+
   @override
   void dispose() {
     searchController.dispose();
+    _scrollController.dispose();
     super.dispose();
   }
 
@@ -78,119 +94,31 @@ class _HomePageState extends State<HomePage> {
     return Directionality(
       textDirection: TextDirection.rtl,
       child: Scaffold(
-        backgroundColor: const Color(0xFFF8F9FA),
+        backgroundColor: Colors.white,
         body: Stack(
           children: [
             // المحتوى الرئيسي
             categoryViewModel.isLoading
                 ? const Center(child: CircularProgressIndicator())
                 : CustomScrollView(
+                    controller: _scrollController,
                     slivers: [
                       // =======================================================================
-                      // 🔹 SliverAppBar - تصميم حديث
+                      // 🔹 SliverAppBar - تصميم حديث مع حركة السكرول (باستخدام Delegate)
                       // =======================================================================
-                      SliverAppBar(
-                        floating: true,
-                        snap: true,
+                      SliverPersistentHeader(
                         pinned: true,
-                        expandedHeight: 130,
-                        collapsedHeight: 130,
-                        backgroundColor: AppColors.mainColor,
-                        elevation: 0,
-                        surfaceTintColor: AppColors.mainColor,
-                        flexibleSpace: FlexibleSpaceBar(
-                          background: Container(
-                            decoration: BoxDecoration(
-                              gradient: LinearGradient(
-                                colors: [
-                                  AppColors.mainColor,
-                                  AppColors.mainColor.withOpacity(0.9),
-                                ],
-                                begin: Alignment.topCenter,
-                                end: Alignment.bottomCenter,
-                              ),
-                            ),
-                            child: SafeArea(
-                              child: Padding(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 16,
-                                  vertical: 8,
-                                ),
-                                child: Column(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    // ---------------------------------------------------------------
-                                    // 🔹 عنوان التوصيل + أيقونات
-                                    // ---------------------------------------------------------------
-                                    Row(
-                                      children: [
-                                        // عنوان التوصيل
-                                        const Expanded(
-                                          child: LocationAppBarWidget(),
-                                        ),
-                                        // أيقونة السلة (على اليسار)
-                                        _buildIconButton(
-                                          icon: Icons.shopping_cart_outlined,
-                                          badgeCount: cartViewModel.itemCount,
-                                          onTap: () => context.go('/CartPage'),
-                                        ),
-                                      ],
-                                    ),
-                                    
-                                    const SizedBox(height: 12),
-                                    
-                                    // ---------------------------------------------------------------
-                                    // 🔹 شريط البحث
-                                    // ---------------------------------------------------------------
-                                    GestureDetector(
-                                      onTap: () {
-                                        if (locationViewModel.hasLocation) {
-                                          context.go('/Search');
-                                        } else {
-                                          _showLocationsSheet();
-                                        }
-                                      },
-                                      child: Container(
-                                        height: 46,
-                                        decoration: BoxDecoration(
-                                          color: Colors.white,
-                                          borderRadius: BorderRadius.circular(12),
-                                          boxShadow: [
-                                            BoxShadow(
-                                              color: Colors.black.withOpacity(0.1),
-                                              blurRadius: 8,
-                                              offset: const Offset(0, 2),
-                                            ),
-                                          ],
-                                        ),
-                                        child: Row(
-                                          children: [
-                                            const SizedBox(width: 14),
-                                            Icon(
-                                              Icons.search,
-                                              color: Colors.grey[400],
-                                              size: 22,
-                                            ),
-                                            const SizedBox(width: 10),
-                                            Expanded(
-                                              child: Text(
-                                                "ابحث عن متجر أو منتج ...",
-                                                style: TextStyle(
-                                                  color: Colors.grey[400],
-                                                  fontSize: 14,
-                                                ),
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ),
-                          ),
+                        delegate: HomeAppBarDelegate(
+                          cartViewModel: cartViewModel,
+                          locationViewModel: locationViewModel,
+                          paddingTop: MediaQuery.of(context).padding.top,
+                          onSearchTap: () {
+                            if (locationViewModel.hasLocation) {
+                              context.go('/Search');
+                            } else {
+                              _showLocationsSheet();
+                            }
+                          },
                         ),
                       ),
 
@@ -416,5 +344,166 @@ class _HomePageState extends State<HomePage> {
         ),
       ),
     ).animate().fadeIn(duration: 300.ms);
+  }
+}
+
+/// كلاس مخصص للتحكم في شريط التطبيق المتحرك
+class HomeAppBarDelegate extends SliverPersistentHeaderDelegate {
+  final CartViewModel cartViewModel;
+  final SavedLocationsViewModel locationViewModel;
+  final VoidCallback onSearchTap;
+  final double paddingTop;
+
+  HomeAppBarDelegate({
+    required this.cartViewModel,
+    required this.locationViewModel,
+    required this.onSearchTap,
+    required this.paddingTop,
+  });
+
+  @override
+  Widget build(BuildContext context, double shrinkOffset, bool overlapsContent) {
+    // حساب نسبة الظهور للعنوان
+    // يختفي تدريجياً خلال أول 50 بكسل من السكرول
+    final double titleOpacity = (1.0 - (shrinkOffset / 50)).clamp(0.0, 1.0);
+
+    return Container(
+      decoration: BoxDecoration(
+        color: AppColors.mainColor, // لون احتياطي
+        gradient: LinearGradient(
+          colors: [
+            AppColors.mainColor,
+            AppColors.mainColor.withOpacity(0.9),
+          ],
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+        ),
+      ),
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          // 1. عنوان التوصيل وأيقونة السلة (في الأعلى)
+          Positioned(
+            top: paddingTop + 8, // مسافة من الـ Status Bar
+            left: 16,
+            right: 16,
+            child: Opacity(
+              opacity: titleOpacity,
+              child: SizedBox(
+                height: 40,
+                child: Row(
+                  children: [
+                    // عنوان التوصيل
+                    const Expanded(
+                      child: LocationAppBarWidget(),
+                    ),
+                    // أيقونة السلة
+                    _buildCartIcon(context),
+                  ],
+                ),
+              ),
+            ),
+          ),
+
+          // 2. شريط البحث (في الأسفل دائماً)
+          Positioned(
+            bottom: 10,
+            left: 16,
+            right: 16,
+            child: GestureDetector(
+              onTap: onSearchTap,
+              child: Container(
+                height: 46,
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(12),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.1),
+                      blurRadius: 8,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
+                ),
+                child: AbsorbPointer(
+                  child: SearchBarWidget(
+                    suggestions: const [
+                      "متجر",
+                      "منتج",
+                      "ملابس",
+                      "أجهزة",
+                      "طعام",
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // بناء أيقونة السلة داخلياً
+  Widget _buildCartIcon(BuildContext context) {
+    return InkWell(
+      onTap: () => context.go('/CartPage'),
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        padding: const EdgeInsets.all(8),
+        decoration: BoxDecoration(
+          color: Colors.white.withOpacity(0.2),
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Stack(
+          clipBehavior: Clip.none,
+          children: [
+            const Icon(
+              Icons.shopping_cart_outlined,
+              color: Colors.white,
+              size: 24,
+            ),
+            if (cartViewModel.itemCount > 0)
+              Positioned(
+                top: -8,
+                right: -8,
+                child: Container(
+                  padding: const EdgeInsets.all(4),
+                  decoration: const BoxDecoration(
+                    color: Colors.red,
+                    shape: BoxShape.circle,
+                  ),
+                  child: Text(
+                    '${cartViewModel.itemCount}',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 10,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  @override
+  // أقصى ارتفاع: TopPadding + المسافة العلوية (8) + قسم العنوان (40) + فراغ (8) + البحث (46) + هامش سفلي (10)
+  // المجموع = TopPadding + 112 تقريباً. لنقل 120 لضمان الراحة
+  double get maxExtent => paddingTop + 120;
+
+  @override
+  // أقل ارتفاع: TopPadding + البحث (46) + هامش سفلي (10) + فراغ بسيط فوقه (8) = 64 تقريباً
+  // أو بتبسيط: 80 بكسل شاملة الـ SafeArea وشريط البحث
+  // لنجعلها: TopPadding + 70
+  double get minExtent => paddingTop + 70;
+
+  @override
+  bool shouldRebuild(covariant HomeAppBarDelegate oldDelegate) {
+    return oldDelegate.cartViewModel != cartViewModel ||
+           oldDelegate.locationViewModel != locationViewModel ||
+           oldDelegate.paddingTop != paddingTop;
   }
 }

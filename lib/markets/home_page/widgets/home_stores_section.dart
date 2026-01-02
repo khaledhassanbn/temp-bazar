@@ -18,16 +18,9 @@ class HomeStoresSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final categoryVm = context.watch<CategoryViewModel>();
-    final filterVm = context.watch<CategoryFilterViewModel>();
-
-    // إذا تم اختيار فئة معينة
-    if (filterVm.selectedCategoryId != null) {
-      return _buildSelectedCategorySection(context, filterVm, categoryVm);
-    }
-
-    // إذا لم يتم اختيار فئة
-    return _buildAllCategoriesSections(context, filterVm, categoryVm);
+    // تم إخفاء قسم المتاجر من الصفحة الرئيسية
+    // يتم عرض الفئات فقط (16 فئة)
+    return const SizedBox.shrink();
   }
 
   /// عرض الفئة المختارة فقط مع متاجرها

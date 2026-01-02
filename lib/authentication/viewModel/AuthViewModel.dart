@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../model/userModel.dart';
 import '../service/service.dart';
+import 'package:bazar_suez/services/fcm_service.dart';
 
 class AuthViewModel extends ChangeNotifier {
   final AuthService _authService = AuthService();
@@ -28,6 +29,8 @@ class AuthViewModel extends ChangeNotifier {
         firstName,
         lastName,
       );
+      // حفظ FCM token للمستخدم الجديد
+      await FcmService().saveTokenForCurrentUser();
       return currentUser;
     } catch (e) {
       errorMessage = _handleError(e.toString());
@@ -43,6 +46,8 @@ class AuthViewModel extends ChangeNotifier {
     errorMessage = null;
     try {
       currentUser = await _authService.signInWithEmail(email, password);
+      // حفظ FCM token للمستخدم
+      await FcmService().saveTokenForCurrentUser();
       return currentUser;
     } catch (e) {
       errorMessage = _handleError(e.toString());
@@ -58,6 +63,8 @@ class AuthViewModel extends ChangeNotifier {
     errorMessage = null;
     try {
       currentUser = await _authService.signInWithGoogle();
+      // حفظ FCM token للمستخدم
+      await FcmService().saveTokenForCurrentUser();
       return currentUser;
     } catch (e) {
       errorMessage = _handleError(e.toString());

@@ -29,6 +29,7 @@ class StoreModel {
   final DateTime createdAt;
   final double averageRating;
   final int totalReviews;
+  final String? fcmToken; // FCM token for push notifications
 
   StoreModel({
     required this.id,
@@ -56,6 +57,7 @@ class StoreModel {
     required this.createdAt,
     this.averageRating = 0.0,
     this.totalReviews = 0,
+    this.fcmToken,
   });
 
   factory StoreModel.fromMap(String id, Map<String, dynamic> map) {
@@ -109,6 +111,7 @@ class StoreModel {
       createdAt: (map['createdAt'] as Timestamp).toDate(),
       averageRating: (map['averageRating'] ?? 0.0).toDouble(),
       totalReviews: map['totalReviews'] ?? 0,
+      fcmToken: map['fcmToken'] as String?,
     );
   }
 

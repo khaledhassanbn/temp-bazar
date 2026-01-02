@@ -6,6 +6,7 @@
  * - Paymob webhook integration for subscription renewals
  * - Facebook Data Deletion callback
  * - Scheduled function for cleanup and auto-renewal
+ * - Order notifications (new order, status changes)
  */
 var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
     if (k2 === undefined) k2 = k;
@@ -41,7 +42,7 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.facebookDataDeletionRequest = exports.cleanupExpiredPendingPaymentsScheduled = exports.deleteExpiredAdsImagesScheduled = exports.autoRenewSubscriptionsScheduled = exports.paymobWebhookHandler = void 0;
+exports.sendPastOrderNotification = exports.sendOrderStatusNotification = exports.sendNewOrderNotification = exports.facebookDataDeletionRequest = exports.cleanupExpiredPendingPaymentsScheduled = exports.deleteExpiredAdsImagesScheduled = exports.autoRenewSubscriptionsScheduled = exports.paymobWebhookHandler = void 0;
 // ---------------------------------------------------------------------------
 // INITIALIZE FIREBASE ADMIN
 // ---------------------------------------------------------------------------
@@ -71,6 +72,12 @@ const autoRenew_1 = require("./subscriptions/autoRenew");
 const dataDeletion_1 = require("./facebook/dataDeletion");
 const deleteExpiredImages_1 = require("./ads/deleteExpiredImages");
 const cleanupExpired_1 = require("./pendingPayments/cleanupExpired");
+// Order Notifications
+const sendOrderNotification_1 = require("./notifications/sendOrderNotification");
+Object.defineProperty(exports, "sendNewOrderNotification", { enumerable: true, get: function () { return sendOrderNotification_1.sendNewOrderNotification; } });
+const sendStatusNotification_1 = require("./notifications/sendStatusNotification");
+Object.defineProperty(exports, "sendOrderStatusNotification", { enumerable: true, get: function () { return sendStatusNotification_1.sendOrderStatusNotification; } });
+Object.defineProperty(exports, "sendPastOrderNotification", { enumerable: true, get: function () { return sendStatusNotification_1.sendPastOrderNotification; } });
 // ---------------------------------------------------------------------------
 // GLOBAL OPTIONS
 // ---------------------------------------------------------------------------
