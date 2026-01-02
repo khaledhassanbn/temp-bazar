@@ -30,6 +30,8 @@ class StoreModel {
   final double averageRating;
   final int totalReviews;
   final String? fcmToken; // FCM token for push notifications
+  final double? deliveryFee; // Calculated delivery fee
+  final int? deliveryTime; // Calculated delivery time in minutes
 
   StoreModel({
     required this.id,
@@ -58,6 +60,8 @@ class StoreModel {
     this.averageRating = 0.0,
     this.totalReviews = 0,
     this.fcmToken,
+    this.deliveryFee,
+    this.deliveryTime,
   });
 
   factory StoreModel.fromMap(String id, Map<String, dynamic> map) {
@@ -112,6 +116,8 @@ class StoreModel {
       averageRating: (map['averageRating'] ?? 0.0).toDouble(),
       totalReviews: map['totalReviews'] ?? 0,
       fcmToken: map['fcmToken'] as String?,
+      deliveryFee: (map['deliveryFee'] ?? 0.0).toDouble(),
+      deliveryTime: map['deliveryTime'] as int?,
     );
   }
 
@@ -144,7 +150,71 @@ class StoreModel {
       'createdAt': Timestamp.fromDate(createdAt),
       'averageRating': averageRating,
       'totalReviews': totalReviews,
+      'deliveryFee': deliveryFee,
+      'deliveryTime': deliveryTime,
     };
+  }
+
+  StoreModel copyWith({
+    String? id,
+    String? name,
+    String? description,
+    String? link,
+    String? phone,
+    String? email,
+    GeoPoint? location,
+    String? facebook,
+    String? instagram,
+    String? logoUrl,
+    String? coverUrl,
+    String? storeType,
+    bool? storeStatus,
+    StoreStatus? status,
+    bool? isVisible,
+    DateTime? licenseStartAt,
+    DateTime? licenseEndAt,
+    int? licenseDurationDays,
+    bool? licenseAutoRenew,
+    String? currentPackageId,
+    WeeklyWorkingHours? workingHours,
+    int? numberOfProducts,
+    DateTime? createdAt,
+    double? averageRating,
+    int? totalReviews,
+    String? fcmToken,
+    double? deliveryFee,
+    int? deliveryTime,
+  }) {
+    return StoreModel(
+      id: id ?? this.id,
+      name: name ?? this.name,
+      description: description ?? this.description,
+      link: link ?? this.link,
+      phone: phone ?? this.phone,
+      email: email ?? this.email,
+      location: location ?? this.location,
+      facebook: facebook ?? this.facebook,
+      instagram: instagram ?? this.instagram,
+      logoUrl: logoUrl ?? this.logoUrl,
+      coverUrl: coverUrl ?? this.coverUrl,
+      storeType: storeType ?? this.storeType,
+      storeStatus: storeStatus ?? this.storeStatus,
+      status: status ?? this.status,
+      isVisible: isVisible ?? this.isVisible,
+      licenseStartAt: licenseStartAt ?? this.licenseStartAt,
+      licenseEndAt: licenseEndAt ?? this.licenseEndAt,
+      licenseDurationDays: licenseDurationDays ?? this.licenseDurationDays,
+      licenseAutoRenew: licenseAutoRenew ?? this.licenseAutoRenew,
+      currentPackageId: currentPackageId ?? this.currentPackageId,
+      workingHours: workingHours ?? this.workingHours,
+      numberOfProducts: numberOfProducts ?? this.numberOfProducts,
+      createdAt: createdAt ?? this.createdAt,
+      averageRating: averageRating ?? this.averageRating,
+      totalReviews: totalReviews ?? this.totalReviews,
+      fcmToken: fcmToken ?? this.fcmToken,
+      deliveryFee: deliveryFee ?? this.deliveryFee,
+      deliveryTime: deliveryTime ?? this.deliveryTime,
+    );
   }
 
   // ═══════════════════════════════════════════════════════════════════════════

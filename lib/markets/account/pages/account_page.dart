@@ -310,6 +310,12 @@ class _AccountPageState extends State<AccountPage> {
             onTap: () => context.push('/delivery-addresses'),
           ),
           _MenuTileData(
+            icon: Icons.favorite_outlined,
+            label: 'المتاجر المفضلة',
+            subtitle: 'المتاجر التي أضفتها للمفضلة',
+            onTap: () => context.push('/favourite-markets'),
+          ),
+          _MenuTileData(
             icon: Icons.card_giftcard_outlined,
             label: '${summary.loyaltyPoints} نقاط',
             subtitle: 'مكافآت',

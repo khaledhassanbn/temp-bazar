@@ -29,27 +29,31 @@ class HomeCategoriesIcons extends StatelessWidget {
       return const SizedBox.shrink();
     }
 
-    // عرض أول 7 فئات فقط
-    final displayCategories = categoryVm.categories.take(7).toList();
+    // تصفية فئة "هدايا" وعرض أول 7 فئات
+    final filteredCategories = categoryVm.categories
+        .where((cat) => 
+            cat.id.toLowerCase() != 'gifts' && 
+            cat.name.toLowerCase() != 'هدايا')
+        .take(7)
+        .toList();
 
     return Container(
-      padding: const EdgeInsets.symmetric(vertical: 16),
+      padding: const EdgeInsets.symmetric(vertical: 8),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // عنوان القسم
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: Text(
-              'تصفح حسب الفئة',
+            child: const Text(
+              'وش ودك تطلب اليوم؟',
               style: TextStyle(
-                fontSize: 18,
+                fontSize: 16,
                 fontWeight: FontWeight.bold,
-                color: Colors.grey[800],
               ),
             ),
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 6),
           // شبكة الفئات 4 في الصف
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -62,14 +66,14 @@ class HomeCategoriesIcons extends StatelessWidget {
                 crossAxisSpacing: 12,
                 mainAxisSpacing: 12,
               ),
-              itemCount: displayCategories.length + 1, // +1 لزر "كل الفئات"
+              itemCount: filteredCategories.length + 1, // +1 لزر "كل الفئات"
               itemBuilder: (context, index) {
-                // العنصر الأخير (أو الثامن) هو زر "كل الفئات"
-                if (index == displayCategories.length) {
+                // العنصر الأخير هو زر "عرض كل الفئات" (بديل عن "هدايا")
+                if (index == filteredCategories.length) {
                   return _buildViewAllItem(context, index);
                 }
 
-                final category = displayCategories[index];
+                final category = filteredCategories[index];
                 final isSelected = filterVm.selectedCategoryId == category.id;
 
                 return _buildCategoryItem(

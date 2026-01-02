@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../../../theme/app_color.dart';
 import '../viewmodels/saved_locations_viewmodel.dart';
 import 'saved_locations_sheet.dart';
 
@@ -23,52 +22,46 @@ class LocationAppBarWidget extends StatelessWidget {
       builder: (context, viewModel, child) {
         return GestureDetector(
           onTap: () => _showLocationsSheet(context),
-          child: Row(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
             mainAxisSize: MainAxisSize.min,
             children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    // النص الرئيسي مع السهم
-                    Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(
-                          viewModel.hasLocation 
-                              ? 'التوصيل إلى' 
-                              : 'اختر موقع التوصيل',
-                          style: const TextStyle(
-                            fontSize: 13,
-                            color: Colors.white,
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                        const SizedBox(width: 4),
-                        const Icon(
-                          Icons.keyboard_arrow_down,
-                          color: Colors.white,
-                          size: 20,
-                        ),
-                      ],
+              // النص الرئيسي مع السهم
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    viewModel.hasLocation 
+                        ? 'التوصيل إلى' 
+                        : 'اختر موقع التوصيل',
+                    style: const TextStyle(
+                      fontSize: 13,
+                      color: Colors.white,
+                      fontWeight: FontWeight.w500,
                     ),
-                    // العنوان المختار
-                    if (viewModel.hasLocation) ...[
-                      const SizedBox(height: 2),
-                      Text(
-                        _truncateAddress(viewModel.displayAddress, 35),
-                        style: const TextStyle(
-                          fontSize: 12,
-                          color: Colors.white70,
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ],
-                  ],
-                ),
+                  ),
+                  const SizedBox(width: 4),
+                  const Icon(
+                    Icons.keyboard_arrow_down,
+                    color: Colors.white,
+                    size: 20,
+                  ),
+                ],
               ),
+              // العنوان المختار
+              if (viewModel.hasLocation) ...[
+                const SizedBox(height: 2),
+                Text(
+                  _truncateAddress(viewModel.displayAddress, 35),
+                  style: const TextStyle(
+                    fontSize: 12,
+                    color: Colors.white70,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  textAlign: TextAlign.right,
+                ),
+              ],
             ],
           ),
         );

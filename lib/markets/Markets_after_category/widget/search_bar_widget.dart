@@ -10,9 +10,9 @@ class SearchBarWidget extends StatelessWidget {
     return TextField(
       textAlignVertical: TextAlignVertical.center,
       decoration: InputDecoration(
-        prefixIcon: const Icon(Icons.search),
+        prefixIcon: const Icon(Icons.search, color: Colors.white70),
         filled: true,
-        fillColor: Colors.grey[100],
+        fillColor: Colors.white.withOpacity(0.2),
         contentPadding: const EdgeInsets.symmetric(
           vertical: 10,
           horizontal: 12,
@@ -21,14 +21,14 @@ class SearchBarWidget extends StatelessWidget {
           borderRadius: BorderRadius.circular(12),
           borderSide: BorderSide.none,
         ),
-        hintStyle: const TextStyle(fontSize: 16, color: Colors.black54),
+        hintStyle: const TextStyle(fontSize: 14, color: Colors.white70),
         // ✅ استخدمنا hint بدل label للتحكم الكامل في المحاذاة والمسافة
         hint: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
             const Text(
               "ابحث عن ",
-              style: TextStyle(fontSize: 16, color: Colors.black54),
+              style: TextStyle(fontSize: 14, color: Colors.white70),
             ),
             // ✅ قللنا المسافة جدًا بين النص والكلمة المتغيرة
             Flexible(child: _TypingText(words: suggestions)),
@@ -127,7 +127,7 @@ class _TypingTextState extends State<_TypingText> {
     if (widget.words.isEmpty) {
       return const Text(
         "منتجات",
-        style: TextStyle(fontSize: 16, color: Colors.black54),
+        style: TextStyle(fontSize: 14, color: Colors.white70),
         maxLines: 1,
         overflow: TextOverflow.clip,
       );
@@ -135,7 +135,7 @@ class _TypingTextState extends State<_TypingText> {
 
     return Text(
       _displayedText,
-      style: const TextStyle(fontSize: 16, color: Colors.black54),
+      style: const TextStyle(fontSize: 14, color: Colors.white70),
       maxLines: 1,
       overflow: TextOverflow.clip,
     );

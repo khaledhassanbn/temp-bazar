@@ -11,6 +11,7 @@ import 'package:bazar_suez/markets/wallet/pages/deposit_request_page.dart';
 import 'package:bazar_suez/markets/wallet/pages/admin_wallet_requests_page.dart';
 import 'package:bazar_suez/markets/saved_locations/pages/delivery_addresses_page.dart';
 import 'package:bazar_suez/markets/license/pages/license_status_page.dart';
+import 'package:bazar_suez/markets/favourite_markets/pages/favourite_markets_page.dart';
 import 'package:go_router/go_router.dart';
 
 final sharedRoutes = [
@@ -28,6 +29,7 @@ final sharedRoutes = [
   ),
   GoRoute(path: '/request-ads', builder: (_, __) => const RequestAdsPage()),
   GoRoute(path: '/AccountPage', builder: (_, __) => const AccountPage()),
+  GoRoute(path: '/favourite-markets', builder: (_, __) => const FavouriteMarketsPage()),
   GoRoute(
     path: '/license-status',
     builder: (context, state) {
