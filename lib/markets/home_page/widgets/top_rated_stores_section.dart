@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 
 import '../services/top_rated_stores_service.dart';
+import '../../favourite_markets/services/favourite_markets_service.dart';
 import '../../create_market/models/store_model.dart';
 
 /// قسم أفضل المطاعم أو أشهر البقالات
@@ -22,13 +23,16 @@ class TopRatedStoresSection extends StatefulWidget {
 
 class _TopRatedStoresSectionState extends State<TopRatedStoresSection> {
   final TopRatedStoresService _service = TopRatedStoresService();
+  final FavouriteMarketsService _favouriteService = FavouriteMarketsService();
   List<StoreModel> _stores = [];
+  Set<String> _favouriteStoreIds = {};
   bool _isLoading = true;
 
   @override
   void initState() {
     super.initState();
     _loadTopRatedStores();
+    _loadFavouriteStores();
   }
 
   Future<void> _loadTopRatedStores() async {
@@ -49,6 +53,31 @@ class _TopRatedStoresSectionState extends State<TopRatedStoresSection> {
       if (!mounted) return;
       setState(() => _isLoading = false);
     }
+  }
+
+  Future<void> _loadFavouriteStores() async {
+    try {
+      final favourites = await _favouriteService.getFavouriteMarkets();
+      if (!mounted) return;
+      setState(() {
+        _favouriteStoreIds = favourites.map((f) => f.marketId).toSet();
+      });
+    } catch (e) {
+      print('خطأ في جلب المتاجر المفضلة: $e');
+    }
+  }
+
+  Future<void> _toggleFavourite(String marketId) async {
+    final isFavourite = _favouriteStoreIds.contains(marketId);
+
+    if (isFavourite) {
+      await _favouriteService.removeFavouriteMarket(marketId);
+    } else {
+      await _favouriteService.addFavouriteMarket(marketId);
+    }
+
+    if (!mounted) return;
+    await _loadFavouriteStores();
   }
 
   @override
@@ -99,6 +128,8 @@ class _TopRatedStoresSectionState extends State<TopRatedStoresSection> {
   }
 
   Widget _buildStoreCard(StoreModel store, int index) {
+    final isFavourite = _favouriteStoreIds.contains(store.id);
+
     return GestureDetector(
       onTap: () {
         if (!mounted) return;
@@ -109,13 +140,6 @@ class _TopRatedStoresSectionState extends State<TopRatedStoresSection> {
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(12),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.05),
-              blurRadius: 8,
-              offset: const Offset(0, 2),
-            ),
-          ],
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.end,
@@ -125,16 +149,14 @@ class _TopRatedStoresSectionState extends State<TopRatedStoresSection> {
               children: [
                 // صورة الغلاف
                 ClipRRect(
-                  borderRadius: const BorderRadius.vertical(
-                    top: Radius.circular(12),
-                  ),
+                  borderRadius: BorderRadius.circular(12),
                   child: SizedBox(
                     height: 160,
                     width: double.infinity,
                     child: store.coverUrl != null && store.coverUrl!.isNotEmpty
                         ? Image.network(
                             store.coverUrl!,
-                            fit: BoxFit.cover,
+                            fit: BoxFit.fill,
                             errorBuilder: (_, __, ___) =>
                                 _buildImagePlaceholder(),
                           )
@@ -177,43 +199,79 @@ class _TopRatedStoresSectionState extends State<TopRatedStoresSection> {
                       ),
                     ),
                   ),
-                // شارة التقييم
+                // القلب والتقييم في الأعلى اليسار
                 Positioned(
                   top: 8,
                   left: 8,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 10,
-                      vertical: 4,
-                    ),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const Icon(Icons.star, color: Colors.amber, size: 14),
-                        const SizedBox(width: 4),
-                        Text(
-                          store.averageRating.toStringAsFixed(1),
-                          style: const TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.bold,
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      // القلب
+                      GestureDetector(
+                        onTap: () => _toggleFavourite(store.id),
+                        child: Container(
+                          padding: const EdgeInsets.all(6),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            shape: BoxShape.circle,
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withOpacity(0.1),
+                                blurRadius: 4,
+                                offset: const Offset(0, 2),
+                              ),
+                            ],
+                          ),
+                          child: Icon(
+                            isFavourite
+                                ? Icons.favorite
+                                : Icons.favorite_border,
+                            color: isFavourite ? Colors.red : Colors.grey[600],
+                            size: 20,
                           ),
                         ),
-                        if (store.totalReviews > 0) ...[
-                          const SizedBox(width: 4),
-                          Text(
-                            '(${store.totalReviews})',
-                            style: TextStyle(
-                              fontSize: 11,
-                              color: Colors.grey[600],
+                      ),
+                      const SizedBox(width: 8),
+                      // التقييم
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 4,
+                        ),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(
+                              Icons.star,
+                              color: Colors.amber,
+                              size: 14,
                             ),
-                          ),
-                        ],
-                      ],
-                    ),
+                            const SizedBox(width: 4),
+                            Text(
+                              store.averageRating.toStringAsFixed(1),
+                              style: const TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            if (store.totalReviews > 0) ...[
+                              const SizedBox(width: 4),
+                              Text(
+                                '(${store.totalReviews})',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  color: Colors.grey[600],
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ],

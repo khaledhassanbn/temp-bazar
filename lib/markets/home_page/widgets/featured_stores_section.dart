@@ -123,13 +123,6 @@ class _FeaturedStoresSectionState extends State<FeaturedStoresSection> {
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(12),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.05),
-              blurRadius: 8,
-              offset: const Offset(0, 2),
-            ),
-          ],
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.end,
@@ -139,9 +132,7 @@ class _FeaturedStoresSectionState extends State<FeaturedStoresSection> {
               children: [
                 // صورة الغلاف
                 ClipRRect(
-                  borderRadius: const BorderRadius.vertical(
-                    top: Radius.circular(12),
-                  ),
+                  borderRadius: BorderRadius.circular(12),
                   child: SizedBox(
                     height: 160,
                     width: double.infinity,
@@ -150,7 +141,7 @@ class _FeaturedStoresSectionState extends State<FeaturedStoresSection> {
                             result.store.coverUrl!.isNotEmpty
                         ? Image.network(
                             result.store.coverUrl!,
-                            fit: BoxFit.cover,
+                            fit: BoxFit.fill,
                             errorBuilder: (_, __, ___) =>
                                 _buildImagePlaceholder(),
                           )

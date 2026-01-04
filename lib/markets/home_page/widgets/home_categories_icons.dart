@@ -46,14 +46,14 @@ class HomeCategoriesIcons extends StatelessWidget {
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16),
             child: const Text(
-              'وش ودك تطلب اليوم؟',
+              'الفئات',
               style: TextStyle(
                 fontSize: 16,
                 fontWeight: FontWeight.bold,
               ),
             ),
           ),
-          const SizedBox(height: 6),
+          // const SizedBox(height: 6),
           // شبكة الفئات 4 في الصف
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16),

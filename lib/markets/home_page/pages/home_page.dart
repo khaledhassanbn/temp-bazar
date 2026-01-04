@@ -222,9 +222,18 @@ class _HomePageState extends State<HomePage> {
                         ),
                         title: _isScrolled
                             ? Row(
-                                mainAxisAlignment: MainAxisAlignment.end,
                                 children: [
-                                  // أيقونة البحث فقط
+                                  // عربة التسوق ثابتة في أقصى اليمين (RTL Start)
+                                  _buildCartIcon(context, cartViewModel),
+                                  
+                                  // مسافة مرنة لدفع العناصر المتبقية إلى اليسار
+                                  const Spacer(),
+
+                                  // عنوان التوصيل (بجانب أيقونة البحث)
+                                  LocationAppBarWidget(),
+                                  const SizedBox(width: 8),
+
+                                  // أيقونة البحث ثابتة في أقصى اليسار (RTL End)
                                   GestureDetector(
                                     onTap: () {
                                       if (locationViewModel.hasLocation) {
@@ -234,24 +243,18 @@ class _HomePageState extends State<HomePage> {
                                       }
                                     },
                                     child: Container(
-                                      width: 40,
-                                      height: 40,
+                                      padding: const EdgeInsets.all(8),
                                       decoration: BoxDecoration(
-                                        color: Colors.white.withOpacity(0.95),
-                                        borderRadius: BorderRadius.circular(8),
+                                        color: Colors.white.withOpacity(0.2),
+                                        borderRadius: BorderRadius.circular(12),
                                       ),
                                       child: const Icon(
                                         Icons.search,
-                                        color: Colors.grey,
-                                        size: 20,
+                                        color: Colors.white,
+                                        size: 24,
                                       ),
                                     ),
                                   ),
-                                  const SizedBox(width: 12),
-                                  // عنوان التوصيل (في أقصى اليمين)
-                                  LocationAppBarWidget(),
-                                  const SizedBox(width: 8),
-                                  _buildCartIcon(context, cartViewModel),
                                 ],
                               )
                             : null,
@@ -290,7 +293,7 @@ class _HomePageState extends State<HomePage> {
                               delay: 150.ms,
                             ),
 
-                            const SizedBox(height: 24),
+                            // const SizedBox(height: 16),
 
                             // 🔹 المتاجر القريبة منك
                             const NearbyStoresSection().animate().fadeIn(
@@ -298,7 +301,7 @@ class _HomePageState extends State<HomePage> {
                               delay: 200.ms,
                             ),
 
-                            const SizedBox(height: 24),
+                            const SizedBox(height: 16),
 
                             // 🔹 أفضل المطاعم
                             const TopRatedStoresSection(
@@ -306,7 +309,7 @@ class _HomePageState extends State<HomePage> {
                               isRestaurants: true,
                             ).animate().fadeIn(duration: 400.ms, delay: 300.ms),
 
-                            const SizedBox(height: 24),
+                            // const SizedBox(height: 16),
 
                             // 🔹 أشهر البقالات
                             const TopRatedStoresSection(
@@ -314,7 +317,7 @@ class _HomePageState extends State<HomePage> {
                               isRestaurants: false,
                             ).animate().fadeIn(duration: 400.ms, delay: 400.ms),
 
-                            const SizedBox(height: 100),
+                           
                           ],
                         ),
                       ),

@@ -27,6 +27,7 @@ class _NearbyStoresSectionState extends State<NearbyStoresSection> {
   Future<void> _loadNearbyStores() async {
     if (!mounted) return;
     setState(() => _isLoading = true);
+
     try {
       final stores = await _service.getNearbyStores(limit: 10);
       if (!mounted) return;
@@ -35,7 +36,7 @@ class _NearbyStoresSectionState extends State<NearbyStoresSection> {
         _isLoading = false;
       });
     } catch (e) {
-      print('خطأ في جلب المتاجر القريبة: $e');
+      debugPrint('خطأ في جلب المتاجر القريبة: $e');
       if (!mounted) return;
       setState(() => _isLoading = false);
     }
@@ -54,42 +55,44 @@ class _NearbyStoresSectionState extends State<NearbyStoresSection> {
       return const SizedBox.shrink();
     }
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        // عنوان القسم
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                'المتاجر القريبة منك',
-                style: TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.grey[800],
-                ),
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(height: 12),
-        // قائمة المتاجر الأفقية
-        SizedBox(
-          height: 140,
-          child: ListView.separated(
-            scrollDirection: Axis.horizontal,
+    return Container(
+      color: AppColors.nearbySectionBg, // 👈 الخلفية الرمادي
+      padding: const EdgeInsets.symmetric(vertical: 12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // عنوان القسم
+          Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16),
-            separatorBuilder: (context, index) => const SizedBox(width: 12),
-            itemCount: _stores.length,
-            itemBuilder: (context, index) {
-              final result = _stores[index];
-              return _buildNearbyStoreCard(result, index);
-            },
+            child: Text(
+              'المتاجر القريبة منك',
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+                color: Colors.grey[800],
+              ),
+            ),
           ),
-        ),
-      ],
+
+          const SizedBox(height: 12),
+
+          // قائمة المتاجر الأفقية
+          SizedBox(
+            height: 155,
+            child: ListView.separated(
+              scrollDirection: Axis.horizontal,
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              separatorBuilder: (context, index) =>
+                  const SizedBox(width: 8),
+              itemCount: _stores.length,
+              itemBuilder: (context, index) {
+                final result = _stores[index];
+                return _buildNearbyStoreCard(result, index);
+              },
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -100,7 +103,7 @@ class _NearbyStoresSectionState extends State<NearbyStoresSection> {
         context.push('/HomeMarketPage?marketLink=${result.store.link}');
       },
       child: Container(
-        width: 120,
+        width: 100,
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(12),
@@ -108,7 +111,7 @@ class _NearbyStoresSectionState extends State<NearbyStoresSection> {
             BoxShadow(
               color: Colors.black.withOpacity(0.05),
               blurRadius: 6,
-              offset: const Offset(0, 2),
+              offset: const Offset(0, 3),
             ),
           ],
         ),
@@ -124,8 +127,7 @@ class _NearbyStoresSectionState extends State<NearbyStoresSection> {
                 color: Colors.grey.shade100,
                 borderRadius: BorderRadius.circular(12),
               ),
-              child:
-                  result.store.logoUrl != null &&
+              child: result.store.logoUrl != null &&
                       result.store.logoUrl!.isNotEmpty
                   ? ClipRRect(
                       borderRadius: BorderRadius.circular(12),
@@ -139,8 +141,13 @@ class _NearbyStoresSectionState extends State<NearbyStoresSection> {
                         ),
                       ),
                     )
-                  : Icon(Icons.store, size: 40, color: Colors.grey[400]),
+                  : Icon(
+                      Icons.store,
+                      size: 40,
+                      color: Colors.grey[400],
+                    ),
             ),
+
             // اسم المتجر
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 8),
@@ -155,35 +162,56 @@ class _NearbyStoresSectionState extends State<NearbyStoresSection> {
                 overflow: TextOverflow.ellipsis,
               ),
             ),
+
             const SizedBox(height: 4),
+
             // المسافة
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Icon(Icons.location_on, size: 14, color: AppColors.mainColor),
+                Icon(
+                  Icons.location_on,
+                  size: 14,
+                  color: AppColors.mainColor,
+                ),
                 const SizedBox(width: 4),
                 Text(
                   result.distanceText,
-                  style: TextStyle(fontSize: 10, color: Colors.grey[600]),
+                  style: TextStyle(
+                    fontSize: 10,
+                    color: Colors.grey[600],
+                  ),
                 ),
               ],
             ),
+
             const SizedBox(height: 2),
+
             // وقت التوصيل
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Icon(Icons.access_time, size: 12, color: Colors.grey[500]),
+                Icon(
+                  Icons.access_time,
+                  size: 12,
+                  color: Colors.grey[500],
+                ),
                 const SizedBox(width: 4),
                 Text(
                   result.deliveryTimeText,
-                  style: TextStyle(fontSize: 9, color: Colors.grey[500]),
+                  style: TextStyle(
+                    fontSize: 9,
+                    color: Colors.grey[500],
+                  ),
                 ),
               ],
             ),
           ],
         ),
-      ).animate().fadeIn(duration: 300.ms, delay: (index * 50).ms),
+      ).animate().fadeIn(
+            duration: 300.ms,
+            delay: (index * 50).ms,
+          ),
     );
   }
 }
