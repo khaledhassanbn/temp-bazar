@@ -23,12 +23,13 @@ class LocationAppBarWidget extends StatelessWidget {
         return GestureDetector(
           onTap: () => _showLocationsSheet(context),
           child: Column(
-            crossAxisAlignment: CrossAxisAlignment.end,
+            crossAxisAlignment: CrossAxisAlignment.center,
             mainAxisSize: MainAxisSize.min,
             children: [
               // النص الرئيسي مع السهم
               Row(
                 mainAxisSize: MainAxisSize.min,
+                mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   Text(
                     viewModel.hasLocation 
@@ -52,14 +53,14 @@ class LocationAppBarWidget extends StatelessWidget {
               if (viewModel.hasLocation) ...[
                 const SizedBox(height: 2),
                 Text(
-                  _truncateAddress(viewModel.displayAddress, 35),
+                  _truncateAddress(viewModel.displayAddress, 20),
                   style: const TextStyle(
                     fontSize: 12,
                     color: Colors.white70,
                   ),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  textAlign: TextAlign.right,
+                  textAlign: TextAlign.center,
                 ),
               ],
             ],

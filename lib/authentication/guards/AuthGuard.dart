@@ -11,6 +11,16 @@ class AuthGuard extends ChangeNotifier {
   StreamSubscription<User?>? _authSubscription;
   StreamSubscription<DocumentSnapshot<Map<String, dynamic>>>?
   _statusSubscription;
+  
+  /// Flag to track if this ChangeNotifier has been disposed
+  bool _isDisposed = false;
+  
+  /// Safe wrapper for notifyListeners that checks disposal state
+  void _safeNotifyListeners() {
+    if (!_isDisposed) {
+      notifyListeners();
+    }
+  }
 
   AuthGuard() {
     _authSubscription = _auth.authStateChanges().listen((user) async {
@@ -20,7 +30,7 @@ class AuthGuard extends ChangeNotifier {
       if (user == null) {
         userStatus = null;
         _hasSetupLocation = false;
-        notifyListeners();
+        _safeNotifyListeners();
         return;
       }
 
@@ -74,13 +84,13 @@ class AuthGuard extends ChangeNotifier {
       _hasSetupLocation = false;
     }
 
-    notifyListeners();
+    _safeNotifyListeners();
   }
 
   /// 🔹 تحديث حالة إعداد الموقع
   void updateLocationSetupStatus(bool hasSetup) {
     _hasSetupLocation = hasSetup;
-    notifyListeners();
+    _safeNotifyListeners();
   }
 
   /// 🔹 متابعة التغييرات في حالة المستخدم من Firestore لحظيًا
@@ -115,7 +125,7 @@ class AuthGuard extends ChangeNotifier {
             }
             
             if (changed) {
-              notifyListeners();
+              _safeNotifyListeners();
             }
           }
         });
@@ -123,6 +133,7 @@ class AuthGuard extends ChangeNotifier {
 
   @override
   void dispose() {
+    _isDisposed = true;
     _authSubscription?.cancel();
     _statusSubscription?.cancel();
     super.dispose();

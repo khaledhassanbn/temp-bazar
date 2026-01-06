@@ -18,6 +18,7 @@ import '../widgets/featured_stores_section.dart';
 import '../../license/services/license_service.dart';
 import '../../license/widgets/license_warning_banner.dart';
 import '../../create_market/models/store_model.dart';
+import '../../account/pages/account_page.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -125,96 +126,124 @@ class _HomePageState extends State<HomePage> {
                           background: Stack(
                             fit: StackFit.expand,
                             children: [
-                              // صورة الخلفية
-                              Image.asset(
-                                'assets/images/create_market.png',
-                                fit: BoxFit.cover,
-                                errorBuilder: (_, __, ___) =>
-                                    Container(color: AppColors.mainColor),
-                              ),
-                              // طبقة تدرج لوني
-                              Container(
-                                decoration: BoxDecoration(
-                                  gradient: LinearGradient(
-                                    begin: Alignment.topCenter,
-                                    end: Alignment.bottomCenter,
-                                    colors: [
-                                      Colors.black.withOpacity(0.3),
-                                      Colors.transparent,
-                                    ],
-                                  ),
+                              // خلفية (أبيض) لتغطية الفراغات
+                              Container(color: Colors.white),
+
+                              // حاوية الصورة مع الحواف الدائرية من الأسفل فقط
+                              // "خط مستقيم من الأسفل وله كيرف حاد من الأطراف"
+                              ClipRRect(
+                                borderRadius: const BorderRadius.only(
+                                  bottomLeft: Radius.circular(25),
+                                  bottomRight: Radius.circular(25),
                                 ),
-                              ),
-                              // محتوى AppBar
-                              Positioned(
-                                top: MediaQuery.of(context).padding.top + 8,
-                                right: 16,
-                                left: 16,
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.end,
+                                child: Stack(
+                                  fit: StackFit.expand,
                                   children: [
-                                    Row(
-                                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                      children: [
-                                        // عنوان التوصيل (في أقصى اليمين - يظهر أولاً في RTL)
-                                        LocationAppBarWidget(),
-                                        // أيقونة السلة على اليسار (تظهر آخراً في RTL)
-                                        _buildCartIcon(context, cartViewModel),
-                                      ],
+                                    // صورة الخلفية
+                                    Image.asset(
+                                      'assets/images/create_market.png',
+                                      fit: BoxFit.cover,
+                                      errorBuilder: (_, __, ___) =>
+                                          Container(color: AppColors.mainColor),
                                     ),
-                                    const SizedBox(height: 20),
-                                    // شريط البحث
-                                    GestureDetector(
-                                      onTap: () {
-                                        if (locationViewModel.hasLocation) {
-                                          context.go('/Search');
-                                        } else {
-                                          _showLocationsSheet();
-                                        }
-                                      },
-                                      child: Container(
-                                        padding: const EdgeInsets.symmetric(
-                                          horizontal: 12,
-                                          vertical: 8,
-                                        ),
-                                        decoration: BoxDecoration(
-                                          color: Colors.transparent,
-                                          borderRadius: BorderRadius.circular(
-                                            8,
-                                          ),
-                                        ),
-                                        child: AbsorbPointer(
-                                          child: SearchBarWidget(
-                                            suggestions: const [
-                                              "متجر",
-                                              "منتج",
-                                              "ملابس",
-                                              "أجهزة",
-                                              "طعام",
-                                            ],
-                                          ),
-                                        ),
-                                      ),
-                                    ),
-                                    // مساحة قابلة للنقر (خفية) تحت البحث حتى نهاية AppBar
-                                    SizedBox(
-                                      height:
-                                          280 -
-                                          (MediaQuery.of(context).padding.top +
-                                              8 +
-                                              40 +
-                                              20 +
-                                              46),
-                                      child: GestureDetector(
-                                        onTap: () {
-                                          context.push('/request-ads');
-                                        },
-                                        child: Container(
-                                          color: Colors.transparent,
+                                    // طبقة تدرج لوني
+                                    Container(
+                                      decoration: BoxDecoration(
+                                        gradient: LinearGradient(
+                                          begin: Alignment.topCenter,
+                                          end: Alignment.bottomCenter,
+                                          colors: [
+                                            Colors.black.withOpacity(0.3),
+                                            Colors.transparent,
+                                          ],
                                         ),
                                       ),
                                     ),
                                   ],
+                                ),
+                              ),
+
+                              // محتوى AppBar - يختفي تدريجياً عند التمرير
+                              Positioned(
+                                top: MediaQuery.of(context).padding.top + 8,
+                                right: 16,
+                                left: 16,
+                                child: AnimatedOpacity(
+                                  duration: const Duration(milliseconds: 200),
+                                  opacity: _isScrolled ? 0.0 : 1.0,
+                                  child: IgnorePointer(
+                                    ignoring: _isScrolled, // تعطيل التفاعل عند الاختفاء
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.end,
+                                      children: [
+                                        Row(
+                                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                          children: [
+                                            // عربة التسوق على اليمين (RTL Start)
+                                            _buildCartIcon(context, cartViewModel),
+
+                                            // عنوان التوصيل (في المنتصف تقريباً أو بجانب السلة)
+                                            Expanded(child: LocationAppBarWidget()),
+
+                                            // 3 شرط (القائمة) على اليسار (RTL End)
+                                            _buildMenuIcon(context),
+                                          ],
+                                        ),
+                                        const SizedBox(height: 20),
+                                        // شريط البحث
+                                        GestureDetector(
+                                          onTap: () {
+                                            if (locationViewModel.hasLocation) {
+                                              context.go('/Search');
+                                            } else {
+                                              _showLocationsSheet();
+                                            }
+                                          },
+                                          child: Container(
+                                            padding: const EdgeInsets.symmetric(
+                                              horizontal: 12,
+                                              vertical: 8,
+                                            ),
+                                            decoration: BoxDecoration(
+                                              color: Colors.transparent,
+                                              borderRadius: BorderRadius.circular(
+                                                8,
+                                              ),
+                                            ),
+                                            child: AbsorbPointer(
+                                              child: SearchBarWidget(
+                                                suggestions: const [
+                                                  "متجر",
+                                                  "منتج",
+                                                  "ملابس",
+                                                  "أجهزة",
+                                                  "طعام",
+                                                ],
+                                              ),
+                                            ),
+                                          ),
+                                        ),
+                                        // مساحة قابلة للنقر (خفية) تحت البحث حتى نهاية AppBar
+                                        SizedBox(
+                                          height:
+                                              280 -
+                                              (MediaQuery.of(context).padding.top +
+                                                  8 +
+                                                  40 +
+                                                  20 +
+                                                  46),
+                                          child: GestureDetector(
+                                            onTap: () {
+                                              context.push('/request-ads');
+                                            },
+                                            child: Container(
+                                              color: Colors.transparent,
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
                                 ),
                               ),
                             ],
@@ -223,17 +252,17 @@ class _HomePageState extends State<HomePage> {
                         title: _isScrolled
                             ? Row(
                                 children: [
-                                  // عربة التسوق ثابتة في أقصى اليمين (RTL Start)
+                                  // عربة التسوق على اليمين (RTL Start)
                                   _buildCartIcon(context, cartViewModel),
                                   
-                                  // مسافة مرنة لدفع العناصر المتبقية إلى اليسار
+                                  // مسافة مرنة
                                   const Spacer(),
 
-                                  // عنوان التوصيل (بجانب أيقونة البحث)
+                                  // عنوان التوصيل
                                   LocationAppBarWidget(),
                                   const SizedBox(width: 8),
 
-                                  // أيقونة البحث ثابتة في أقصى اليسار (RTL End)
+                                  // أيقونة البحث
                                   GestureDetector(
                                     onTap: () {
                                       if (locationViewModel.hasLocation) {
@@ -255,6 +284,11 @@ class _HomePageState extends State<HomePage> {
                                       ),
                                     ),
                                   ),
+                                  
+                                  const SizedBox(width: 8),
+                                  
+                                  // أيقونة القائمة (3 شرط) على اليسار (RTL End)
+                                  _buildMenuIcon(context),
                                 ],
                               )
                             : null,
@@ -285,7 +319,7 @@ class _HomePageState extends State<HomePage> {
                               delay: 100.ms,
                             ),
 
-                            const SizedBox(height: 16),
+                            // const SizedBox(height:8),
 
                             // 🔹 المتاجر المختارة (مختارات)
                             const FeaturedStoresSection().animate().fadeIn(
@@ -330,6 +364,46 @@ class _HomePageState extends State<HomePage> {
             if (!locationViewModel.hasLocation && !locationViewModel.isLoading)
               _buildLocationBlockingOverlay(),
           ],
+        ),
+      ),
+    );
+  }
+
+  // بناء أيقونة القائمة (3 شرط)
+  Widget _buildMenuIcon(BuildContext context) {
+    return InkWell(
+      onTap: () {
+        Navigator.of(context).push(
+          PageRouteBuilder(
+            pageBuilder: (context, animation, secondaryAnimation) =>
+                const AccountPage(),
+            transitionsBuilder:
+                (context, animation, secondaryAnimation, child) {
+              const begin = Offset(-1.0, 0.0); // من اليسار
+              const end = Offset.zero;
+              const curve = Curves.easeInOut;
+              var tween =
+                  Tween(begin: begin, end: end).chain(CurveTween(curve: curve));
+              return SlideTransition(
+                position: animation.drive(tween),
+                child: child,
+              );
+            },
+            transitionDuration: const Duration(milliseconds: 300),
+          ),
+        );
+      },
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        padding: const EdgeInsets.all(8),
+        decoration: BoxDecoration(
+          color: Colors.white.withOpacity(0.2),
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: const Icon(
+          Icons.menu,
+          color: Colors.white,
+          size: 24,
         ),
       ),
     );

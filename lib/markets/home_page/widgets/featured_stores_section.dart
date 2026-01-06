@@ -5,7 +5,6 @@ import 'package:flutter_animate/flutter_animate.dart';
 import '../services/featured_stores_service.dart';
 import '../../favourite_markets/services/favourite_markets_service.dart';
 
-/// قسم المتاجر المختارة (المتاجر التي لها إعلانات نشطة)
 class FeaturedStoresSection extends StatefulWidget {
   const FeaturedStoresSection({super.key});
 
@@ -16,6 +15,7 @@ class FeaturedStoresSection extends StatefulWidget {
 class _FeaturedStoresSectionState extends State<FeaturedStoresSection> {
   final FeaturedStoresService _service = FeaturedStoresService();
   final FavouriteMarketsService _favouriteService = FavouriteMarketsService();
+
   List<FeaturedStoreResult> _stores = [];
   Set<String> _favouriteStoreIds = {};
   bool _isLoading = true;
@@ -28,7 +28,6 @@ class _FeaturedStoresSectionState extends State<FeaturedStoresSection> {
   }
 
   Future<void> _loadFeaturedStores() async {
-    if (!mounted) return;
     setState(() => _isLoading = true);
     try {
       final stores = await _service.getFeaturedStores(limit: 10);
@@ -37,8 +36,7 @@ class _FeaturedStoresSectionState extends State<FeaturedStoresSection> {
         _stores = stores;
         _isLoading = false;
       });
-    } catch (e) {
-      print('خطأ في جلب المتاجر المختارة: $e');
+    } catch (_) {
       if (!mounted) return;
       setState(() => _isLoading = false);
     }
@@ -49,23 +47,18 @@ class _FeaturedStoresSectionState extends State<FeaturedStoresSection> {
       final favourites = await _favouriteService.getFavouriteMarkets();
       if (!mounted) return;
       setState(() {
-        _favouriteStoreIds = favourites.map((f) => f.marketId).toSet();
+        _favouriteStoreIds = favourites.map((e) => e.marketId).toSet();
       });
-    } catch (e) {
-      print('خطأ في جلب المتاجر المفضلة: $e');
-    }
+    } catch (_) {}
   }
 
   Future<void> _toggleFavourite(String marketId) async {
     final isFavourite = _favouriteStoreIds.contains(marketId);
-
     if (isFavourite) {
       await _favouriteService.removeFavouriteMarket(marketId);
     } else {
       await _favouriteService.addFavouriteMarket(marketId);
     }
-
-    if (!mounted) return;
     await _loadFavouriteStores();
   }
 
@@ -78,16 +71,14 @@ class _FeaturedStoresSectionState extends State<FeaturedStoresSection> {
       );
     }
 
-    if (_stores.isEmpty) {
-      return const SizedBox.shrink();
-    }
+    if (_stores.isEmpty) return const SizedBox.shrink();
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16),
-          child: const Text(
+        const Padding(
+          padding: EdgeInsets.symmetric(horizontal: 16),
+          child: Text(
             'مختارات',
             style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
           ),
@@ -98,11 +89,10 @@ class _FeaturedStoresSectionState extends State<FeaturedStoresSection> {
           child: ListView.separated(
             scrollDirection: Axis.horizontal,
             padding: const EdgeInsets.symmetric(horizontal: 16),
-            separatorBuilder: (context, index) => const SizedBox(width: 12),
+            separatorBuilder: (_, __) => const SizedBox(width: 12),
             itemCount: _stores.length,
             itemBuilder: (context, index) {
-              final result = _stores[index];
-              return _buildStoreCard(result, index);
+              return _buildStoreCard(_stores[index], index);
             },
           ),
         ),
@@ -115,7 +105,6 @@ class _FeaturedStoresSectionState extends State<FeaturedStoresSection> {
 
     return GestureDetector(
       onTap: () {
-        if (!mounted) return;
         context.push('/HomeMarketPage?marketLink=${result.store.link}');
       },
       child: Container(
@@ -127,18 +116,15 @@ class _FeaturedStoresSectionState extends State<FeaturedStoresSection> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.end,
           children: [
-            // صورة الغلاف مع لوجو المتجر
+            /// ================== الصورة ==================
             Stack(
               children: [
-                // صورة الغلاف
                 ClipRRect(
                   borderRadius: BorderRadius.circular(12),
                   child: SizedBox(
                     height: 160,
                     width: double.infinity,
-                    child:
-                        result.store.coverUrl != null &&
-                            result.store.coverUrl!.isNotEmpty
+                    child: result.store.coverUrl?.isNotEmpty == true
                         ? Image.network(
                             result.store.coverUrl!,
                             fit: BoxFit.fill,
@@ -148,139 +134,83 @@ class _FeaturedStoresSectionState extends State<FeaturedStoresSection> {
                         : _buildImagePlaceholder(),
                   ),
                 ),
-                // لوجو المتجر في الأعلى
-                if (result.store.logoUrl != null &&
-                    result.store.logoUrl!.isNotEmpty)
+
+                /// اللوجو
+                if (result.store.logoUrl?.isNotEmpty == true)
                   Positioned(
                     top: 8,
                     right: 8,
-                    child: Stack(
-                      children: [
-                        Container(
-                          width: 60,
-                          height: 60,
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            shape: BoxShape.circle,
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black.withOpacity(0.1),
-                                blurRadius: 4,
-                                offset: const Offset(0, 2),
-                              ),
-                            ],
-                          ),
-                          padding: const EdgeInsets.all(4),
-                          child: ClipOval(
-                            child: Image.network(
-                              result.store.logoUrl!,
-                              fit: BoxFit.cover,
-                              errorBuilder: (_, __, ___) => Container(
-                                color: Colors.grey[200],
-                                child: Icon(
-                                  Icons.store,
-                                  size: 30,
-                                  color: Colors.grey[400],
-                                ),
-                              ),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                // شارة "إعلان" في أسفل يسار الصورة
-                Positioned(
-                  bottom: 8,
-                  left: 8,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 8,
-                      vertical: 4,
-                    ),
-                    decoration: BoxDecoration(
-                      color: Colors.green.shade600,
-                      borderRadius: BorderRadius.circular(4),
-                    ),
-                    child: const Text(
-                      'إعلان',
-                      style: TextStyle(
-                        fontSize: 10,
-                        fontWeight: FontWeight.bold,
+                    child: Container(
+                      width: 60,
+                      height: 60,
+                      padding: const EdgeInsets.all(4),
+                      decoration: BoxDecoration(
                         color: Colors.white,
+                        shape: BoxShape.circle,
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.1),
+                            blurRadius: 4,
+                          ),
+                        ],
+                      ),
+                      child: ClipOval(
+                        child: Image.network(
+                          result.store.logoUrl!,
+                          fit: BoxFit.cover,
+                        ),
                       ),
                     ),
                   ),
-                ),
-                // القلب والتقييم في الأعلى اليسار
+
+                /// القلب + التقييم
                 Positioned(
                   top: 8,
                   left: 8,
                   child: Row(
-                    mainAxisSize: MainAxisSize.min,
                     children: [
-                      // القلب
                       GestureDetector(
                         onTap: () => _toggleFavourite(result.store.id),
                         child: Container(
                           padding: const EdgeInsets.all(6),
-                          decoration: BoxDecoration(
+                          decoration: const BoxDecoration(
                             color: Colors.white,
                             shape: BoxShape.circle,
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black.withOpacity(0.1),
-                                blurRadius: 4,
-                                offset: const Offset(0, 2),
-                              ),
-                            ],
                           ),
                           child: Icon(
                             isFavourite
                                 ? Icons.favorite
                                 : Icons.favorite_border,
-                            color: isFavourite ? Colors.red : Colors.grey[600],
+                            color: isFavourite ? Colors.red : Colors.grey,
                             size: 20,
                           ),
                         ),
                       ),
                       const SizedBox(width: 8),
-                      // التقييم
                       Container(
                         padding: const EdgeInsets.symmetric(
-                          horizontal: 10,
-                          vertical: 4,
-                        ),
+                            horizontal: 8, vertical: 4),
                         decoration: BoxDecoration(
                           color: Colors.white,
                           borderRadius: BorderRadius.circular(20),
                         ),
                         child: Row(
-                          mainAxisSize: MainAxisSize.min,
                           children: [
-                            const Icon(
-                              Icons.star,
-                              color: Colors.amber,
-                              size: 14,
-                            ),
+                            const Icon(Icons.star,
+                                color: Colors.amber, size: 14),
                             const SizedBox(width: 4),
                             Text(
                               result.store.averageRating.toStringAsFixed(1),
                               style: const TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.bold,
-                              ),
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.bold),
                             ),
-                            if (result.store.totalReviews > 0) ...[
-                              const SizedBox(width: 4),
-                              Text(
-                                '(${result.store.totalReviews})',
-                                style: TextStyle(
-                                  fontSize: 11,
-                                  color: Colors.grey[600],
-                                ),
-                              ),
-                            ],
+                            const SizedBox(width: 4),
+                            Text(
+                              '(${result.store.totalReviews})',
+                              style: TextStyle(
+                                  fontSize: 11, color: Colors.grey[600]),
+                            ),
                           ],
                         ),
                       ),
@@ -289,81 +219,91 @@ class _FeaturedStoresSectionState extends State<FeaturedStoresSection> {
                 ),
               ],
             ),
-            // معلومات المتجر
+
+            /// ================== المعلومات ==================
             Padding(
               padding: const EdgeInsets.all(12),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.end,
-                mainAxisSize: MainAxisSize.min,
                 children: [
-                  // اسم المتجر على اليمين
-                  Align(
-                    alignment: Alignment.centerRight,
-                    child: Text(
-                      result.store.name,
-                      style: const TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                      ),
-                      textAlign: TextAlign.right,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
+                  /// الاسم + إعلان (بدون تغيير مكان الاسم)
+Row(
+  children: [
+    /// اسم المتجر (يسار)
+    Text(
+      result.store.name,
+      style: const TextStyle(
+        fontSize: 16,
+        fontWeight: FontWeight.bold,
+      ),
+      maxLines: 1,
+      overflow: TextOverflow.ellipsis,
+    ),
+
+    const Spacer(),
+
+    /// إعلان (يمين – إطار رمادي شفاف)
+    Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: Colors.transparent,
+        borderRadius: BorderRadius.circular(4),
+        border: Border.all(
+          color: const Color.fromARGB(255, 196, 196, 196),
+          width: 1,
+        ),
+      ),
+      child: const Text(
+        'إعلان',
+        style: TextStyle(
+          fontSize: 10,
+          color:Color.fromARGB(255, 169, 169, 169),
+          // fontWeight: FontWeight.w500,
+        ),
+      ),
+    ),
+  ],
+),
+
+
+
                   const SizedBox(height: 4),
-                  // الوصف على اليمين
+
+                  /// الوصف (من غير أي تعديل)
                   if (result.store.description.isNotEmpty)
                     Align(
                       alignment: Alignment.centerRight,
                       child: Text(
                         result.store.description,
-                        style: TextStyle(fontSize: 11, color: Colors.grey[600]),
+                        style: TextStyle(
+                            fontSize: 11, color: Colors.grey[600]),
                         textAlign: TextAlign.right,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
                     ),
+
                   const SizedBox(height: 8),
-                  // وقت التوصيل ومبلغ التوصيل
+
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      // مبلغ التوصيل
                       if (result.deliveryFee != null)
                         Row(
                           children: [
-                            Icon(
-                              Icons.delivery_dining,
-                              size: 14,
-                              color: Colors.grey[600],
-                            ),
+                            const Icon(Icons.delivery_dining, size: 14),
                             const SizedBox(width: 4),
-                            Text(
-                              result.deliveryFeeText,
-                              style: TextStyle(
-                                fontSize: 11,
-                                color: Colors.grey[600],
-                              ),
-                            ),
+                            Text(result.deliveryFeeText,
+                                style: const TextStyle(fontSize: 11)),
                           ],
                         ),
-                      // وقت التوصيل
                       if (result.deliveryTimeMinutes != null)
                         Row(
                           children: [
-                            Icon(
-                              Icons.access_time,
-                              size: 14,
-                              color: Colors.grey[600],
-                            ),
+                            const Icon(Icons.access_time, size: 14),
                             const SizedBox(width: 4),
-                            Text(
-                              result.deliveryTimeText,
-                              style: TextStyle(
-                                fontSize: 11,
-                                color: Colors.grey[600],
-                              ),
-                            ),
+                            Text(result.deliveryTimeText,
+                                style: const TextStyle(fontSize: 11)),
                           ],
                         ),
                     ],
@@ -380,8 +320,8 @@ class _FeaturedStoresSectionState extends State<FeaturedStoresSection> {
   Widget _buildImagePlaceholder() {
     return Container(
       color: Colors.grey[200],
-      child: Center(
-        child: Icon(Icons.store, size: 40, color: Colors.grey[400]),
+      child: const Center(
+        child: Icon(Icons.store, size: 40, color: Colors.grey),
       ),
     );
   }

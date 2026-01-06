@@ -11,6 +11,23 @@ class CartViewModel extends ChangeNotifier {
   List<CartItemModel> _cartItems = [];
   bool _isLoading = false;
   String? _error;
+  
+  /// Flag to track if this ChangeNotifier has been disposed
+  bool _isDisposed = false;
+  
+  /// Safe wrapper for notifyListeners that checks disposal state
+  void _safeNotifyListeners() {
+    if (!_isDisposed) {
+      notifyListeners();
+    }
+  }
+  
+  @override
+  void dispose() {
+    _isDisposed = true;
+    _cartBox.close(); // Moving close here to ensure it happens on dispose
+    super.dispose();
+  }
 
   /// Getter for cart items list
   List<CartItemModel> get cartItems => List.unmodifiable(_cartItems);
@@ -54,7 +71,7 @@ class CartViewModel extends ChangeNotifier {
     try {
       _isLoading = true;
       _error = null;
-      notifyListeners();
+      _safeNotifyListeners();
 
       // Open the cart box
       _cartBox = await Hive.openBox<CartItemModel>(_cartBoxName);
@@ -66,7 +83,7 @@ class CartViewModel extends ChangeNotifier {
       debugPrint('CartViewModel initialization error: $e');
     } finally {
       _isLoading = false;
-      notifyListeners();
+      _safeNotifyListeners();
     }
   }
 
@@ -74,7 +91,7 @@ class CartViewModel extends ChangeNotifier {
   Future<void> _loadCartItems() async {
     try {
       _cartItems = _cartBox.values.toList();
-      notifyListeners();
+      _safeNotifyListeners();
     } catch (e) {
       _error = 'فشل في تحميل عناصر السلة';
       debugPrint('Load cart items error: $e');
@@ -116,7 +133,7 @@ class CartViewModel extends ChangeNotifier {
     } catch (e) {
       _error = 'فشل في إضافة المنتج للسلة';
       debugPrint('Add item error: $e');
-      notifyListeners();
+      _safeNotifyListeners();
       return false;
     }
   }
@@ -134,7 +151,7 @@ class CartViewModel extends ChangeNotifier {
     } catch (e) {
       _error = 'فشل في استبدال منتجات السلة';
       debugPrint('Add item with market replacement error: $e');
-      notifyListeners();
+      _safeNotifyListeners();
     }
   }
 
@@ -143,7 +160,7 @@ class CartViewModel extends ChangeNotifier {
     try {
       await _cartBox.add(item);
       _cartItems.add(item);
-      notifyListeners();
+      _safeNotifyListeners();
     } catch (e) {
       throw Exception('فشل في حفظ المنتج في السلة');
     }
@@ -171,11 +188,11 @@ class CartViewModel extends ChangeNotifier {
       final updatedItem = _cartItems[index].copyWith(quantity: newQuantity);
       await _cartBox.putAt(index, updatedItem);
       _cartItems[index] = updatedItem;
-      notifyListeners();
+      _safeNotifyListeners();
     } catch (e) {
       _error = 'فشل في تحديث كمية المنتج';
       debugPrint('Update quantity error: $e');
-      notifyListeners();
+      _safeNotifyListeners();
     }
   }
 
@@ -186,11 +203,11 @@ class CartViewModel extends ChangeNotifier {
     try {
       await _cartBox.putAt(index, updatedItem);
       _cartItems[index] = updatedItem;
-      notifyListeners();
+      _safeNotifyListeners();
     } catch (e) {
       _error = 'فشل في تحديث المنتج';
       debugPrint('Update item error: $e');
-      notifyListeners();
+      _safeNotifyListeners();
     }
   }
 
@@ -201,11 +218,11 @@ class CartViewModel extends ChangeNotifier {
     try {
       await _cartBox.deleteAt(index);
       _cartItems.removeAt(index);
-      notifyListeners();
+      _safeNotifyListeners();
     } catch (e) {
       _error = 'فشل في حذف المنتج من السلة';
       debugPrint('Remove item error: $e');
-      notifyListeners();
+      _safeNotifyListeners();
     }
   }
 
@@ -222,11 +239,11 @@ class CartViewModel extends ChangeNotifier {
     try {
       await _cartBox.clear();
       _cartItems.clear();
-      notifyListeners();
+      _safeNotifyListeners();
     } catch (e) {
       _error = 'فشل في مسح السلة';
       debugPrint('Clear cart error: $e');
-      notifyListeners();
+      _safeNotifyListeners();
     }
   }
 
@@ -254,12 +271,7 @@ class CartViewModel extends ChangeNotifier {
     await _loadCartItems();
   }
 
-  /// Dispose resources
-  @override
-  void dispose() {
-    _cartBox.close();
-    super.dispose();
-  }
+
 
   /// Create a cart item from product details
   static CartItemModel createCartItem({

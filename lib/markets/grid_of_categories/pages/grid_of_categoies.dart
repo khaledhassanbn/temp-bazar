@@ -251,8 +251,12 @@ class _CategoriesGridPageState extends State<CategoriesGridPage> {
       );
     } else {
       // اسم صورة محلية - استخدم Image.asset
+      final imagePath = icon.startsWith('assets/')
+          ? icon
+          : 'assets/images/categories/$icon';
+
       return Image.asset(
-        'assets/images/categories/$icon',
+        imagePath,
         fit: BoxFit.cover,
         width: double.infinity,
         height: double.infinity,

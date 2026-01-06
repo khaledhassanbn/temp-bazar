@@ -8,8 +8,6 @@ import '../../grid_of_categories/Model/model.dart';
 import '../../grid_of_categories/ViewModel/ViewModel.dart';
 import '../../Markets_after_category/viewmodel/category_filter_viewmodel.dart';
 
-/// ويدجت لعرض أيقونات الفئات بشكل شبكي (4 في الصف)
-/// عند الضغط على فئة، يتم فتح صفحة الفئة
 class HomeCategoriesIcons extends StatelessWidget {
   const HomeCategoriesIcons({super.key});
 
@@ -29,64 +27,42 @@ class HomeCategoriesIcons extends StatelessWidget {
       return const SizedBox.shrink();
     }
 
-    // تصفية فئة "هدايا" وعرض أول 7 فئات
+    // تصفية فئة "هدايا" وعرض أول 3 فئات
     final filteredCategories = categoryVm.categories
         .where((cat) => 
             cat.id.toLowerCase() != 'gifts' && 
             cat.name.toLowerCase() != 'هدايا')
-        .take(7)
+        .take(3)
         .toList();
 
     return Container(
-      padding: const EdgeInsets.symmetric(vertical: 8),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // عنوان القسم
-          Padding(
+      padding: const EdgeInsets.symmetric(vertical: 12),
+      child: SizedBox(
+        height: 110,
+        child: Directionality(
+          textDirection: TextDirection.ltr,
+          child: ListView.builder(
+            scrollDirection: Axis.horizontal,
             padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: const Text(
-              'الفئات',
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-          ),
-          // const SizedBox(height: 6),
-          // شبكة الفئات 4 في الصف
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: GridView.builder(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: 4,
-                childAspectRatio: 0.85,
-                crossAxisSpacing: 12,
-                mainAxisSpacing: 12,
-              ),
-              itemCount: filteredCategories.length + 1, // +1 لزر "كل الفئات"
-              itemBuilder: (context, index) {
-                // العنصر الأخير هو زر "عرض كل الفئات" (بديل عن "هدايا")
-                if (index == filteredCategories.length) {
-                  return _buildViewAllItem(context, index);
-                }
+            itemCount: filteredCategories.length + 1,
+            itemBuilder: (context, index) {
+              if (index == filteredCategories.length) {
+                return _buildViewAllItem(context, index);
+              }
 
-                final category = filteredCategories[index];
-                final isSelected = filterVm.selectedCategoryId == category.id;
+              final category = filteredCategories[index];
+              final isSelected = filterVm.selectedCategoryId == category.id;
 
-                return _buildCategoryItem(
-                  context,
-                  category,
-                  isSelected,
-                  filterVm,
-                  index,
-                );
-              },
-            ),
+              return _buildCategoryItem(
+                context,
+                category,
+                isSelected,
+                filterVm,
+                index,
+              );
+            },
           ),
-        ],
+        ),
       ),
     );
   }
@@ -94,39 +70,42 @@ class HomeCategoriesIcons extends StatelessWidget {
   Widget _buildViewAllItem(BuildContext context, int index) {
     return GestureDetector(
       onTap: () => context.push('/CategoriesGrid'),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Expanded(
-            child: Container(
-              width: double.infinity,
+      child: Container(
+        width: 80,
+        margin: const EdgeInsets.only(right: 12),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 70,
+              height: 70,
               decoration: BoxDecoration(
                 color: AppColors.mainColor.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(16),
               ),
               child: Icon(
                 Icons.grid_view_rounded,
                 color: AppColors.mainColor,
-                size: 32,
+                size: 36,
               ),
             ),
-          ),
-          const SizedBox(height: 6),
-          Text(
-            'كل الفئات',
-            style: TextStyle(
-              fontSize: 11,
-              fontWeight: FontWeight.bold, // 🔥 خط عريض دائماً
-              color: AppColors.mainColor,
+            const SizedBox(height: 8),
+            Text(
+              'عرض الكل',
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.bold,
+                color: AppColors.mainColor,
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              textAlign: TextAlign.center,
             ),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            textAlign: TextAlign.center,
-          ),
-        ],
+          ],
+        ),
       ).animate().scale(
             duration: 300.ms,
-            delay: (index * 30).ms,
+            delay: (index * 50).ms,
             begin: const Offset(0.8, 0.8),
             end: const Offset(1, 1),
           ),
@@ -142,54 +121,48 @@ class HomeCategoriesIcons extends StatelessWidget {
   ) {
     return GestureDetector(
       onTap: () {
-        // فتح صفحة الفئة مباشرة
         context.go('/FoodHomePage?categoryId=${category.id}');
       },
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          // صورة الفئة بدون إطار
-          Expanded(
-            child: Container(
-              width: double.infinity,
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(12),
-              ),
+      child: Container(
+        width: 80,
+        margin: const EdgeInsets.only(right: 12),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            SizedBox(
+              width: 70,
+              height: 70,
               child: ClipRRect(
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(16),
                 child: _buildCategoryImage(category),
               ),
             ),
-          ),
-          const SizedBox(height: 6),
-          // اسم الفئة
-          Text(
-            category.name,
-            style: TextStyle(
-              fontSize: 11,
-              fontWeight: FontWeight.bold, // 🔥 خط عريض دائماً
-              color: isSelected ? AppColors.mainColor : Colors.grey[700],
+            const SizedBox(height: 8),
+            Text(
+              category.name,
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.bold,
+                color: isSelected ? AppColors.mainColor : Colors.grey[700],
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              textAlign: TextAlign.center,
             ),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            textAlign: TextAlign.center,
-          ),
-        ],
+          ],
+        ),
       ).animate().scale(
             duration: 300.ms,
-            delay: (index * 30).ms,
+            delay: (index * 50).ms,
             begin: const Offset(0.8, 0.8),
             end: const Offset(1, 1),
           ),
     );
   }
 
-  /// بناء صورة الفئة بدون خلفية (مثل PNG شفاف)
   Widget _buildCategoryImage(CategoryModel category) {
-    // إذا كانت الفئة لها أيقونة (URL)
     if (category.icon.isNotEmpty) {
       if (category.icon.startsWith('http')) {
-        // صورة من الإنترنت
         return Image.network(
           category.icon,
           fit: BoxFit.contain,
@@ -205,16 +178,18 @@ class HomeCategoriesIcons extends StatelessWidget {
           },
         );
       } else {
-        // صورة محلية من assets
+        // If it's a local asset but doesn't have the full path, add it
+        final imagePath = category.icon.startsWith('assets/')
+            ? category.icon
+            : 'assets/images/categories/${category.icon}';
+            
         return Image.asset(
-          category.icon,
+          imagePath,
           fit: BoxFit.contain,
           errorBuilder: (_, __, ___) => _buildFallbackIcon(category.id),
         );
       }
     }
-    
-    // محاولة تحميل صورة من assets/images/categories/
     return Image.asset(
       'assets/images/categories/${category.id}.png',
       fit: BoxFit.contain,
@@ -222,22 +197,20 @@ class HomeCategoriesIcons extends StatelessWidget {
     );
   }
 
-  /// أيقونة احتياطية في حالة عدم وجود صورة
   Widget _buildFallbackIcon(String categoryId) {
     return Container(
       decoration: BoxDecoration(
         color: AppColors.mainColor.withOpacity(0.1),
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(16),
       ),
       child: Icon(
         _getCategoryIcon(categoryId),
-        size: 32,
+        size: 36,
         color: AppColors.mainColor,
       ),
     );
   }
 
-  // أيقونات الفئات الافتراضية
   IconData _getCategoryIcon(String categoryId) {
     switch (categoryId.toLowerCase()) {
       case 'food':
@@ -265,4 +238,3 @@ class HomeCategoriesIcons extends StatelessWidget {
     }
   }
 }
-

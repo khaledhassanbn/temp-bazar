@@ -39,11 +39,25 @@ class _CreateEditCategoryPageState extends State<CreateEditCategoryPage> {
     // قائمة ثابتة بأسماء الصور المتاحة
     // يرجى إضافة أسماء الصور هنا عند إضافتها في فولدر assets/images/categories
     // وتحديدها أيضاً في ملف pubspec.yaml
-    const List<String> staticImages = [
-      'cothes.png',
-      // أضف أسماء الصور الجديدة هنا عند إضافتها
-      // مثال: 'category1.png', 'category2.jpg', 'food.png',
-    ];
+const List<String> staticImages = [
+  'accessories.png',
+  'animal.png',
+  'cars.png',
+  'cosmatics.png',
+  'clothes.png',
+  'electric.png',
+  'food.png',
+  'furniture.png',
+  'laptop.png',
+  'nuts.png',
+  'perfumes.png',
+  'pharmacy.png',
+  'phones.png',
+  'sebaka.png',
+  'school.png',
+  'supermarket.png',
+];
+
 
     setState(() {
       _availableImages = staticImages;
@@ -102,90 +116,108 @@ class _CreateEditCategoryPageState extends State<CreateEditCategoryPage> {
 
     showModalBottomSheet(
       context: context,
+      isScrollControlled: true,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
-      builder: (context) => Container(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Padding(
-              padding: const EdgeInsets.only(bottom: 16),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  const Text(
-                    'اختر صورة للفئة',
-                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-                  ),
-                  IconButton(
-                    icon: const Icon(Icons.close),
-                    onPressed: () => Navigator.pop(context),
-                  ),
-                ],
-              ),
-            ),
-            SizedBox(
-              height: 300,
-              child: GridView.builder(
-                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: 3,
-                  crossAxisSpacing: 10,
-                  mainAxisSpacing: 10,
-                  childAspectRatio: 1,
+      builder: (context) => SingleChildScrollView(
+        padding: EdgeInsets.only(
+          bottom: MediaQuery.of(context).viewInsets.bottom,
+        ),
+        child: Container(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Padding(
+                padding: const EdgeInsets.only(bottom: 16),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text(
+                      'اختر صورة للفئة',
+                      style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.close),
+                      onPressed: () => Navigator.pop(context),
+                    ),
+                  ],
                 ),
-                itemCount: _availableImages.length,
-                itemBuilder: (context, index) {
-                  final imageName = _availableImages[index];
-                  final isSelected = _selectedImageName == imageName;
+              ),
+              SizedBox(
+                height: 300,
+                child: GridView.builder(
+                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: 3,
+                    crossAxisSpacing: 10,
+                    mainAxisSpacing: 10,
+                    childAspectRatio: 1,
+                  ),
+                  itemCount: _availableImages.length,
+                  itemBuilder: (context, index) {
+                    final imageName = _availableImages[index];
+                    final isSelected = _selectedImageName == imageName;
 
-                  return GestureDetector(
-                    onTap: () {
-                      setState(() {
-                        _selectedImageName = imageName;
-                      });
-                      Navigator.pop(context);
-                    },
-                    child: Container(
-                      decoration: BoxDecoration(
-                        border: Border.all(
-                          color: isSelected
-                              ? AppColors.mainColor
-                              : Colors.grey[300]!,
-                          width: isSelected ? 3 : 1,
+                    return GestureDetector(
+                      onTap: () {
+                        setState(() {
+                          _selectedImageName = imageName;
+                        });
+                        Navigator.pop(context);
+                      },
+                      child: Container(
+                        decoration: BoxDecoration(
+                          border: Border.all(
+                            color: isSelected
+                                ? AppColors.mainColor
+                                : Colors.grey[300]!,
+                            width: isSelected ? 3 : 1,
+                          ),
+                          borderRadius: BorderRadius.circular(12),
                         ),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(11),
-                        child: Image.asset(
-                          'assets/images/categories/$imageName',
-                          fit: BoxFit.cover,
-                          errorBuilder: (context, _, __) => Container(
-                            color: Colors.grey[200],
-                            child: const Icon(Icons.broken_image),
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(11),
+                          child: Image.asset(
+                            'assets/images/categories/$imageName',
+                            fit: BoxFit.cover,
+                            errorBuilder: (context, _, __) => Container(
+                              color: Colors.grey[200],
+                              child: const Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(Icons.broken_image, color: Colors.grey),
+                                  SizedBox(height: 4),
+                                  Text(
+                                    'غير موجود',
+                                    style: TextStyle(
+                                        fontSize: 10, color: Colors.grey),
+                                    textAlign: TextAlign.center,
+                                  ),
+                                ],
+                              ),
+                            ),
                           ),
                         ),
                       ),
-                    ),
-                  );
-                },
-              ),
-            ),
-            const SizedBox(height: 16),
-            if (_selectedImageName != null)
-              ElevatedButton(
-                onPressed: () => Navigator.pop(context),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.mainColor,
-                  foregroundColor: Colors.white,
-                  minimumSize: const Size(double.infinity, 50),
+                    );
+                  },
                 ),
-                child: const Text('تأكيد الاختيار'),
               ),
-          ],
+              const SizedBox(height: 16),
+              if (_selectedImageName != null)
+                ElevatedButton(
+                  onPressed: () => Navigator.pop(context),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.mainColor,
+                    foregroundColor: Colors.white,
+                    minimumSize: const Size(double.infinity, 50),
+                  ),
+                  child: const Text('تأكيد الاختيار'),
+                ),
+            ],
+          ),
         ),
       ),
     );

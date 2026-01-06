@@ -18,6 +18,22 @@ class SavedLocationsViewModel extends ChangeNotifier {
   bool _hasLocation = false;
   bool _locationPermissionDenied = false;
   bool _isInitializing = true;
+  
+  /// Flag to track if this ChangeNotifier has been disposed
+  bool _isDisposed = false;
+  
+  /// Safe wrapper for notifyListeners that checks disposal state
+  void _safeNotifyListeners() {
+    if (!_isDisposed) {
+      notifyListeners();
+    }
+  }
+  
+  @override
+  void dispose() {
+    _isDisposed = true;
+    super.dispose();
+  }
 
   // الموقع الحالي (من GPS)
   GeoPoint? _currentLocation;
@@ -64,7 +80,7 @@ class SavedLocationsViewModel extends ChangeNotifier {
   /// تهيئة الـ ViewModel
   Future<void> initialize() async {
     _isInitializing = true;
-    notifyListeners();
+    _safeNotifyListeners();
 
     try {
       await loadSavedLocations();
@@ -76,7 +92,7 @@ class SavedLocationsViewModel extends ChangeNotifier {
       }
     } finally {
       _isInitializing = false;
-      notifyListeners();
+      _safeNotifyListeners();
     }
   }
 
@@ -87,7 +103,7 @@ class SavedLocationsViewModel extends ChangeNotifier {
       bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
       if (!serviceEnabled) {
         _locationPermissionDenied = true;
-        notifyListeners();
+        _safeNotifyListeners();
         return;
       }
 
@@ -97,20 +113,20 @@ class SavedLocationsViewModel extends ChangeNotifier {
         permission = await Geolocator.requestPermission();
         if (permission == LocationPermission.denied) {
           _locationPermissionDenied = true;
-          notifyListeners();
+          _safeNotifyListeners();
           return;
         }
       }
 
       if (permission == LocationPermission.deniedForever) {
         _locationPermissionDenied = true;
-        notifyListeners();
+        _safeNotifyListeners();
         return;
       }
 
       // الحصول على الموقع الحالي
       _isLoading = true;
-      notifyListeners();
+      _safeNotifyListeners();
 
       Position position = await Geolocator.getCurrentPosition(
         desiredAccuracy: LocationAccuracy.high,
@@ -124,13 +140,13 @@ class SavedLocationsViewModel extends ChangeNotifier {
       _hasLocation = true;
       _locationPermissionDenied = false;
       _isLoading = false;
-      notifyListeners();
+      _safeNotifyListeners();
 
     } catch (e) {
       debugPrint('خطأ في الكشف عن الموقع: $e');
       _locationPermissionDenied = true;
       _isLoading = false;
-      notifyListeners();
+      _safeNotifyListeners();
     }
   }
 
@@ -175,16 +191,16 @@ class SavedLocationsViewModel extends ChangeNotifier {
   Future<void> loadSavedLocations() async {
     _isLoading = true;
     _error = null;
-    notifyListeners();
+    _safeNotifyListeners();
 
     try {
       _savedLocations = await _service.getSavedLocations();
       _isLoading = false;
-      notifyListeners();
+      _safeNotifyListeners();
     } catch (e) {
       _error = 'فشل تحميل العناوين';
       _isLoading = false;
-      notifyListeners();
+      _safeNotifyListeners();
     }
   }
 
@@ -195,7 +211,7 @@ class SavedLocationsViewModel extends ChangeNotifier {
       if (_selectedLocation != null) {
         _hasLocation = true;
       }
-      notifyListeners();
+      _safeNotifyListeners();
     } catch (e) {
       debugPrint('خطأ في تحميل العنوان الافتراضي: $e');
     }
@@ -209,7 +225,7 @@ class SavedLocationsViewModel extends ChangeNotifier {
     bool setAsDefault = false,
   }) async {
     _isLoading = true;
-    notifyListeners();
+    _safeNotifyListeners();
 
     try {
       final newLocation = await _service.addLocation(
@@ -228,17 +244,17 @@ class SavedLocationsViewModel extends ChangeNotifier {
         
         _hasLocation = true;
         _isLoading = false;
-        notifyListeners();
+        _safeNotifyListeners();
         return true;
       }
 
       _isLoading = false;
-      notifyListeners();
+      _safeNotifyListeners();
       return false;
     } catch (e) {
       _error = 'فشل إضافة العنوان';
       _isLoading = false;
-      notifyListeners();
+      _safeNotifyListeners();
       return false;
     }
   }
@@ -258,7 +274,7 @@ class SavedLocationsViewModel extends ChangeNotifier {
   /// تعديل عنوان
   Future<bool> updateLocation(SavedLocation location) async {
     _isLoading = true;
-    notifyListeners();
+    _safeNotifyListeners();
 
     try {
       final success = await _service.updateLocation(location);
@@ -271,12 +287,12 @@ class SavedLocationsViewModel extends ChangeNotifier {
       }
 
       _isLoading = false;
-      notifyListeners();
+      _safeNotifyListeners();
       return success;
     } catch (e) {
       _error = 'فشل تعديل العنوان';
       _isLoading = false;
-      notifyListeners();
+      _safeNotifyListeners();
       return false;
     }
   }
@@ -284,7 +300,7 @@ class SavedLocationsViewModel extends ChangeNotifier {
   /// حذف عنوان
   Future<bool> deleteLocation(String locationId) async {
     _isLoading = true;
-    notifyListeners();
+    _safeNotifyListeners();
 
     try {
       final success = await _service.deleteLocation(locationId);
@@ -297,12 +313,12 @@ class SavedLocationsViewModel extends ChangeNotifier {
       }
 
       _isLoading = false;
-      notifyListeners();
+      _safeNotifyListeners();
       return success;
     } catch (e) {
       _error = 'فشل حذف العنوان';
       _isLoading = false;
-      notifyListeners();
+      _safeNotifyListeners();
       return false;
     }
   }
@@ -326,7 +342,7 @@ class SavedLocationsViewModel extends ChangeNotifier {
   void selectLocation(SavedLocation location) {
     _selectedLocation = location;
     _hasLocation = true;
-    notifyListeners();
+    _safeNotifyListeners();
   }
 
   /// استخدام الموقع الحالي
@@ -335,12 +351,12 @@ class SavedLocationsViewModel extends ChangeNotifier {
     if (_currentLocation != null) {
       _hasLocation = true;
     }
-    notifyListeners();
+    _safeNotifyListeners();
   }
 
   /// مسح الخطأ
   void clearError() {
     _error = null;
-    notifyListeners();
+    _safeNotifyListeners();
   }
 }

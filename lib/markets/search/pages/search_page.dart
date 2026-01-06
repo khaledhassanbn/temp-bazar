@@ -108,8 +108,12 @@ class _SearchPageState extends State<SearchPage> {
     }
 
     // حالة الصورة من التطبيق
+    final imagePath = icon.startsWith('assets/')
+        ? icon
+        : 'assets/images/categories/$icon';
+
     return Image.asset(
-      'assets/images/categories/$icon',
+      imagePath,
       fit: BoxFit.cover,
       errorBuilder: (context, _, __) => const Icon(Icons.category),
     );

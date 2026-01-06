@@ -348,8 +348,12 @@ class _ManageCategoriesPageState extends State<ManageCategoriesPage> {
       );
     } else {
       // اسم صورة محلية - استخدم Image.asset
+      final imagePath = icon.startsWith('assets/')
+          ? icon
+          : 'assets/images/categories/$icon';
+
       return Image.asset(
-        'assets/images/categories/$icon',
+        imagePath,
         fit: BoxFit.cover,
         errorBuilder: (context, _, __) =>
             Icon(Icons.category, size: 40, color: AppColors.mainColor),
