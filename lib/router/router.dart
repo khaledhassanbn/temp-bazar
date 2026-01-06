@@ -3,7 +3,7 @@ import 'package:bazar_suez/Layouts/market_layout.dart';
 import 'package:bazar_suez/Layouts/user_layout.dart';
 import 'package:bazar_suez/authentication/guards/AuthGuard.dart';
 import 'package:bazar_suez/authentication/pages/signin_with_social.dart';
-import 'package:bazar_suez/markets/Markets_after_category/pages/home_market.dart';
+import 'package:bazar_suez/markets/Markets_after_category/pages/category_market_page.dart';
 import 'package:bazar_suez/markets/home_market/pages/home_market_page.dart';
 import 'package:go_router/go_router.dart';
 
@@ -15,7 +15,7 @@ import 'routes_config/user_routes.dart';
 
 bool _isPublicPath(String path) {
   if (path.isEmpty || path == '/') return true;
-  if (path == '/FoodHomePage') return true;
+  if (path == '/CategoryMarketPage') return true;
   if (path.startsWith('/market/')) return true;
   return false;
 }
@@ -67,7 +67,7 @@ Future<GoRouter> createRouter(AuthGuard authGuard) async {
           path: '/',
           builder: (context, state) {
             final categoryId = state.uri.queryParameters['categoryId'];
-            return FoodHomePage(categoryId: categoryId);
+            return CategoryMarketPage(categoryId: categoryId);
           },
         ),
         GoRoute(

@@ -269,8 +269,8 @@ class _SearchPageState extends State<SearchPage> {
                     final category = categoryVm.categories[index];
                     return GestureDetector(
                       onTap: () {
-                        // فتح صفحة FoodHomePage مع categoryId
-                        context.go('/FoodHomePage?categoryId=${category.id}');
+                        // فتح صفحة CategoryMarketPage مع categoryId
+                        context.go('/CategoryMarketPage?categoryId=${category.id}');
                       },
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,

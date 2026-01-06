@@ -141,7 +141,7 @@ class _CategoriesGridPageState extends State<CategoriesGridPage> {
                           return GestureDetector(
                             onTap: () {
                               context.push(
-                                '/FoodHomePage?categoryId=${category.id}',
+                                '/CategoryMarketPage?categoryId=${category.id}',
                               );
                             },
                             child:

@@ -29,9 +29,11 @@ class HomeCategoriesIcons extends StatelessWidget {
 
     // تصفية فئة "هدايا" وعرض أول 3 فئات
     final filteredCategories = categoryVm.categories
-        .where((cat) => 
-            cat.id.toLowerCase() != 'gifts' && 
-            cat.name.toLowerCase() != 'هدايا')
+        .where(
+          (cat) =>
+              cat.id.toLowerCase() != 'gifts' &&
+              cat.name.toLowerCase() != 'هدايا',
+        )
         .take(3)
         .toList();
 
@@ -70,40 +72,41 @@ class HomeCategoriesIcons extends StatelessWidget {
   Widget _buildViewAllItem(BuildContext context, int index) {
     return GestureDetector(
       onTap: () => context.push('/CategoriesGrid'),
-      child: Container(
-        width: 80,
-        margin: const EdgeInsets.only(right: 12),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: 70,
-              height: 70,
-              decoration: BoxDecoration(
-                color: AppColors.mainColor.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(16),
-              ),
-              child: Icon(
-                Icons.grid_view_rounded,
-                color: AppColors.mainColor,
-                size: 36,
-              ),
+      child:
+          Container(
+            width: 80,
+            margin: const EdgeInsets.only(right: 12),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 70,
+                  height: 70,
+                  decoration: BoxDecoration(
+                    color: AppColors.mainColor.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: Icon(
+                    Icons.grid_view_rounded,
+                    color: AppColors.mainColor,
+                    size: 36,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'عرض الكل',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
+                    color: AppColors.mainColor,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  textAlign: TextAlign.center,
+                ),
+              ],
             ),
-            const SizedBox(height: 8),
-            Text(
-              'عرض الكل',
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.bold,
-                color: AppColors.mainColor,
-              ),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              textAlign: TextAlign.center,
-            ),
-          ],
-        ),
-      ).animate().scale(
+          ).animate().scale(
             duration: 300.ms,
             delay: (index * 50).ms,
             begin: const Offset(0.8, 0.8),
@@ -121,37 +124,38 @@ class HomeCategoriesIcons extends StatelessWidget {
   ) {
     return GestureDetector(
       onTap: () {
-        context.go('/FoodHomePage?categoryId=${category.id}');
+        context.go('/CategoryMarketPage?categoryId=${category.id}');
       },
-      child: Container(
-        width: 80,
-        margin: const EdgeInsets.only(right: 12),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            SizedBox(
-              width: 70,
-              height: 70,
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(16),
-                child: _buildCategoryImage(category),
-              ),
+      child:
+          Container(
+            width: 80,
+            margin: const EdgeInsets.only(right: 12),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                SizedBox(
+                  width: 70,
+                  height: 70,
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(16),
+                    child: _buildCategoryImage(category),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  category.name,
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
+                    color: isSelected ? AppColors.mainColor : Colors.grey[700],
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  textAlign: TextAlign.center,
+                ),
+              ],
             ),
-            const SizedBox(height: 8),
-            Text(
-              category.name,
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.bold,
-                color: isSelected ? AppColors.mainColor : Colors.grey[700],
-              ),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              textAlign: TextAlign.center,
-            ),
-          ],
-        ),
-      ).animate().scale(
+          ).animate().scale(
             duration: 300.ms,
             delay: (index * 50).ms,
             begin: const Offset(0.8, 0.8),
@@ -182,7 +186,7 @@ class HomeCategoriesIcons extends StatelessWidget {
         final imagePath = category.icon.startsWith('assets/')
             ? category.icon
             : 'assets/images/categories/${category.icon}';
-            
+
         return Image.asset(
           imagePath,
           fit: BoxFit.contain,
