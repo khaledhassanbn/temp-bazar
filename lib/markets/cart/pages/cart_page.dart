@@ -6,6 +6,8 @@ import 'package:bazar_suez/markets/cart/widgets/cart_summary_section.dart';
 import 'package:bazar_suez/markets/cart/widgets/cart_user_info_section.dart';
 import 'package:bazar_suez/markets/cart/viewmodels/cart_view_model.dart';
 import 'package:bazar_suez/markets/home_market/pages/ProductDetails.dart';
+import 'package:bazar_suez/markets/saved_locations/viewmodels/saved_locations_viewmodel.dart';
+import 'package:bazar_suez/services/delivery_fee/delivery_fee_service.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
@@ -55,7 +57,7 @@ class _CartPageState extends State<CartPage> {
     _fetchMarketName();
   }
 
-  /// جلب بيانات المتجر من Firestore
+  /// جلب بيانات المتجر من Firestore وحساب رسوم التوصيل
   Future<void> _fetchMarketName() async {
     final cartViewModel = Provider.of<CartViewModel>(context, listen: false);
     if (cartViewModel.isEmpty) {
@@ -77,6 +79,9 @@ class _CartPageState extends State<CartPage> {
           _marketName = data?['name'] ?? 'المتجر';
           _marketLogo = data?['logoUrl'];
         });
+
+        // حساب رسوم التوصيل بناءً على المسافة
+        await _calculateAndSetDeliveryFee(data);
       }
     } catch (e) {
       if (mounted) {
@@ -84,6 +89,53 @@ class _CartPageState extends State<CartPage> {
           _marketName = 'المتجر';
         });
       }
+    }
+  }
+
+  /// حساب وتعيين رسوم التوصيل بناءً على المسافة
+  Future<void> _calculateAndSetDeliveryFee(Map<String, dynamic>? storeData) async {
+    if (!mounted) return;
+
+    final cartViewModel = Provider.of<CartViewModel>(context, listen: false);
+    final locationVm = Provider.of<SavedLocationsViewModel>(context, listen: false);
+    final deliveryFeeService = DeliveryFeeService();
+
+    try {
+      // جلب إعدادات رسوم التوصيل
+      final settings = await deliveryFeeService.getSettings();
+
+      // جلب موقع المستخدم
+      final userLocation = locationVm.activeLocation;
+
+      // جلب موقع المتجر
+      GeoPoint? storeLocation;
+      if (storeData != null && storeData['location'] is GeoPoint) {
+        storeLocation = storeData['location'] as GeoPoint;
+      }
+
+      if (userLocation != null && storeLocation != null) {
+        // حساب المسافة
+        final distanceKm = DeliveryFeeService.calculateDistanceFromGeoPoints(
+          userLocation,
+          storeLocation,
+        );
+
+        // حساب رسوم التوصيل
+        final deliveryFee = deliveryFeeService.calculateDeliveryFee(
+          distanceKm,
+          settings,
+        );
+
+        // تعيين رسوم التوصيل في CartViewModel
+        cartViewModel.setDeliveryFee(deliveryFee);
+      } else {
+        // استخدام رسوم التوصيل الافتراضية
+        cartViewModel.setDeliveryFee(settings.baseFee);
+      }
+    } catch (e) {
+      debugPrint('خطأ في حساب رسوم التوصيل: $e');
+      // استخدام القيمة الافتراضية في حالة الخطأ
+      cartViewModel.setDeliveryFee(30.0);
     }
   }
 

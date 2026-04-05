@@ -9,6 +9,7 @@ import 'package:bazar_suez/ads/views/admin_ads_page.dart';
 import 'package:bazar_suez/ads/views/admin_ad_requests_page.dart';
 import 'package:bazar_suez/admin/offices/offices_list_page.dart';
 import 'package:bazar_suez/admin/offices/create_edit_office_page.dart';
+import 'package:bazar_suez/admin/delivery_fee/delivery_fee_settings_page.dart';
 
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
@@ -74,5 +75,9 @@ final adminRoutes = [
       final officeId = state.pathParameters['officeId']!;
       return CreateEditOfficePage(officeId: officeId);
     },
+  ),
+  GoRoute(
+    path: '/admin/delivery-fee-settings',
+    builder: (context, state) => const DeliveryFeeSettingsPage(),
   ),
 ];

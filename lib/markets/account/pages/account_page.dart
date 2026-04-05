@@ -293,6 +293,12 @@ class _AccountPageState extends State<AccountPage> {
             subtitle: 'عرض وإدارة طلبات شحن المحفظة',
             onTap: () => context.push('/admin/wallet-requests'),
           ),
+          _MenuTileData(
+            icon: Icons.delivery_dining,
+            label: 'رسوم التوصيل',
+            subtitle: 'إعدادات حساب رسوم التوصيل',
+            onTap: () => context.push('/admin/delivery-fee-settings'),
+          ),
         ],
       ),
     ];

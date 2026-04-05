@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
-import 'dart:math' as math;
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:bazar_suez/markets/Markets_after_category/viewmodel/category_filter_viewmodel.dart';
 import 'package:bazar_suez/markets/cart/viewmodels/cart_view_model.dart';
 import 'package:bazar_suez/markets/saved_locations/viewmodels/saved_locations_viewmodel.dart';
@@ -12,6 +12,8 @@ import 'package:bazar_suez/markets/home_page/services/featured_stores_service.da
 import 'package:bazar_suez/markets/saved_locations/widgets/saved_locations_sheet.dart';
 import 'package:bazar_suez/markets/Markets_after_category/widget/search_bar_widget.dart';
 import 'package:bazar_suez/theme/app_color.dart';
+import 'package:bazar_suez/services/delivery_fee/delivery_fee_service.dart';
+import 'package:bazar_suez/services/delivery_fee/delivery_fee_settings.dart';
 
 class CategoryMarketPage extends StatefulWidget {
   final String? categoryId;
@@ -26,8 +28,10 @@ class _CategoryMarketPageState extends State<CategoryMarketPage> {
   final TextEditingController _searchController = TextEditingController();
   String? _categoryName;
   final FeaturedStoresService _featuredStoresService = FeaturedStoresService();
+  final DeliveryFeeService _deliveryFeeService = DeliveryFeeService();
   List<FeaturedStoreResult> _featuredStores = [];
   bool _isLoadingFeatured = false;
+  DeliveryFeeSettings? _deliverySettings;
 
   @override
   void initState() {
@@ -39,12 +43,27 @@ class _CategoryMarketPageState extends State<CategoryMarketPage> {
         vm.setCategory(widget.categoryId);
         _loadCategoryName(widget.categoryId!);
       }
+      _loadDeliverySettings();
       _loadFeaturedStores();
     });
     // إضافة listener للبحث
     _searchController.addListener(() {
       setState(() {}); // تحديث القائمة عند تغيير نص البحث
     });
+  }
+  
+  Future<void> _loadDeliverySettings() async {
+    try {
+      final settings = await _deliveryFeeService.getSettings();
+      if (mounted) {
+        setState(() => _deliverySettings = settings);
+      }
+    } catch (e) {
+      // استخدام القيم الافتراضية
+      if (mounted) {
+        setState(() => _deliverySettings = DeliveryFeeSettings.defaults());
+      }
+    }
   }
 
   Future<void> _loadFeaturedStores() async {
@@ -84,38 +103,20 @@ class _CategoryMarketPageState extends State<CategoryMarketPage> {
     super.dispose();
   }
 
-  // حساب المسافة بين نقطتين (Haversine formula)
-  double _calculateDistance(
-    double lat1,
-    double lon1,
-    double lat2,
-    double lon2,
-  ) {
-    const double earthRadius = 6371; // نصف قطر الأرض بالكيلومتر
-    final double dLat = _toRadians(lat2 - lat1);
-    final double dLon = _toRadians(lon2 - lon1);
-    final double a =
-        math.sin(dLat / 2) * math.sin(dLat / 2) +
-        math.cos(_toRadians(lat1)) *
-            math.cos(_toRadians(lat2)) *
-            math.sin(dLon / 2) *
-            math.sin(dLon / 2);
-    final double c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a));
-    return earthRadius * c;
-  }
-
-  double _toRadians(double degrees) {
-    return degrees * (math.pi / 180);
-  }
-
   // حساب وقت التوصيل (بالدقائق)
   int _calculateDeliveryTime(double distanceKm) {
-    return ((distanceKm / 20) * 60 + 15).round();
+    return DeliveryFeeService.calculateDeliveryTime(distanceKm);
   }
 
-  // حساب رسوم التوصيل (5 جنيه لكل كيلو)
+  // حساب رسوم التوصيل باستخدام النظام المتدرج
   double _calculateDeliveryFee(double distanceKm) {
-    return distanceKm * 5;
+    if (_deliverySettings == null) return 30.0; // قيمة افتراضية
+    return _deliveryFeeService.calculateDeliveryFee(distanceKm, _deliverySettings!);
+  }
+
+  // حساب المسافة بين نقطتين
+  double _calculateDistance(GeoPoint userLocation, GeoPoint storeLocation) {
+    return DeliveryFeeService.calculateDistanceFromGeoPoints(userLocation, storeLocation);
   }
 
   String _normalize(String input) {
@@ -520,13 +521,11 @@ class _CategoryMarketPageState extends State<CategoryMarketPage> {
 
     if (locationVm.activeLocation != null && store.location != null) {
       distanceKm = _calculateDistance(
-        locationVm.activeLocation!.latitude,
-        locationVm.activeLocation!.longitude,
-        store.location!.latitude,
-        store.location!.longitude,
+        locationVm.activeLocation!,
+        store.location!,
       );
       deliveryTime = _calculateDeliveryTime(distanceKm);
-      deliveryFee = _calculateDeliveryFee(distanceKm); // 5 جنيه لكل كيلو
+      deliveryFee = _calculateDeliveryFee(distanceKm);
     }
 
     return Container(
@@ -698,10 +697,8 @@ class _CategoryMarketPageState extends State<CategoryMarketPage> {
     // حساب المسافة والوقت والرسوم
     if (locationVm.activeLocation != null && store.location != null) {
       distanceKm = _calculateDistance(
-        locationVm.activeLocation!.latitude,
-        locationVm.activeLocation!.longitude,
-        store.location!.latitude,
-        store.location!.longitude,
+        locationVm.activeLocation!,
+        store.location!,
       );
       deliveryTime = _calculateDeliveryTime(distanceKm);
       deliveryFee = _calculateDeliveryFee(distanceKm);

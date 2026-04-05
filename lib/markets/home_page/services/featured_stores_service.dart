@@ -1,57 +1,21 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'dart:math' as math;
 import 'package:bazar_suez/markets/create_market/models/store_model.dart';
 import '../../../ads/services/ads_service.dart';
+import '../../../services/delivery_fee/delivery_fee_service.dart';
 
 /// Service لجلب المتاجر المختارة (التي لها إعلانات نشطة)
 class FeaturedStoresService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final AdsService _adsService = AdsService();
   final FirebaseAuth _auth = FirebaseAuth.instance;
-
-  /// حساب المسافة بين نقطتين باستخدام Haversine Formula (بالكيلومتر)
-  double _calculateDistance(
-    double lat1,
-    double lon1,
-    double lat2,
-    double lon2,
-  ) {
-    const double earthRadius = 6371; // نصف قطر الأرض بالكيلومتر
-
-    final double dLat = _toRadians(lat2 - lat1);
-    final double dLon = _toRadians(lon2 - lon1);
-
-    final double a =
-        math.sin(dLat / 2) * math.sin(dLat / 2) +
-        math.cos(_toRadians(lat1)) *
-            math.cos(_toRadians(lat2)) *
-            math.sin(dLon / 2) *
-            math.sin(dLon / 2);
-
-    final double c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a));
-    return earthRadius * c;
-  }
-
-  double _toRadians(double degrees) {
-    return degrees * (math.pi / 180);
-  }
+  final DeliveryFeeService _deliveryFeeService = DeliveryFeeService();
 
   /// حساب وقت التوصيل التقديري (بالدقائق)
-  /// deliveryTime = (distanceKm / 20 * 60) + 15
   int _calculateDeliveryTime(double distanceKm) {
-    return ((distanceKm / 20) * 60 + 15).round();
+    return DeliveryFeeService.calculateDeliveryTime(distanceKm);
   }
 
-  /// حساب مبلغ التوصيل
-  /// المسافة * 12، حد أدنى 20 جنيه
-  double _calculateDeliveryFee(double distanceKm) {
-    if (distanceKm <= 1) {
-      return 20.0; // حد أدنى 20 جنيه
-    }
-    final fee = distanceKm * 12;
-    return fee < 20 ? 20.0 : fee;
-  }
 
   /// جلب موقع المستخدم من Firestore
   Future<GeoPoint?> _getUserLocation(String userId) async {
@@ -110,6 +74,9 @@ class FeaturedStoresService {
 
       // جلب موقع المستخدم
       final userLocation = await _getUserLocation(user.uid);
+
+      // جلب إعدادات رسوم التوصيل
+      final deliverySettings = await _deliveryFeeService.getSettings();
 
       // جلب الإعلانات النشطة
       final activeAds = await _adsService.fetchActiveAds();
@@ -172,14 +139,15 @@ class FeaturedStoresService {
           double? deliveryFee;
 
           if (userLocation != null && store.location != null) {
-            distanceKm = _calculateDistance(
-              userLocation.latitude,
-              userLocation.longitude,
-              store.location!.latitude,
-              store.location!.longitude,
+            distanceKm = DeliveryFeeService.calculateDistanceFromGeoPoints(
+              userLocation,
+              store.location!,
             );
             deliveryTimeMinutes = _calculateDeliveryTime(distanceKm);
-            deliveryFee = _calculateDeliveryFee(distanceKm);
+            deliveryFee = _deliveryFeeService.calculateDeliveryFee(
+              distanceKm,
+              deliverySettings,
+            );
           }
 
           results.add(

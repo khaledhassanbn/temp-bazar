@@ -12,6 +12,9 @@ class CartViewModel extends ChangeNotifier {
   bool _isLoading = false;
   String? _error;
   
+  /// رسوم التوصيل المحسوبة ديناميكياً
+  double _deliveryFee = 30.0; // القيمة الافتراضية
+  
   /// Flag to track if this ChangeNotifier has been disposed
   bool _isDisposed = false;
   
@@ -49,8 +52,21 @@ class CartViewModel extends ChangeNotifier {
   double get subtotal =>
       _cartItems.fold(0.0, (sum, item) => sum + item.totalPrice);
 
-  /// Getter for delivery fee (can be customized)
-  double get deliveryFee => 6.99;
+  /// Getter for delivery fee (calculated dynamically based on distance)
+  double get deliveryFee => _deliveryFee;
+  
+  /// Setter for delivery fee (called from CartPage with calculated value)
+  set deliveryFee(double value) {
+    if (_deliveryFee != value) {
+      _deliveryFee = value;
+      _safeNotifyListeners();
+    }
+  }
+  
+  /// تعيين رسوم التوصيل
+  void setDeliveryFee(double fee) {
+    deliveryFee = fee;
+  }
 
   /// Getter for service fee (can be customized)
   double get serviceFee => 3.99;
