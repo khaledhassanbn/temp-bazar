@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -13,6 +14,8 @@ import 'package:bazar_suez/markets/home_market/widgets/market_product_section.da
 import 'package:bazar_suez/markets/home_market/widgets/floating_cart_bar.dart';
 import 'package:bazar_suez/markets/home_market/viewmodels/market_details_viewmodel.dart';
 import 'package:bazar_suez/markets/license/widgets/license_warning_banner.dart';
+import 'package:bazar_suez/markets/search_in_market/pages/search_in_market_page.dart';
+import 'package:bazar_suez/markets/search_in_market/viewmodels/search_in_market_viewmodel.dart';
 
 class MarketAnimatedPage extends StatefulWidget {
   final String? marketLink;
@@ -332,6 +335,22 @@ class _MarketAnimatedPageState extends State<MarketAnimatedPage>
                   onTabSelected: (i) {
                     if (!_isScrolling) _scrollToCategory(i);
                   },
+                  onSearchPressed: vm.store != null && ordered.isNotEmpty
+                      ? () {
+                          final marketId = vm.store!.id;
+                          Navigator.of(context).push(
+                            MaterialPageRoute<void>(
+                              builder: (ctx) => ChangeNotifierProvider(
+                                create: (_) => SearchInMarketViewModel(
+                                  marketId: marketId,
+                                  categories: ordered,
+                                ),
+                                child: const SearchInMarketPage(),
+                              ),
+                            ),
+                          );
+                        }
+                      : null,
                 ),
                 if (!isOrderingBlocked) const FloatingCartBar(),
                 // === Overlay حجب الصفحة عند انتهاء الترخيص (لصاحب المتجر فقط) ===
@@ -363,7 +382,9 @@ class _MarketAnimatedPageState extends State<MarketAnimatedPage>
         elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: Colors.black87),
-          onPressed: () => Navigator.of(context).pop(),
+          onPressed: () {
+            context.go('/HomePage');
+          },
         ),
         title: Text(
           store.name ?? 'المتجر',

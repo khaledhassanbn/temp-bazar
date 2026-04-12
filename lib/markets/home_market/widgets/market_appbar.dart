@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 
 class MarketAppBar extends StatelessWidget {
   final double scrollOffset;
@@ -8,6 +9,7 @@ class MarketAppBar extends StatelessWidget {
   final Function(int) onTabSelected;
   final List<String> tabs;
   final String? storeName;
+  final VoidCallback? onSearchPressed;
 
   const MarketAppBar({
     super.key,
@@ -18,6 +20,7 @@ class MarketAppBar extends StatelessWidget {
     required this.onTabSelected,
     required this.tabs,
     this.storeName,
+    this.onSearchPressed,
   });
 
   double _calculateAppBarOpacity(double offset) =>
@@ -59,7 +62,9 @@ class MarketAppBar extends StatelessWidget {
                   IconButton(
                     icon: const Icon(Icons.arrow_back),
                     color: Colors.black,
-                    onPressed: () => Navigator.pop(context),
+                    onPressed: () {
+                      context.go('/HomePage');
+                    },
                   ),
                   Opacity(
                     opacity: opacity,
@@ -75,7 +80,7 @@ class MarketAppBar extends StatelessWidget {
                     children: [
                       IconButton(
                         icon: const Icon(Icons.search),
-                        onPressed: () {},
+                        onPressed: onSearchPressed,
                       ),
                       IconButton(
                         icon: const Icon(Icons.favorite_border),

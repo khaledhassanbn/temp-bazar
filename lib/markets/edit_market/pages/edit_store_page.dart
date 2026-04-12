@@ -302,15 +302,8 @@ class _EditStorePageState extends State<EditStorePage> {
           backgroundColor: Colors.green,
         ),
       );
-      // نرجع بـ pop مع نتيجة true بدلاً من go
-      // لأن go تدمّر الصفحة السابقة وتعيد إنشاءها (5-8 ثوانى)
-      // بينما pop ترجعنا للصفحة الموجودة بالفعل
       final navigator = Navigator.of(context);
-      if (navigator.canPop()) {
-        navigator.pop(true); // true = تم التحديث بنجاح
-      } else {
-        context.go('/HomeMarketPage?marketLink=${widget.storeId}');
-      }
+      context.go('/HomePage');
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
