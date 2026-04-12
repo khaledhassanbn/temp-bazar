@@ -3,6 +3,7 @@ import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:go_router/go_router.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 class MarketInfoCard extends StatelessWidget {
   final String marketName;
@@ -19,6 +20,8 @@ class MarketInfoCard extends StatelessWidget {
   final String? instagram;
   final String? marketLink; // نستخدم رابط المتجر للمشاركة
   final String? storeId; // معرف المتجر للتقييمات
+  final GeoPoint? location;
+  final bool showAddress;
 
   const MarketInfoCard({
     super.key,
@@ -34,6 +37,8 @@ class MarketInfoCard extends StatelessWidget {
     this.instagram,
     this.marketLink,
     this.storeId,
+    this.location,
+    this.showAddress = false,
   });
 
   // 🔹 تنسيق الأرقام (1000 → 1,000)
@@ -64,6 +69,7 @@ class MarketInfoCard extends StatelessWidget {
   String get _whatsappNumber => _phoneNumber; // بدون +
   bool get _hasFacebook => facebook != null && facebook!.isNotEmpty;
   bool get _hasInstagram => instagram != null && instagram!.isNotEmpty;
+  bool get _canShowLocation => showAddress && location != null;
   String get _shareLink => marketLink != null && marketLink!.isNotEmpty
       ? 'com.example.bazar_suez/market/$marketLink'
       : 'com.example.bazar_suez/market/unknown';
@@ -156,8 +162,8 @@ class MarketInfoCard extends StatelessWidget {
                       GestureDetector(
                         onTap: storeId != null
                             ? () => context.push(
-                                  '/store-reviews?storeId=$storeId&storeName=${Uri.encodeComponent(marketName)}',
-                                )
+                                '/store-reviews?storeId=$storeId&storeName=${Uri.encodeComponent(marketName)}',
+                              )
                             : null,
                         child: Container(
                           padding: const EdgeInsets.symmetric(
@@ -171,7 +177,11 @@ class MarketInfoCard extends StatelessWidget {
                           child: Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              const Icon(Icons.star, size: 18, color: Colors.amber),
+                              const Icon(
+                                Icons.star,
+                                size: 18,
+                                color: Colors.amber,
+                              ),
                               const SizedBox(width: 4),
                               Text(
                                 rating.toStringAsFixed(1),
@@ -239,6 +249,15 @@ class MarketInfoCard extends StatelessWidget {
                         icon: FontAwesomeIcons.instagram,
                         color: Colors.purple,
                         onTap: () => _launchUrl(instagram!),
+                      ),
+                    if (_canShowLocation) const SizedBox(width: 10),
+                    if (_canShowLocation)
+                      _buildIconButton(
+                        icon: Icons.location_on,
+                        color: Colors.redAccent,
+                        onTap: () => _launchUrl(
+                          'https://www.google.com/maps/search/?api=1&query=${location!.latitude},${location!.longitude}',
+                        ),
                       ),
                   ],
                 ),

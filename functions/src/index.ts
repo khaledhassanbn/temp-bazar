@@ -42,6 +42,9 @@ import { facebookDataDeletion } from "./facebook/dataDeletion";
 import { deleteExpiredAdsImages } from "./ads/deleteExpiredImages";
 import { cleanupExpiredPendingPayments } from "./pendingPayments/cleanupExpired";
 
+// Working Hours
+import { updateStoreOpenStatus } from "./workingHours/updateStoreOpenStatus";
+
 // Order Notifications
 import { sendNewOrderNotification } from "./notifications/sendOrderNotification";
 import { sendOrderStatusNotification, sendPastOrderNotification } from "./notifications/sendStatusNotification";
@@ -96,6 +99,18 @@ export const cleanupExpiredPendingPaymentsScheduled =
     },
     cleanupExpiredPendingPayments
   );
+
+// ---------------------------------------------------------------------------
+// WORKING HOURS — Update isOpenNow field for all active stores
+// ---------------------------------------------------------------------------
+export const updateStoreOpenStatusScheduled = functions.scheduler.onSchedule(
+  {
+    schedule: "*/15 * * * *", // Every 15 minutes
+    timeZone: "Africa/Cairo",
+    memory: "512MiB",
+  },
+  updateStoreOpenStatus
+);
 
 // ---------------------------------------------------------------------------
 // FACEBOOK DATA DELETION CALLBACK

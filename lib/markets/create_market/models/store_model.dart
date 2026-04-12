@@ -32,6 +32,9 @@ class StoreModel {
   final String? fcmToken; // FCM token for push notifications
   final double? deliveryFee; // Calculated delivery fee
   final int? deliveryTime; // Calculated delivery time in minutes
+  final bool showAddress; // Show address/map icon on store page
+  final bool available; // Store availability (active/busy)
+  final bool? isOpenNow; // Set by Cloud Function based on working hours
 
   StoreModel({
     required this.id,
@@ -62,6 +65,9 @@ class StoreModel {
     this.fcmToken,
     this.deliveryFee,
     this.deliveryTime,
+    this.showAddress = false,
+    this.available = true,
+    this.isOpenNow,
   });
 
   factory StoreModel.fromMap(String id, Map<String, dynamic> map) {
@@ -85,8 +91,6 @@ class StoreModel {
       if (v is DateTime) return v;
       return null;
     }
-
-    final subscription = map['subscription'] as Map<String, dynamic>? ?? {};
 
     return StoreModel(
       id: id,
@@ -118,6 +122,11 @@ class StoreModel {
       fcmToken: map['fcmToken'] as String?,
       deliveryFee: (map['deliveryFee'] ?? 0.0).toDouble(),
       deliveryTime: map['deliveryTime'] as int?,
+      showAddress: map['show_adress'] == true || map['showAddress'] == true,
+      available: map['available'] is bool
+          ? map['available'] as bool
+          : (map['storeStatus'] is bool ? map['storeStatus'] as bool : true),
+      isOpenNow: map['isOpenNow'] as bool?,
     );
   }
 
@@ -138,10 +147,12 @@ class StoreModel {
       'status': status.name,
       'isVisible': isVisible,
       // نكتفي فقط بحقلي البداية والنهاية كما طلب المستخدم
-      'licenseStartAt':
-          licenseStartAt != null ? Timestamp.fromDate(licenseStartAt!) : null,
-      'licenseEndAt':
-          licenseEndAt != null ? Timestamp.fromDate(licenseEndAt!) : null,
+      'licenseStartAt': licenseStartAt != null
+          ? Timestamp.fromDate(licenseStartAt!)
+          : null,
+      'licenseEndAt': licenseEndAt != null
+          ? Timestamp.fromDate(licenseEndAt!)
+          : null,
       'licenseDurationDays': licenseDurationDays,
       'licenseAutoRenew': licenseAutoRenew,
       'currentPackageId': currentPackageId,
@@ -152,6 +163,9 @@ class StoreModel {
       'totalReviews': totalReviews,
       'deliveryFee': deliveryFee,
       'deliveryTime': deliveryTime,
+      'show_adress': showAddress,
+      'available': available,
+      if (isOpenNow != null) 'isOpenNow': isOpenNow,
     };
   }
 
@@ -184,6 +198,9 @@ class StoreModel {
     String? fcmToken,
     double? deliveryFee,
     int? deliveryTime,
+    bool? showAddress,
+    bool? available,
+    bool? isOpenNow,
   }) {
     return StoreModel(
       id: id ?? this.id,
@@ -214,6 +231,9 @@ class StoreModel {
       fcmToken: fcmToken ?? this.fcmToken,
       deliveryFee: deliveryFee ?? this.deliveryFee,
       deliveryTime: deliveryTime ?? this.deliveryTime,
+      showAddress: showAddress ?? this.showAddress,
+      available: available ?? this.available,
+      isOpenNow: isOpenNow ?? this.isOpenNow,
     );
   }
 
@@ -238,4 +258,15 @@ class StoreModel {
 
   /// Returns true if the store has an active (non-expired) license
   bool get hasActiveLicense => !isLicenseExpired;
+
+  /// Returns true when store is currently closed by configured working hours.
+  /// Prioritises the server-side `isOpenNow` field set by the Cloud Function.
+  /// Falls back to local calculation only when `isOpenNow` hasn't been set.
+  bool get isClosedByWorkingHours {
+    // Server-side value (from Cloud Function)
+    if (isOpenNow != null) return !isOpenNow!;
+    // Fallback: local calculation
+    if (workingHours == null) return false;
+    return !workingHours!.isOpenAt(DateTime.now());
+  }
 }

@@ -6,6 +6,32 @@ import '../services/store_service.dart';
 import '../../create_market/models/working_hours.dart';
 import '../../create_market/models/store_model.dart';
 
+class StoreAdminProfile {
+  final String uid;
+  final String email;
+  final String displayName;
+  final String? avatarUrl;
+
+  const StoreAdminProfile({
+    required this.uid,
+    required this.email,
+    required this.displayName,
+    this.avatarUrl,
+  });
+
+  String get initials {
+    final trimmed = displayName.trim();
+    if (trimmed.isEmpty) return 'م';
+    final parts = trimmed.split(' ');
+    if (parts.length >= 2) {
+      return '${parts[0].isNotEmpty ? parts[0][0] : ''}${parts[1].isNotEmpty ? parts[1][0] : ''}'
+          .trim()
+          .toUpperCase();
+    }
+    return trimmed[0].toUpperCase();
+  }
+}
+
 class EditStoreViewModel extends ChangeNotifier {
   final StoreService _service = StoreService();
 
@@ -23,6 +49,7 @@ class EditStoreViewModel extends ChangeNotifier {
   DateTime? createdAt;
   bool loading = false;
   bool showAddress = false;
+  bool available = true;
 
   // حقول الفئات
   String? selectedCategoryId;
@@ -74,6 +101,9 @@ class EditStoreViewModel extends ChangeNotifier {
       workingHours = store.workingHours;
       numberOfProducts = store.numberOfProducts;
       createdAt = store.createdAt;
+      available = data['available'] is bool
+          ? data['available'] as bool
+          : store.storeStatus;
 
       if (store.location != null) {
         location = LatLng(store.location!.latitude, store.location!.longitude);
@@ -131,6 +161,11 @@ class EditStoreViewModel extends ChangeNotifier {
     notifyListeners();
   }
 
+  void setAvailable(bool value) {
+    available = value;
+    notifyListeners();
+  }
+
   void setSelectedCategory(String? categoryId, {String? categoryNameAr}) {
     selectedCategoryId = categoryId;
     selectedCategoryNameAr = categoryNameAr;
@@ -159,13 +194,9 @@ class EditStoreViewModel extends ChangeNotifier {
   }
 
   String? validateAll() {
-    if (name.isEmpty) return 'اسم المتجر مطلوب';
     if (description.isEmpty) return 'وصف المتجر مطلوب';
     if (phone.isEmpty) return 'رقم الهاتف مطلوب';
     if (phone.length != 11) return 'رقم الهاتف يجب أن يكون 11 رقم';
-    if (selectedCategoryId == null || selectedCategoryId!.isEmpty) {
-      return 'اختر الفئة الرئيسية';
-    }
     if (location == null) return 'اختر موقع المتجر';
     return null;
   }
@@ -220,6 +251,65 @@ class EditStoreViewModel extends ChangeNotifier {
     }
   }
 
+  Stream<List<StoreAdminProfile>> watchAdmins(String marketId) {
+    final users = FirebaseFirestore.instance.collection('users');
+    final primary = users.where('market_id', isEqualTo: marketId).snapshots();
+
+    return primary.asyncMap((snapshot) async {
+      if (snapshot.docs.isNotEmpty) {
+        return snapshot.docs.map(_mapAdminDoc).toList();
+      }
+
+      final fallback = await users.where('marketId', isEqualTo: marketId).get();
+      if (fallback.docs.isNotEmpty) {
+        return fallback.docs.map(_mapAdminDoc).toList();
+      }
+
+      return <StoreAdminProfile>[];
+    });
+  }
+
+  Future<void> removeAdmin(String uid, {required int currentCount}) async {
+    if (currentCount <= 1) {
+      throw 'يجب أن يبقى مدير واحد على الأقل';
+    }
+    await FirebaseFirestore.instance.collection('users').doc(uid).update({
+      'status': 'user',
+      'market_id': FieldValue.delete(),
+      'marketId': FieldValue.delete(),
+      'market': FieldValue.delete(),
+    });
+  }
+
+  StoreAdminProfile _mapAdminDoc(
+    QueryDocumentSnapshot<Map<String, dynamic>> doc,
+  ) {
+    final data = doc.data();
+    final firstName = (data['firstName'] as String?) ?? '';
+    final lastName = (data['lastName'] as String?) ?? '';
+    final displayName = [
+      firstName,
+      lastName,
+    ].where((part) => part.trim().isNotEmpty).join(' ').trim();
+    final fallbackName = (data['displayName'] as String?) ?? 'مدير';
+
+    return StoreAdminProfile(
+      uid: doc.id,
+      email: (data['email'] as String?) ?? '',
+      displayName: displayName.isNotEmpty ? displayName : fallbackName,
+      avatarUrl: data['avatarUrl'] as String?,
+    );
+  }
+
+  Future<void> updateAvailability(String storeId, bool value) async {
+    available = value;
+    notifyListeners();
+    await FirebaseFirestore.instance.collection('markets').doc(storeId).update({
+      'available': value,
+      'storeStatus': value,
+    });
+  }
+
   /// تحديث بيانات المتجر
   Future<void> updateStore(String storeId) async {
     final error = validateAll();
@@ -229,7 +319,6 @@ class EditStoreViewModel extends ChangeNotifier {
 
     try {
       final payload = <String, dynamic>{
-        'name': name,
         'description': description,
         'phone': phone,
         'facebook': facebook.isNotEmpty ? facebook : null,
@@ -238,10 +327,8 @@ class EditStoreViewModel extends ChangeNotifier {
             ? GeoPoint(location!.latitude, location!.longitude)
             : null,
         'show_adress': showAddress,
-        'categoryId': selectedCategoryId,
-        'categoryNameAr': selectedCategoryNameAr,
-        'subCategoryId': selectedSubCategoryId,
-        'subCategoryNameAr': selectedSubCategoryNameAr,
+        'available': available,
+        'storeStatus': available,
         'workingHours': workingHours?.toMap(),
       };
 

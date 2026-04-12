@@ -134,11 +134,16 @@ class WorkingHours {
 // نموذج لإدارة مواعيد العمل الأسبوعية
 class WeeklyWorkingHours {
   final List<WorkingHours> workingHours;
+  final bool isAlwaysOpen;
 
-  WeeklyWorkingHours({required this.workingHours});
+  WeeklyWorkingHours({
+    required this.workingHours,
+    this.isAlwaysOpen = false,
+  });
 
   factory WeeklyWorkingHours.empty() {
     return WeeklyWorkingHours(
+      isAlwaysOpen: false,
       workingHours: [
         WorkingHours(dayOfWeek: 'السبت', isOpen: false),
         WorkingHours(dayOfWeek: 'الأحد', isOpen: false),
@@ -154,6 +159,7 @@ class WeeklyWorkingHours {
   factory WeeklyWorkingHours.fromMap(Map<String, dynamic> map) {
     final List<dynamic> hoursList = map['workingHours'] ?? [];
     return WeeklyWorkingHours(
+      isAlwaysOpen: map['isAlwaysOpen'] ?? false,
       workingHours: hoursList
           .map((hour) => WorkingHours.fromMap(hour))
           .toList(),
@@ -161,7 +167,20 @@ class WeeklyWorkingHours {
   }
 
   Map<String, dynamic> toMap() {
-    return {'workingHours': workingHours.map((hour) => hour.toMap()).toList()};
+    return {
+      'isAlwaysOpen': isAlwaysOpen,
+      'workingHours': workingHours.map((hour) => hour.toMap()).toList(),
+    };
+  }
+
+  WeeklyWorkingHours copyWith({
+    List<WorkingHours>? workingHours,
+    bool? isAlwaysOpen,
+  }) {
+    return WeeklyWorkingHours(
+      workingHours: workingHours ?? this.workingHours,
+      isAlwaysOpen: isAlwaysOpen ?? this.isAlwaysOpen,
+    );
   }
 
   // الحصول على ساعات عمل يوم معين
@@ -195,17 +214,20 @@ class WeeklyWorkingHours {
 
   // التحقق من أن المتجر مفتوح في وقت معين
   bool isOpenAt(DateTime dateTime) {
-    final dayNames = [
-      'السبت',
-      'الأحد',
-      'الاثنين',
-      'الثلاثاء',
-      'الأربعاء',
-      'الخميس',
-      'الجمعة',
-    ];
-    final dayIndex = dateTime.weekday % 7; // تحويل من 1-7 إلى 0-6
-    final dayName = dayNames[dayIndex];
+    if (isAlwaysOpen) return true;
+
+    // Dart weekday: 1=Monday, 2=Tuesday, ..., 6=Saturday, 7=Sunday
+    // يطابق أسماء الأيام العربية كما في الـ Cloud Function تماماً
+    const weekdayToArabic = {
+      1: 'الاثنين',
+      2: 'الثلاثاء',
+      3: 'الأربعاء',
+      4: 'الخميس',
+      5: 'الجمعة',
+      6: 'السبت',
+      7: 'الأحد',
+    };
+    final dayName = weekdayToArabic[dateTime.weekday]!;
 
     final dayHours = getDayHours(dayName);
     if (dayHours == null || !dayHours.isOpen) return false;
@@ -213,10 +235,23 @@ class WeeklyWorkingHours {
     final timeString =
         '${dateTime.hour.toString().padLeft(2, '0')}:${dateTime.minute.toString().padLeft(2, '0')}';
 
-    // التحقق من ساعات العمل العادية
+    // التحقق من ساعات العمل (مع دعم الـ Overnight مثل 22:00 – 02:00)
     if (dayHours.openTime != null && dayHours.closeTime != null) {
-      if (timeString.compareTo(dayHours.openTime!) >= 0 &&
-          timeString.compareTo(dayHours.closeTime!) <= 0) {
+      final isOvernight =
+          dayHours.openTime!.compareTo(dayHours.closeTime!) > 0;
+
+      final bool inRange;
+      if (isOvernight) {
+        // نطاق ليلي: مثل 22:00 → 02:00 (يتخطى منتصف الليل)
+        inRange = timeString.compareTo(dayHours.openTime!) >= 0 ||
+            timeString.compareTo(dayHours.closeTime!) <= 0;
+      } else {
+        // نطاق عادي: مثل 09:00 → 18:00
+        inRange = timeString.compareTo(dayHours.openTime!) >= 0 &&
+            timeString.compareTo(dayHours.closeTime!) <= 0;
+      }
+
+      if (inRange) {
         // التحقق من الاستراحة إذا كانت موجودة
         if (dayHours.hasBreak &&
             dayHours.breakStartTime != null &&
@@ -226,7 +261,6 @@ class WeeklyWorkingHours {
             return false; // في وقت الاستراحة
           }
         }
-
         return true;
       }
     }

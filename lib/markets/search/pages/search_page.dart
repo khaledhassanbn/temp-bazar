@@ -33,9 +33,8 @@ class _SearchPageState extends State<SearchPage> {
       }
 
       final filterVm = context.read<CategoryFilterViewModel>();
-      if (filterVm.stores.isEmpty) {
-        filterVm.fetchAllStores();
-      }
+      // Always refresh stores so availability changes appear immediately
+      filterVm.fetchAllStores();
     });
 
     // طلب التركيز على حقل البحث بعد بناء الواجهة
@@ -94,6 +93,9 @@ class _SearchPageState extends State<SearchPage> {
       return name.contains(q);
     }).toList();
   }
+
+  bool _isStoreBusy(StoreModel store) => !store.available;
+  bool _isStoreClosed(StoreModel store) => store.isClosedByWorkingHours;
 
   Widget _buildCategoryImage(String icon) {
     if (icon.isEmpty) return const SizedBox.shrink();
@@ -270,7 +272,9 @@ class _SearchPageState extends State<SearchPage> {
                     return GestureDetector(
                       onTap: () {
                         // فتح صفحة CategoryMarketPage مع categoryId
-                        context.go('/CategoryMarketPage?categoryId=${category.id}');
+                        context.go(
+                          '/CategoryMarketPage?categoryId=${category.id}',
+                        );
                       },
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
@@ -365,7 +369,8 @@ class _SearchPageState extends State<SearchPage> {
                         decoration: BoxDecoration(
                           color: Colors.grey[200],
                           borderRadius: BorderRadius.circular(16),
-                          image: store.logoUrl != null && store.logoUrl!.isNotEmpty
+                          image:
+                              store.logoUrl != null && store.logoUrl!.isNotEmpty
                               ? DecorationImage(
                                   image: NetworkImage(store.logoUrl!),
                                   fit: BoxFit.cover,
@@ -434,30 +439,147 @@ class _SearchPageState extends State<SearchPage> {
     }
     return ListView.separated(
       itemCount: stores.length,
-      separatorBuilder: (_, __) => const Divider(height: 1),
+      padding: const EdgeInsets.fromLTRB(12, 6, 12, 16),
+      separatorBuilder: (_, __) => const SizedBox(height: 10),
       itemBuilder: (context, index) {
         final store = stores[index];
-        return ListTile(
-          leading: CircleAvatar(
-            backgroundImage: store.logoUrl != null && store.logoUrl!.isNotEmpty
-                ? NetworkImage(store.logoUrl!)
-                : null,
-            child: (store.logoUrl == null || store.logoUrl!.isEmpty)
-                ? Text(
-                    store.name.characters.first,
-                    style: const TextStyle(fontWeight: FontWeight.bold),
-                  )
-                : null,
-          ),
-          title: Text(store.name),
-          subtitle: Text(
-            store.description,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-          ),
+        final busy = _isStoreBusy(store);
+        final closed = _isStoreClosed(store);
+        final blocked = busy || closed;
+
+        return InkWell(
+          borderRadius: BorderRadius.circular(16),
           onTap: () {
             context.go('/HomeMarketPage?marketLink=${store.id}');
           },
+          child: Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: const Color(0xFFEDEDED)),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.03),
+                  blurRadius: 8,
+                  offset: const Offset(0, 3),
+                ),
+              ],
+            ),
+            child: Row(
+              children: [
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(14),
+                  child: SizedBox(
+                    width: 84,
+                    height: 84,
+                    child: Stack(
+                      fit: StackFit.expand,
+                      children: [
+                        Container(
+                          color: Colors.grey[200],
+                          child:
+                              store.logoUrl != null && store.logoUrl!.isNotEmpty
+                              ? Image.network(
+                                  store.logoUrl!,
+                                  fit: BoxFit.cover,
+                                  errorBuilder: (_, __, ___) => Center(
+                                    child: Text(
+                                      store.name.characters.first,
+                                      style: const TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 24,
+                                      ),
+                                    ),
+                                  ),
+                                )
+                              : Center(
+                                  child: Text(
+                                    store.name.characters.first,
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 24,
+                                    ),
+                                  ),
+                                ),
+                        ),
+                        if (blocked)
+                          Container(color: Colors.black.withOpacity(0.22)),
+                        if (blocked)
+                          Center(
+                            child: Image.asset(
+                              closed
+                                  ? 'assets/images/closed.png'
+                                  : 'assets/images/busy.png',
+                              width: 52,
+                              height: 52,
+                              fit: BoxFit.contain,
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Directionality(
+                    textDirection: TextDirection.ltr,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          store.name,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          textAlign: TextAlign.left,
+                          style: const TextStyle(
+                            fontSize: 17,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          store.description,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          textAlign: TextAlign.left,
+                          style: const TextStyle(
+                            color: Colors.black54,
+                            fontSize: 13,
+                          ),
+                        ),
+                        if (blocked) ...[
+                          const SizedBox(height: 8),
+                          Container(
+                            width: double.infinity,
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 10,
+                              vertical: 8,
+                            ),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFF7F1DE),
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: Text(
+                              closed
+                                  ? 'المتجر مغلق حاليًا حسب مواعيد العمل. يمكنك تصفح المنتجات لكن لا يمكن إتمام الطلب الآن.'
+                                  : 'المتجر مشغول حاليًا. يمكنك تصفح المنتجات لكن لا يمكن إتمام الطلب الآن.',
+                              textAlign: TextAlign.right,
+                              style: const TextStyle(
+                                fontSize: 12,
+                                color: Color(0xFF5A4A1B),
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
         );
       },
     );

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'widgets/market_bottom_navigation.dart';
+import 'package:bazar_suez/router/widgets/app_back_guard.dart';
 
 class MarketLayout extends StatelessWidget {
   final Widget child;
@@ -9,10 +10,13 @@ class MarketLayout extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final currentIndex = _getIndexFromRoute(context);
-    return Scaffold(
-      // ❌ لا يوجد AppBar لأن كل صفحة عندها AppBar خاص بها
-      body: child,
-      bottomNavigationBar: MarketBottomNavigation(currentIndex: currentIndex),
+    return AppBackGuard(
+      homePath: '/HomePage',
+      bypassToPreviousPaths: const ['/edit-store'],
+      child: Scaffold(
+        body: child,
+        bottomNavigationBar: MarketBottomNavigation(currentIndex: currentIndex),
+      ),
     );
   }
 

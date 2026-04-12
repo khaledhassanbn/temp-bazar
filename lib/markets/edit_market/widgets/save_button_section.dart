@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../viewmodels/edit_store_viewmodel.dart';
 import 'package:bazar_suez/theme/app_color.dart';
+import 'package:go_router/go_router.dart';
 
 class SaveButtonSection extends StatelessWidget {
   final EditStoreViewModel viewModel;
@@ -38,7 +39,7 @@ class SaveButtonSection extends StatelessWidget {
             backgroundColor: Colors.green,
           ),
         );
-        Navigator.of(context).pop();
+        context.go('/HomeMarketPage?marketLink=$storeId');
       }
     } catch (e) {
       if (context.mounted) {

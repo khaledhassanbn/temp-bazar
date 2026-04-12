@@ -8,6 +8,7 @@ import 'package:bazar_suez/markets/home_market/widget_details/product_bottom_bar
 import 'package:bazar_suez/markets/home_market/widget_details/product_loading_error.dart';
 import 'package:bazar_suez/markets/cart/viewmodels/cart_view_model.dart';
 import 'package:bazar_suez/markets/cart/models/cart_item_model.dart';
+import 'package:bazar_suez/markets/create_market/models/working_hours.dart';
 
 class ProductDetailsPage extends StatefulWidget {
   final String? marketId;
@@ -45,6 +46,8 @@ class _ProductDetailsPageState extends State<ProductDetailsPage>
   String? _error;
   List<Map<String, dynamic>> _requiredOptions = [];
   List<Map<String, dynamic>> _extraOptions = [];
+  bool _storeAvailable = true;
+  bool _storeClosedByWorkingHours = false;
 
   @override
   void initState() {
@@ -85,6 +88,21 @@ class _ProductDetailsPageState extends State<ProductDetailsPage>
     }
 
     try {
+      final marketDoc = await FirebaseFirestore.instance
+          .collection('markets')
+          .doc(marketId)
+          .get();
+      final marketData = marketDoc.data() ?? {};
+      _storeAvailable = marketData['available'] is bool
+          ? marketData['available'] as bool
+          : (marketData['storeStatus'] as bool? ?? true);
+      if (marketData['workingHours'] is Map<String, dynamic>) {
+        final weekly = WeeklyWorkingHours.fromMap(
+          marketData['workingHours'] as Map<String, dynamic>,
+        );
+        _storeClosedByWorkingHours = !weekly.isOpenAt(DateTime.now());
+      }
+
       final doc = await FirebaseFirestore.instance
           .collection('markets')
           .doc(marketId)
@@ -185,7 +203,13 @@ class _ProductDetailsPageState extends State<ProductDetailsPage>
       bottomNavigationBar: ProductBottomBar(
         quantity: quantity,
         totalPrice: totalPrice,
-        onAdd: _addToCart,
+        onAdd: (_storeAvailable && !_storeClosedByWorkingHours)
+            ? _addToCart
+            : () => _showErrorSnackBar(
+                _storeClosedByWorkingHours
+                    ? 'المتجر مغلق حاليًا حسب مواعيد العمل، لا يمكن إضافة منتجات للسلة الآن'
+                    : 'المتجر مشغول حاليًا، لا يمكن إضافة منتجات للسلة الآن',
+              ),
         onIncrease: () => setState(() => quantity++),
         onDecrease: () => setState(() => quantity > 1 ? quantity-- : quantity),
       ),
@@ -234,6 +258,15 @@ class _ProductDetailsPageState extends State<ProductDetailsPage>
 
   /// Add item to cart with market validation
   Future<void> _addToCart() async {
+    if (!_storeAvailable || _storeClosedByWorkingHours) {
+      _showErrorSnackBar(
+        _storeClosedByWorkingHours
+            ? 'المتجر مغلق حاليًا حسب مواعيد العمل، لا يمكن إضافة منتجات للسلة الآن'
+            : 'المتجر مشغول حاليًا، لا يمكن إضافة منتجات للسلة الآن',
+      );
+      return;
+    }
+
     final cartViewModel = context.read<CartViewModel>();
 
     // Validate required options are selected

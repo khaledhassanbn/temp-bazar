@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'widgets/admin_bottom_navigation.dart';
+import 'package:bazar_suez/router/widgets/app_back_guard.dart';
 
 /// Layout wrapper for admin pages that adds bottom navigation bar
 /// Similar to MarketLayout - wraps child in Scaffold with bottom nav
@@ -14,9 +15,12 @@ class AdminLayout extends StatelessWidget {
 
     // Wrap child in Scaffold with bottom navigation bar
     // Child pages should not have their own Scaffold to avoid nesting
-    return Scaffold(
-      body: child,
-      bottomNavigationBar: AdminBottomNavigation(currentIndex: currentIndex),
+    return AppBackGuard(
+      homePath: '/admin/dashboard',
+      child: Scaffold(
+        body: child,
+        bottomNavigationBar: AdminBottomNavigation(currentIndex: currentIndex),
+      ),
     );
   }
 

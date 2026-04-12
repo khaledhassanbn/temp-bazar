@@ -18,15 +18,13 @@ import 'markets/grid_of_categories/ViewModel/ViewModel.dart';
 import 'markets/Markets_after_category/viewmodel/category_filter_viewmodel.dart';
 import 'markets/cart/viewmodels/cart_view_model.dart';
 import 'markets/saved_locations/viewmodels/saved_locations_viewmodel.dart';
+import 'markets/home_page/viewmodels/home_data_provider.dart';
 
 // 🐝 Hive
 import 'services/hive_adapters_setup.dart';
 
 // 🔔 FCM Notifications
 import 'services/fcm_service.dart';
-
-// 🌍 App Router
-import 'package:bazar_suez/router/app_router.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -96,6 +94,7 @@ class _MyAppState extends State<MyApp> {
             return savedLocationsViewModel;
           },
         ),
+        ChangeNotifierProvider(create: (_) => HomeDataProvider()),
       ],
       child: FutureBuilder<GoRouter>(
         future: _routerFuture,

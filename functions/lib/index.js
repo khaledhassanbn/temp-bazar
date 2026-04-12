@@ -42,7 +42,7 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.sendPastOrderNotification = exports.sendOrderStatusNotification = exports.sendNewOrderNotification = exports.facebookDataDeletionRequest = exports.cleanupExpiredPendingPaymentsScheduled = exports.deleteExpiredAdsImagesScheduled = exports.autoRenewSubscriptionsScheduled = exports.paymobWebhookHandler = void 0;
+exports.sendPastOrderNotification = exports.sendOrderStatusNotification = exports.sendNewOrderNotification = exports.facebookDataDeletionRequest = exports.updateStoreOpenStatusScheduled = exports.cleanupExpiredPendingPaymentsScheduled = exports.deleteExpiredAdsImagesScheduled = exports.autoRenewSubscriptionsScheduled = exports.paymobWebhookHandler = void 0;
 // ---------------------------------------------------------------------------
 // INITIALIZE FIREBASE ADMIN
 // ---------------------------------------------------------------------------
@@ -72,6 +72,8 @@ const autoRenew_1 = require("./subscriptions/autoRenew");
 const dataDeletion_1 = require("./facebook/dataDeletion");
 const deleteExpiredImages_1 = require("./ads/deleteExpiredImages");
 const cleanupExpired_1 = require("./pendingPayments/cleanupExpired");
+// Working Hours
+const updateStoreOpenStatus_1 = require("./workingHours/updateStoreOpenStatus");
 // Order Notifications
 const sendOrderNotification_1 = require("./notifications/sendOrderNotification");
 Object.defineProperty(exports, "sendNewOrderNotification", { enumerable: true, get: function () { return sendOrderNotification_1.sendNewOrderNotification; } });
@@ -110,6 +112,14 @@ exports.cleanupExpiredPendingPaymentsScheduled = functions.scheduler.onSchedule(
     timeZone: "Africa/Cairo",
     memory: "512MiB",
 }, cleanupExpired_1.cleanupExpiredPendingPayments);
+// ---------------------------------------------------------------------------
+// WORKING HOURS — Update isOpenNow field for all active stores
+// ---------------------------------------------------------------------------
+exports.updateStoreOpenStatusScheduled = functions.scheduler.onSchedule({
+    schedule: "*/15 * * * *", // Every 15 minutes
+    timeZone: "Africa/Cairo",
+    memory: "512MiB",
+}, updateStoreOpenStatus_1.updateStoreOpenStatus);
 // ---------------------------------------------------------------------------
 // FACEBOOK DATA DELETION CALLBACK
 // ---------------------------------------------------------------------------

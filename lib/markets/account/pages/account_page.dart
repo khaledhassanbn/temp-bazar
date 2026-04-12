@@ -216,7 +216,7 @@ class _AccountPageState extends State<AccountPage> {
       _MarketAction(
         icon: Icons.store_mall_directory_outlined,
         label: 'تعديل المتجر',
-        onTap: () => context.go('/edit-store?marketId=${market.id}'),
+        onTap: () => context.push('/edit-store?marketId=${market.id}'),
       ),
       _MarketAction(
         icon: Icons.receipt_long_outlined,

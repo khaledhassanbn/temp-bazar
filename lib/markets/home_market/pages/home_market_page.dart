@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:bazar_suez/markets/home_page/viewmodels/home_data_provider.dart';
 
 // استيراد الودجات اللي قسمناها
 import 'package:bazar_suez/markets/home_market/widgets/market_cover_section.dart';
@@ -45,29 +46,23 @@ class _MarketAnimatedPageState extends State<MarketAnimatedPage>
     return _userMarketId != null && _userMarketId == storeId;
   }
 
-  Future<void> _loadUserMarketId() async {
-    final user = FirebaseAuth.instance.currentUser;
-    if (user == null) return;
+  /// يأخذ معرف متجر المستخدم من HomeDataProvider (بدون query إضافي)
+  void _resolveUserMarketId() {
     try {
-      final doc = await FirebaseFirestore.instance
-          .collection('users')
-          .doc(user.uid)
-          .get();
-      final data = doc.data();
-      if (data != null) {
-        _userMarketId = data['market_id'] as String? ??
-            data['marketId'] as String? ??
-            (data['market'] is Map ? data['market']['id'] as String? : null);
-        if (mounted) setState(() {});
-      }
-    } catch (_) {}
+      final homeData = context.read<HomeDataProvider>();
+      _userMarketId = homeData.myStore?.id;
+    } catch (_) {
+      // HomeDataProvider مش متاح — نتجاهل
+    }
   }
 
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 1, vsync: this);
-    _loadUserMarketId(); // تحميل معرف متجر المستخدم
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _resolveUserMarketId();
+    });
 
     _scrollController.addListener(() {
       if (!_scrollController.hasClients) return;
@@ -166,13 +161,17 @@ class _MarketAnimatedPageState extends State<MarketAnimatedPage>
           builder: (context, scrollOffset, _) {
             final bool isMerged = scrollOffset >= mergePoint;
             final vm = context.watch<MarketDetailsViewModel>();
+            final bool isBusyStore = vm.store != null && !vm.store!.available;
+            final bool isClosedStore =
+                vm.store != null && vm.store!.isClosedByWorkingHours;
+            final bool isOrderingBlocked = isBusyStore || isClosedStore;
 
             // ═══════════════════════════════════════════════════════════════
             // 🔒 التحقق من صلاحية الترخيص للمستخدمين الآخرين
             // إذا كان الترخيص منتهياً والزائر ليس صاحب المتجر = عرض صفحة غير متاح
             // ═══════════════════════════════════════════════════════════════
-            if (vm.store != null && 
-                vm.store!.isLicenseExpired && 
+            if (vm.store != null &&
+                vm.store!.isLicenseExpired &&
                 !_isStoreOwner(vm.store!.id)) {
               return _buildStoreUnavailablePage(context, vm.store!);
             }
@@ -261,6 +260,30 @@ class _MarketAnimatedPageState extends State<MarketAnimatedPage>
                           tabs: ordered.map((c) => c.name).toList(),
                         ),
                       ),
+                    if (isOrderingBlocked)
+                      SliverToBoxAdapter(
+                        child: Container(
+                          margin: const EdgeInsets.fromLTRB(14, 10, 14, 4),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 10,
+                          ),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFF7F1DE),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Text(
+                            isClosedStore
+                                ? 'هذا المتجر مغلق حاليًا حسب مواعيد العمل. يمكنك تصفح القائمة، لكن الطلب غير متاح الآن.'
+                                : 'هذا المتجر مشغول حاليًا. يمكنك تصفح القائمة، لكن الطلب غير متاح الآن.',
+                            textAlign: TextAlign.right,
+                            style: const TextStyle(
+                              fontWeight: FontWeight.w700,
+                              color: Color(0xFF5A4A1B),
+                            ),
+                          ),
+                        ),
+                      ),
                     if (vm.isLoading)
                       const SliverToBoxAdapter(
                         child: Padding(
@@ -310,7 +333,7 @@ class _MarketAnimatedPageState extends State<MarketAnimatedPage>
                     if (!_isScrolling) _scrollToCategory(i);
                   },
                 ),
-                const FloatingCartBar(),
+                if (!isOrderingBlocked) const FloatingCartBar(),
                 // === Overlay حجب الصفحة عند انتهاء الترخيص (لصاحب المتجر فقط) ===
                 if (vm.store != null && _isStoreOwner(vm.store!.id))
                   LicenseExpiredOverlay(store: vm.store!),
@@ -404,10 +427,7 @@ class _MarketAnimatedPageState extends State<MarketAnimatedPage>
                   icon: const Icon(Icons.home_outlined),
                   label: const Text(
                     'العودة للصفحة الرئيسية',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                    ),
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                   ),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFF4E99B4),

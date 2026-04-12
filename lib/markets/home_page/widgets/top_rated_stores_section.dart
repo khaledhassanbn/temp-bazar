@@ -1,13 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import 'package:provider/provider.dart';
 
-import '../services/top_rated_stores_service.dart';
-import '../../favourite_markets/services/favourite_markets_service.dart';
 import '../../create_market/models/store_model.dart';
+import '../viewmodels/home_data_provider.dart';
 
 /// قسم أفضل المطاعم أو أشهر البقالات
-class TopRatedStoresSection extends StatefulWidget {
+class TopRatedStoresSection extends StatelessWidget {
   final String title;
   final bool isRestaurants; // true = مطاعم, false = بقالات
 
@@ -18,78 +18,21 @@ class TopRatedStoresSection extends StatefulWidget {
   });
 
   @override
-  State<TopRatedStoresSection> createState() => _TopRatedStoresSectionState();
-}
-
-class _TopRatedStoresSectionState extends State<TopRatedStoresSection> {
-  final TopRatedStoresService _service = TopRatedStoresService();
-  final FavouriteMarketsService _favouriteService = FavouriteMarketsService();
-  List<StoreModel> _stores = [];
-  Set<String> _favouriteStoreIds = {};
-  bool _isLoading = true;
-
-  @override
-  void initState() {
-    super.initState();
-    _loadTopRatedStores();
-    _loadFavouriteStores();
-  }
-
-  Future<void> _loadTopRatedStores() async {
-    if (!mounted) return;
-    setState(() => _isLoading = true);
-    try {
-      final stores = widget.isRestaurants
-          ? await _service.getTopRatedRestaurants(limit: 10)
-          : await _service.getTopRatedGroceries(limit: 10);
-
-      if (!mounted) return;
-      setState(() {
-        _stores = stores;
-        _isLoading = false;
-      });
-    } catch (e) {
-      print('خطأ في جلب أفضل المتاجر: $e');
-      if (!mounted) return;
-      setState(() => _isLoading = false);
-    }
-  }
-
-  Future<void> _loadFavouriteStores() async {
-    try {
-      final favourites = await _favouriteService.getFavouriteMarkets();
-      if (!mounted) return;
-      setState(() {
-        _favouriteStoreIds = favourites.map((f) => f.marketId).toSet();
-      });
-    } catch (e) {
-      print('خطأ في جلب المتاجر المفضلة: $e');
-    }
-  }
-
-  Future<void> _toggleFavourite(String marketId) async {
-    final isFavourite = _favouriteStoreIds.contains(marketId);
-
-    if (isFavourite) {
-      await _favouriteService.removeFavouriteMarket(marketId);
-    } else {
-      await _favouriteService.addFavouriteMarket(marketId);
-    }
-
-    if (!mounted) return;
-    await _loadFavouriteStores();
-  }
-
-  @override
   Widget build(BuildContext context) {
-    if (_isLoading) {
+    final homeData = context.watch<HomeDataProvider>();
+
+    final stores = isRestaurants
+        ? homeData.topRatedRestaurants
+        : homeData.topRatedGroceries;
+
+    if (homeData.isLoadingTopRated) {
       return const SizedBox(
         height: 240,
         child: Center(child: CircularProgressIndicator()),
       );
     }
 
-    if (_stores.isEmpty) {
+    if (stores.isEmpty) {
       return const SizedBox.shrink();
     }
 
@@ -100,7 +43,7 @@ class _TopRatedStoresSectionState extends State<TopRatedStoresSection> {
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16),
           child: Text(
-            widget.title,
+            title,
             style: TextStyle(
               fontSize: 20,
               fontWeight: FontWeight.bold,
@@ -116,10 +59,10 @@ class _TopRatedStoresSectionState extends State<TopRatedStoresSection> {
             scrollDirection: Axis.horizontal,
             padding: const EdgeInsets.symmetric(horizontal: 16),
             separatorBuilder: (context, index) => const SizedBox(width: 12),
-            itemCount: _stores.length,
+            itemCount: stores.length,
             itemBuilder: (context, index) {
-              final store = _stores[index];
-              return _buildStoreCard(store, index);
+              final store = stores[index];
+              return _buildStoreCard(context, store, homeData, index);
             },
           ),
         ),
@@ -127,12 +70,16 @@ class _TopRatedStoresSectionState extends State<TopRatedStoresSection> {
     );
   }
 
-  Widget _buildStoreCard(StoreModel store, int index) {
-    final isFavourite = _favouriteStoreIds.contains(store.id);
+  Widget _buildStoreCard(
+    BuildContext context,
+    StoreModel store,
+    HomeDataProvider homeData,
+    int index,
+  ) {
+    final isFavourite = homeData.favouriteStoreIds.contains(store.id);
 
     return GestureDetector(
       onTap: () {
-        if (!mounted) return;
         context.push('/HomeMarketPage?marketLink=${store.link}');
       },
       child: Container(
@@ -208,7 +155,7 @@ class _TopRatedStoresSectionState extends State<TopRatedStoresSection> {
                     children: [
                       // القلب
                       GestureDetector(
-                        onTap: () => _toggleFavourite(store.id),
+                        onTap: () => homeData.toggleFavourite(store.id),
                         child: Container(
                           padding: const EdgeInsets.all(6),
                           decoration: BoxDecoration(

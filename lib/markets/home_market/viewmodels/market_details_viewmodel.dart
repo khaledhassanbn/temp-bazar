@@ -83,6 +83,11 @@ class MarketDetailsViewModel extends ChangeNotifier {
   StreamSubscription<List<MarketCategoryModel>>? _categoriesSubscription;
   List<MarketCategoryModel> _categories = [];
   bool _isDisposed = false;
+  bool get _canNotify => !_isDisposed;
+
+  void _safeNotifyListeners() {
+    if (_canNotify) notifyListeners();
+  }
 
   List<MarketCategoryModel> get categories => _categories;
   MarketCategoryModel? get bestSellersCategory =>
@@ -121,39 +126,27 @@ class MarketDetailsViewModel extends ChangeNotifier {
   StoreModel? get store => _store;
 
   Future<void> loadByLink(String marketLink) async {
+    if (_isDisposed) return;
     if (marketLink.isEmpty) {
       _errorMessage = 'رابط المتجر غير صالح';
-      notifyListeners();
+      _safeNotifyListeners();
       return;
     }
     _isLoading = true;
     _errorMessage = null;
-    notifyListeners();
+    _safeNotifyListeners();
     try {
       final doc = await _firestore.collection('markets').doc(marketLink).get();
+      if (_isDisposed) return;
       if (!doc.exists) {
         _errorMessage = 'لم يتم العثور على المتجر';
       } else {
         final data = doc.data() as Map<String, dynamic>;
-        
-        // جلب إحصائيات التقييم من الساب-كولكشن
-        try {
-          final statsDoc = await _firestore
-              .collection('markets')
-              .doc(doc.id)
-              .collection('statistics')
-              .doc('rating')
-              .get();
-          
-          if (statsDoc.exists) {
-            final statsData = statsDoc.data();
-            data['averageRating'] = statsData?['averageRating'];
-            data['totalReviews'] = statsData?['totalReviews'];
-          }
-        } catch (e) {
-          debugPrint('خطأ في جلب إحصائيات التقييم: $e');
-        }
+        // averageRating و totalReviews موجودين في document المتجر مباشرة
+        // (بفضل denormalization في ReviewService)
+        // لا حاجة لـ query إضافي على statistics/rating subcollection
 
+        if (_isDisposed) return;
         _store = StoreModel.fromMap(doc.id, data);
         // ابدأ بث الفئات حسب الهيكل الجديد (من جذر products)
         startCategoriesStream();
@@ -164,20 +157,31 @@ class MarketDetailsViewModel extends ChangeNotifier {
         print('MarketDetailsViewModel.loadByLink error: $e');
       }
     } finally {
+      if (_isDisposed) return;
       _isLoading = false;
-      notifyListeners();
+      _safeNotifyListeners();
     }
   }
 
-  /// يبدأ بث جلب الفئات من Firestore وفق هيكل: markets/{marketId}/products/{category}/items
+  /// يبدأ جلب الفئات — تحميل أولي سريع بالتوازي ثم بث للتحديثات
   void startCategoriesStream() {
-    // استخدم معرّف المتجر المحمّل، وإن لم يتوفر فافتراض kb كما في المثال
     final String marketId = (_store?.id.isNotEmpty == true) ? _store!.id : 'kb';
 
     final productsCollection = _firestore
         .collection('markets')
         .doc(marketId)
         .collection('products');
+
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    // 1) تحميل أولي سريع بـ get() — أسرع من snapshots() للمرة الأولى
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    _loadCategoriesOnce(productsCollection);
+
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    // 2) بث للتحديثات في الخلفية (لو أضاف صاحب المتجر منتج جديد)
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    _categoriesSubscription?.cancel();
+    if (_isDisposed) return;
 
     _categoriesStream = productsCollection.snapshots().asyncMap((
       snapshot,
@@ -196,23 +200,16 @@ class MarketDetailsViewModel extends ChangeNotifier {
       }).toList();
 
       var withItems = await Future.wait(futures);
-
-      // استبعاد الفئات التي لا تحتوي على عناصر
       withItems = withItems.where((c) => c.items.isNotEmpty).toList();
-
-      // فرز القوائم حسب order تصاعديًا (تحوّط في حال غياب الترتيب في الاستعلام)
       withItems.sort((a, b) => a.order.compareTo(b.order));
       return withItems;
     });
 
-    // استمع وحدّث الحالة
-    // ألغِ أي اشتراك سابق قبل إنشاء اشتراك جديد
-    _categoriesSubscription?.cancel();
     _categoriesSubscription = _categoriesStream!.listen(
       (data) {
         if (_isDisposed) return;
         _categories = data;
-        notifyListeners();
+        _safeNotifyListeners();
       },
       onError: (e) {
         if (_isDisposed) return;
@@ -220,9 +217,44 @@ class MarketDetailsViewModel extends ChangeNotifier {
           print('Categories stream error: $e');
         }
         _errorMessage = 'تعذر تحميل الفئات';
-        notifyListeners();
+        _safeNotifyListeners();
       },
     );
+  }
+
+  /// تحميل أولي سريع — كل الفئات والـ items بالتوازي بدون stream
+  Future<void> _loadCategoriesOnce(CollectionReference productsCollection) async {
+    try {
+      final categoriesSnap = await productsCollection.get();
+      if (_isDisposed) return;
+
+      final rawCategories = categoriesSnap.docs
+          .map((d) => MarketCategoryModel.fromDoc(d))
+          .toList();
+
+      // جلب items لكل فئة بالتوازي
+      final futures = rawCategories.map((category) async {
+        final itemsSnap = await productsCollection
+            .doc(category.id)
+            .collection('items')
+            .get();
+        final items = itemsSnap.docs.map(MarketItemModel.fromDoc).toList();
+        return category.copyWith(items: items);
+      }).toList();
+
+      var withItems = await Future.wait(futures);
+      withItems = withItems.where((c) => c.items.isNotEmpty).toList();
+      withItems.sort((a, b) => a.order.compareTo(b.order));
+
+      if (_isDisposed) return;
+      _categories = withItems;
+      _safeNotifyListeners();
+    } catch (e) {
+      if (kDebugMode) {
+        print('_loadCategoriesOnce error: $e');
+      }
+      // الـ stream هيحاول تاني في الخلفية
+    }
   }
 
   @override

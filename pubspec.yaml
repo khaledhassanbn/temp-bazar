@@ -78,6 +78,8 @@ flutter:
     - assets/images/categories/
     - assets/images/create_market.png
     - assets/images/adsmarket.jpg
+    - assets/images/busy.png
+    - assets/images/closed.png
     
 
   fonts:

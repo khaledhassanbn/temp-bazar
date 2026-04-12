@@ -1,77 +1,25 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import 'package:provider/provider.dart';
 
-import '../services/featured_stores_service.dart';
-import '../../favourite_markets/services/favourite_markets_service.dart';
+import '../viewmodels/home_data_provider.dart';
 
-class FeaturedStoresSection extends StatefulWidget {
+class FeaturedStoresSection extends StatelessWidget {
   const FeaturedStoresSection({super.key});
 
   @override
-  State<FeaturedStoresSection> createState() => _FeaturedStoresSectionState();
-}
-
-class _FeaturedStoresSectionState extends State<FeaturedStoresSection> {
-  final FeaturedStoresService _service = FeaturedStoresService();
-  final FavouriteMarketsService _favouriteService = FavouriteMarketsService();
-
-  List<FeaturedStoreResult> _stores = [];
-  Set<String> _favouriteStoreIds = {};
-  bool _isLoading = true;
-
-  @override
-  void initState() {
-    super.initState();
-    _loadFeaturedStores();
-    _loadFavouriteStores();
-  }
-
-  Future<void> _loadFeaturedStores() async {
-    setState(() => _isLoading = true);
-    try {
-      final stores = await _service.getFeaturedStores(limit: 10);
-      if (!mounted) return;
-      setState(() {
-        _stores = stores;
-        _isLoading = false;
-      });
-    } catch (_) {
-      if (!mounted) return;
-      setState(() => _isLoading = false);
-    }
-  }
-
-  Future<void> _loadFavouriteStores() async {
-    try {
-      final favourites = await _favouriteService.getFavouriteMarkets();
-      if (!mounted) return;
-      setState(() {
-        _favouriteStoreIds = favourites.map((e) => e.marketId).toSet();
-      });
-    } catch (_) {}
-  }
-
-  Future<void> _toggleFavourite(String marketId) async {
-    final isFavourite = _favouriteStoreIds.contains(marketId);
-    if (isFavourite) {
-      await _favouriteService.removeFavouriteMarket(marketId);
-    } else {
-      await _favouriteService.addFavouriteMarket(marketId);
-    }
-    await _loadFavouriteStores();
-  }
-
-  @override
   Widget build(BuildContext context) {
-    if (_isLoading) {
+    final homeData = context.watch<HomeDataProvider>();
+
+    if (homeData.isLoadingFeatured) {
       return const SizedBox(
         height: 240,
         child: Center(child: CircularProgressIndicator()),
       );
     }
 
-    if (_stores.isEmpty) return const SizedBox.shrink();
+    if (homeData.featuredStores.isEmpty) return const SizedBox.shrink();
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -90,9 +38,14 @@ class _FeaturedStoresSectionState extends State<FeaturedStoresSection> {
             scrollDirection: Axis.horizontal,
             padding: const EdgeInsets.symmetric(horizontal: 16),
             separatorBuilder: (_, __) => const SizedBox(width: 12),
-            itemCount: _stores.length,
+            itemCount: homeData.featuredStores.length,
             itemBuilder: (context, index) {
-              return _buildStoreCard(_stores[index], index);
+              return _buildStoreCard(
+                context,
+                homeData.featuredStores[index],
+                homeData,
+                index,
+              );
             },
           ),
         ),
@@ -100,8 +53,13 @@ class _FeaturedStoresSectionState extends State<FeaturedStoresSection> {
     );
   }
 
-  Widget _buildStoreCard(FeaturedStoreResult result, int index) {
-    final isFavourite = _favouriteStoreIds.contains(result.store.id);
+  Widget _buildStoreCard(
+    BuildContext context,
+    FeaturedStoreResult result,
+    HomeDataProvider homeData,
+    int index,
+  ) {
+    final isFavourite = homeData.favouriteStoreIds.contains(result.store.id);
 
     return GestureDetector(
       onTap: () {
@@ -170,7 +128,8 @@ class _FeaturedStoresSectionState extends State<FeaturedStoresSection> {
                   child: Row(
                     children: [
                       GestureDetector(
-                        onTap: () => _toggleFavourite(result.store.id),
+                        onTap: () =>
+                            homeData.toggleFavourite(result.store.id),
                         child: Container(
                           padding: const EdgeInsets.all(6),
                           decoration: const BoxDecoration(
@@ -226,50 +185,44 @@ class _FeaturedStoresSectionState extends State<FeaturedStoresSection> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
-                  /// الاسم + إعلان (بدون تغيير مكان الاسم)
-Row(
-  children: [
-    /// اسم المتجر (يسار)
-    Text(
-      result.store.name,
-      style: const TextStyle(
-        fontSize: 16,
-        fontWeight: FontWeight.bold,
-      ),
-      maxLines: 1,
-      overflow: TextOverflow.ellipsis,
-    ),
-
-    const Spacer(),
-
-    /// إعلان (يمين – إطار رمادي شفاف)
-    Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-      decoration: BoxDecoration(
-        color: Colors.transparent,
-        borderRadius: BorderRadius.circular(4),
-        border: Border.all(
-          color: const Color.fromARGB(255, 196, 196, 196),
-          width: 1,
-        ),
-      ),
-      child: const Text(
-        'إعلان',
-        style: TextStyle(
-          fontSize: 10,
-          color:Color.fromARGB(255, 169, 169, 169),
-          // fontWeight: FontWeight.w500,
-        ),
-      ),
-    ),
-  ],
-),
-
-
+                  /// الاسم + إعلان
+                  Row(
+                    children: [
+                      Text(
+                        result.store.name,
+                        style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      const Spacer(),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 8, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: Colors.transparent,
+                          borderRadius: BorderRadius.circular(4),
+                          border: Border.all(
+                            color: const Color.fromARGB(255, 196, 196, 196),
+                            width: 1,
+                          ),
+                        ),
+                        child: const Text(
+                          'إعلان',
+                          style: TextStyle(
+                            fontSize: 10,
+                            color: Color.fromARGB(255, 169, 169, 169),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
 
                   const SizedBox(height: 4),
 
-                  /// الوصف (من غير أي تعديل)
+                  /// الوصف
                   if (result.store.description.isNotEmpty)
                     Align(
                       alignment: Alignment.centerRight,

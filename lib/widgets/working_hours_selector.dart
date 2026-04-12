@@ -41,41 +41,64 @@ class _WorkingHoursSelectorState extends State<WorkingHoursSelector> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Text(
-              'مواعيد العمل',
-              style: TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.w700,
-                color: AppColors.mainColor,
-              ),
+            Row(
+              children: [
+                Text(
+                  'تحديد مواعيد العمل',
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.mainColor,
+                  ),
+                ),
+                if (widget.required)
+                  const Text(' *', style: TextStyle(color: Colors.red)),
+              ],
             ),
-            if (widget.required)
-              const Text(' *', style: TextStyle(color: Colors.red)),
+            Switch(
+              value: !_workingHours.isAlwaysOpen,
+              activeColor: AppColors.mainColor,
+              onChanged: (val) {
+                setState(() {
+                  _workingHours = _workingHours.copyWith(isAlwaysOpen: !val);
+                  widget.onChanged(_workingHours);
+                });
+              },
+            ),
           ],
         ),
-        const SizedBox(height: 3),
-        Container(
-          decoration: BoxDecoration(
-            border: Border.all(color: Colors.grey[300]!),
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: Column(
-            children: _workingHours.workingHours.map((dayHours) {
-              return _DayWorkingHoursCard(
-                dayHours: dayHours,
-                onChanged: (newHours) =>
-                    _updateDayHours(dayHours.dayOfWeek, newHours),
-              );
-            }).toList(),
-          ),
-        ),
-        const SizedBox(height: 8),
-        if (!_workingHours.isValid)
+        if (_workingHours.isAlwaysOpen) ...[
+          const SizedBox(height: 4),
           Text(
-            'يرجى التحقق من صحة مواعيد العمل',
-            style: TextStyle(color: Colors.red[600], fontSize: 12),
+            'المتجر يعمل طوال أيام الأسبوع وعلى مدار الساعة.',
+            style: TextStyle(color: Colors.black54, fontSize: 13),
           ),
+        ] else ...[
+          const SizedBox(height: 8),
+          Container(
+            decoration: BoxDecoration(
+              border: Border.all(color: Colors.grey[300]!),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Column(
+              children: _workingHours.workingHours.map((dayHours) {
+                return _DayWorkingHoursCard(
+                  dayHours: dayHours,
+                  onChanged: (newHours) =>
+                      _updateDayHours(dayHours.dayOfWeek, newHours),
+                );
+              }).toList(),
+            ),
+          ),
+          const SizedBox(height: 8),
+          if (!_workingHours.isValid)
+            Text(
+              'يرجى التحقق من صحة مواعيد العمل',
+              style: TextStyle(color: Colors.red[600], fontSize: 12),
+            ),
+        ],
       ],
     );
   }

@@ -20,6 +20,7 @@ class CategoryFilterViewModel extends ChangeNotifier {
   // Map to store stores for each category (for home page display)
   Map<String, List<StoreModel>> categoryStoresMap = {};
   bool isLoadingCategoryStores = false;
+  bool _hasLoadedCategoryStores = false;
 
   Future<void> setCategory(String? categoryId) async {
     selectedCategoryId = categoryId;
@@ -102,7 +103,10 @@ class CategoryFilterViewModel extends ChangeNotifier {
   Future<void> fetchStoresForAllCategories(
     List<String> categoryIds, {
     int limit = 8,
+    bool force = false,
   }) async {
+    if (_hasLoadedCategoryStores && !force) return; // خلاص محملة من قبل
+
     isLoadingCategoryStores = true;
     notifyListeners();
 
@@ -114,6 +118,7 @@ class CategoryFilterViewModel extends ChangeNotifier {
         final categoryStores = await _storeService.getStoresByIds(limitedLinks);
         categoryStoresMap[categoryId] = categoryStores;
       }
+      _hasLoadedCategoryStores = true;
     } finally {
       isLoadingCategoryStores = false;
       notifyListeners();

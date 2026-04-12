@@ -12,13 +12,12 @@ import '../../saved_locations/viewmodels/saved_locations_viewmodel.dart';
 import '../../saved_locations/widgets/location_app_bar_widget.dart';
 import '../../saved_locations/widgets/saved_locations_sheet.dart';
 import '../widgets/home_categories_icons.dart';
-import '../widgets/nearby_stores_section.dart';
+
 import '../widgets/top_rated_stores_section.dart';
 import '../widgets/featured_stores_section.dart';
-import '../../license/services/license_service.dart';
 import '../../license/widgets/license_warning_banner.dart';
-import '../../create_market/models/store_model.dart';
 import '../../account/pages/account_page.dart';
+import '../viewmodels/home_data_provider.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -30,9 +29,6 @@ class HomePage extends StatefulWidget {
 class _HomePageState extends State<HomePage> {
   final TextEditingController searchController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
-  final LicenseService _licenseService = LicenseService();
-  StoreModel? _myStore;
-  bool _licenseLoading = false;
   bool _isScrolled = false;
 
   @override
@@ -40,27 +36,41 @@ class _HomePageState extends State<HomePage> {
     super.initState();
     _scrollController.addListener(_scrollListener);
 
-    // 🔹 تحميل حالة الترخيص فوراً (بشكل مستقل)
-    _loadLicenseStatus();
-
-    // 🔹 تحميل الفئات عند فتح الصفحة
+    // تحميل البيانات عند فتح الصفحة
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      _loadCategories();
+      _loadAllData();
     });
   }
 
-  Future<void> _loadCategories() async {
+  /// تحميل كل البيانات بالتوازي
+  Future<void> _loadAllData() async {
     if (!mounted) return;
+
+    final homeData = Provider.of<HomeDataProvider>(context, listen: false);
+    final locationVm = Provider.of<SavedLocationsViewModel>(
+      context,
+      listen: false,
+    );
     final categoryVm = Provider.of<CategoryViewModel>(context, listen: false);
     final filterVm = Provider.of<CategoryFilterViewModel>(
       context,
       listen: false,
     );
 
+    // تحميل الفئات + بيانات الصفحة الرئيسية بالتوازي
+    await Future.wait([
+      homeData.loadHomeData(locationVm: locationVm),
+      _loadCategories(categoryVm, filterVm),
+    ]);
+  }
+
+  Future<void> _loadCategories(
+    CategoryViewModel categoryVm,
+    CategoryFilterViewModel filterVm,
+  ) async {
     await categoryVm.fetchCategories();
     if (!mounted) return;
 
-    // Load stores for all categories for home page display
     if (categoryVm.categories.isNotEmpty) {
       final categoryIds = categoryVm.categories.map((c) => c.id).toList();
       await filterVm.fetchStoresForAllCategories(categoryIds, limit: 8);
@@ -70,7 +80,6 @@ class _HomePageState extends State<HomePage> {
   void _scrollListener() {
     if (!mounted) return;
     final offset = _scrollController.offset;
-    // animation تدريجي: يبدأ الاختفاء عند 50 بكسل ويكتمل عند 150 بكسل
     final newScrolled = offset > 50;
     if (newScrolled != _isScrolled) {
       setState(() => _isScrolled = newScrolled);
@@ -100,6 +109,7 @@ class _HomePageState extends State<HomePage> {
     final categoryViewModel = Provider.of<CategoryViewModel>(context);
     final cartViewModel = Provider.of<CartViewModel>(context);
     final locationViewModel = Provider.of<SavedLocationsViewModel>(context);
+    final homeData = Provider.of<HomeDataProvider>(context);
 
     return Directionality(
       textDirection: TextDirection.rtl,
@@ -114,7 +124,7 @@ class _HomePageState extends State<HomePage> {
                     controller: _scrollController,
                     slivers: [
                       // =======================================================================
-                      // 🔹 SliverAppBar - تصميم جديد مشابه لـ HungerStation
+                      // 🔹 SliverAppBar
                       // =======================================================================
                       SliverAppBar(
                         expandedHeight: 280,
@@ -126,11 +136,7 @@ class _HomePageState extends State<HomePage> {
                           background: Stack(
                             fit: StackFit.expand,
                             children: [
-                              // خلفية (أبيض) لتغطية الفراغات
                               Container(color: Colors.white),
-
-                              // حاوية الصورة مع الحواف الدائرية من الأسفل فقط
-                              // "خط مستقيم من الأسفل وله كيرف حاد من الأطراف"
                               ClipRRect(
                                 borderRadius: const BorderRadius.only(
                                   bottomLeft: Radius.circular(25),
@@ -139,14 +145,12 @@ class _HomePageState extends State<HomePage> {
                                 child: Stack(
                                   fit: StackFit.expand,
                                   children: [
-                                    // صورة الخلفية
                                     Image.asset(
                                       'assets/images/create_market.png',
                                       fit: BoxFit.cover,
                                       errorBuilder: (_, __, ___) =>
                                           Container(color: AppColors.mainColor),
                                     ),
-                                    // طبقة تدرج لوني
                                     Container(
                                       decoration: BoxDecoration(
                                         gradient: LinearGradient(
@@ -162,8 +166,6 @@ class _HomePageState extends State<HomePage> {
                                   ],
                                 ),
                               ),
-
-                              // محتوى AppBar - يختفي تدريجياً عند التمرير
                               Positioned(
                                 top: MediaQuery.of(context).padding.top + 8,
                                 right: 16,
@@ -172,25 +174,26 @@ class _HomePageState extends State<HomePage> {
                                   duration: const Duration(milliseconds: 200),
                                   opacity: _isScrolled ? 0.0 : 1.0,
                                   child: IgnorePointer(
-                                    ignoring: _isScrolled, // تعطيل التفاعل عند الاختفاء
+                                    ignoring: _isScrolled,
                                     child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.end,
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.end,
                                       children: [
                                         Row(
-                                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                          mainAxisAlignment:
+                                              MainAxisAlignment.spaceBetween,
                                           children: [
-                                            // عربة التسوق على اليمين (RTL Start)
-                                            _buildCartIcon(context, cartViewModel),
-
-                                            // عنوان التوصيل (في المنتصف تقريباً أو بجانب السلة)
-                                            Expanded(child: LocationAppBarWidget()),
-
-                                            // 3 شرط (القائمة) على اليسار (RTL End)
+                                            _buildCartIcon(
+                                              context,
+                                              cartViewModel,
+                                            ),
+                                            Expanded(
+                                              child: LocationAppBarWidget(),
+                                            ),
                                             _buildMenuIcon(context),
                                           ],
                                         ),
                                         const SizedBox(height: 20),
-                                        // شريط البحث
                                         GestureDetector(
                                           onTap: () {
                                             if (locationViewModel.hasLocation) {
@@ -206,9 +209,8 @@ class _HomePageState extends State<HomePage> {
                                             ),
                                             decoration: BoxDecoration(
                                               color: Colors.transparent,
-                                              borderRadius: BorderRadius.circular(
-                                                8,
-                                              ),
+                                              borderRadius:
+                                                  BorderRadius.circular(8),
                                             ),
                                             child: AbsorbPointer(
                                               child: SearchBarWidget(
@@ -223,11 +225,12 @@ class _HomePageState extends State<HomePage> {
                                             ),
                                           ),
                                         ),
-                                        // مساحة قابلة للنقر (خفية) تحت البحث حتى نهاية AppBar
                                         SizedBox(
                                           height:
                                               280 -
-                                              (MediaQuery.of(context).padding.top +
+                                              (MediaQuery.of(
+                                                    context,
+                                                  ).padding.top +
                                                   8 +
                                                   40 +
                                                   20 +
@@ -252,17 +255,10 @@ class _HomePageState extends State<HomePage> {
                         title: _isScrolled
                             ? Row(
                                 children: [
-                                  // عربة التسوق على اليمين (RTL Start)
                                   _buildCartIcon(context, cartViewModel),
-                                  
-                                  // مسافة مرنة
                                   const Spacer(),
-
-                                  // عنوان التوصيل
                                   LocationAppBarWidget(),
                                   const SizedBox(width: 8),
-
-                                  // أيقونة البحث
                                   GestureDetector(
                                     onTap: () {
                                       if (locationViewModel.hasLocation) {
@@ -284,10 +280,7 @@ class _HomePageState extends State<HomePage> {
                                       ),
                                     ),
                                   ),
-                                  
                                   const SizedBox(width: 8),
-                                  
-                                  // أيقونة القائمة (3 شرط) على اليسار (RTL End)
                                   _buildMenuIcon(context),
                                 ],
                               )
@@ -296,62 +289,48 @@ class _HomePageState extends State<HomePage> {
 
                       // =======================================================================
                       // 🔹 محتوى الصفحة
-                      // =======================================================================
+                      // ==6=====================================================================
                       SliverToBoxAdapter(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             const SizedBox(height: 8),
 
-                            if (_myStore != null)
+                            if (homeData.myStore != null)
                               LicenseWarningBanner(
-                                store: _myStore!,
+                                store: homeData.myStore!,
                               ).animate().fadeIn(duration: 300.ms),
 
-                            if (_myStore != null &&
-                                (_myStore!.daysUntilExpiry <= 3 ||
-                                    _myStore!.isLicenseExpired))
+                            if (homeData.myStore != null &&
+                                (homeData.myStore!.daysUntilExpiry <= 3 ||
+                                    homeData.myStore!.isLicenseExpired))
                               const SizedBox(height: 12),
 
                             // 🔹 أيقونات الفئات
-                            const HomeCategoriesIcons().animate().fadeIn(
+                            HomeCategoriesIcons().animate().fadeIn(
                               duration: 400.ms,
                               delay: 100.ms,
                             ),
 
-                            // const SizedBox(height:8),
-
                             // 🔹 المتاجر المختارة (مختارات)
-                            const FeaturedStoresSection().animate().fadeIn(
+                            FeaturedStoresSection().animate().fadeIn(
                               duration: 400.ms,
                               delay: 150.ms,
-                            ),
-
-                            // const SizedBox(height: 16),
-
-                            // 🔹 المتاجر القريبة منك
-                            const NearbyStoresSection().animate().fadeIn(
-                              duration: 400.ms,
-                              delay: 200.ms,
                             ),
 
                             const SizedBox(height: 16),
 
                             // 🔹 أفضل المطاعم
-                            const TopRatedStoresSection(
+                            TopRatedStoresSection(
                               title: 'أفضل المطاعم',
                               isRestaurants: true,
                             ).animate().fadeIn(duration: 400.ms, delay: 300.ms),
 
-                            // const SizedBox(height: 16),
-
                             // 🔹 أشهر البقالات
-                            const TopRatedStoresSection(
+                            TopRatedStoresSection(
                               title: 'أشهر البقالات',
                               isRestaurants: false,
                             ).animate().fadeIn(duration: 400.ms, delay: 400.ms),
-
-                           
                           ],
                         ),
                       ),
@@ -379,16 +358,18 @@ class _HomePageState extends State<HomePage> {
                 const AccountPage(),
             transitionsBuilder:
                 (context, animation, secondaryAnimation, child) {
-              const begin = Offset(-1.0, 0.0); // من اليسار
-              const end = Offset.zero;
-              const curve = Curves.easeInOut;
-              var tween =
-                  Tween(begin: begin, end: end).chain(CurveTween(curve: curve));
-              return SlideTransition(
-                position: animation.drive(tween),
-                child: child,
-              );
-            },
+                  const begin = Offset(-1.0, 0.0);
+                  const end = Offset.zero;
+                  const curve = Curves.easeInOut;
+                  var tween = Tween(
+                    begin: begin,
+                    end: end,
+                  ).chain(CurveTween(curve: curve));
+                  return SlideTransition(
+                    position: animation.drive(tween),
+                    child: child,
+                  );
+                },
             transitionDuration: const Duration(milliseconds: 300),
           ),
         );
@@ -400,11 +381,7 @@ class _HomePageState extends State<HomePage> {
           color: Colors.white.withOpacity(0.2),
           borderRadius: BorderRadius.circular(12),
         ),
-        child: const Icon(
-          Icons.menu,
-          color: Colors.white,
-          size: 24,
-        ),
+        child: const Icon(Icons.menu, color: Colors.white, size: 24),
       ),
     );
   }
@@ -451,34 +428,6 @@ class _HomePageState extends State<HomePage> {
         ),
       ),
     );
-  }
-
-  Future<void> _loadLicenseStatus() async {
-    if (_licenseLoading) return;
-    if (!mounted) return;
-    setState(() => _licenseLoading = true);
-    try {
-      final marketId = await _licenseService.resolveCurrentUserMarketId();
-      if (!mounted) return;
-      if (marketId == null) {
-        if (mounted) {
-          setState(() => _licenseLoading = false);
-        }
-        return;
-      }
-      final store = await _licenseService.fetchStore(marketId);
-      if (!mounted) return;
-      if (mounted) {
-        setState(() {
-          _myStore = store;
-          _licenseLoading = false;
-        });
-      }
-    } catch (_) {
-      if (mounted) {
-        setState(() => _licenseLoading = false);
-      }
-    }
   }
 
   /// طبقة الحجب عند عدم تحديد الموقع

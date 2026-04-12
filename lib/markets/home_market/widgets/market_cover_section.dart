@@ -78,6 +78,8 @@ class MarketCoverSection extends StatelessWidget {
                 instagram: store?.instagram,
                 marketLink: store?.link,
                 storeId: store?.id,
+                location: store?.location,
+                showAddress: store?.showAddress ?? false,
               ),
             ),
           ),
