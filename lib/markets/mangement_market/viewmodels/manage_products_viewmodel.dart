@@ -13,6 +13,7 @@ class ManageProductsViewModel extends ChangeNotifier {
   ProductCategoryModel? selectedCategory;
   List<ProductCategoryModel> categories = [];
   List<ProductModel> products = [];
+  Map<String, List<ProductModel>> _productsCache = {};
   String searchQuery = '';
 
   // أسماء غير قابلة للترتيب
@@ -54,6 +55,7 @@ class ManageProductsViewModel extends ChangeNotifier {
       for (var i = 0; i < allCategories.length; i++) {
         final cat = allCategories[i];
         final prods = productsPerCategory[i];
+        _productsCache[cat.id] = List.from(prods); // إضافة الكاش
         if (prods.isNotEmpty) filtered.add(cat);
       }
 
@@ -72,7 +74,7 @@ class ManageProductsViewModel extends ChangeNotifier {
       }
 
       if (selectedCategory != null) {
-        await loadProducts(marketId, selectedCategory!.id);
+        products = _productsCache[selectedCategory!.id] ?? [];
       } else {
         products = [];
       }
@@ -95,7 +97,12 @@ class ManageProductsViewModel extends ChangeNotifier {
       errorMessage = null;
       notifyListeners();
 
-      products = await ProductService.getProducts(marketId, categoryId);
+      if (_productsCache.containsKey(categoryId)) {
+        products = _productsCache[categoryId]!;
+      } else {
+        products = await ProductService.getProducts(marketId, categoryId);
+        _productsCache[categoryId] = products;
+      }
     } catch (e) {
       errorMessage = 'حدث خطأ أثناء تحميل المنتجات';
     } finally {
@@ -182,7 +189,7 @@ class ManageProductsViewModel extends ChangeNotifier {
       );
 
       await ProductService.reorderCategories(marketId, toSend);
-      await loadCategories(marketId);
+      categories = toSend; // Update categories locally
       successMessage = 'تم حفظ ترتيب الفئات بنجاح';
     } catch (e) {
       errorMessage = 'تعذر حفظ ترتيب الفئات';
@@ -216,6 +223,7 @@ class ManageProductsViewModel extends ChangeNotifier {
 
     final oldSnapshot = List<ProductModel>.from(products);
     products = updated;
+    _productsCache[categoryId] = products; // تحديث الكاش
     notifyListeners();
 
     // حفظ مباشر للمنتجات (كما تريد)
@@ -239,6 +247,7 @@ class ManageProductsViewModel extends ChangeNotifier {
     final idx = products.indexWhere((p) => p.id == productId);
     if (idx != -1) {
       final removed = products.removeAt(idx);
+      _productsCache[categoryId] = products; // تحديث الكاش
       notifyListeners();
       try {
         await ProductService.deleteProduct(marketId, categoryId, productId);
@@ -249,6 +258,37 @@ class ManageProductsViewModel extends ChangeNotifier {
         errorMessage = 'تعذر حذف المنتج';
         notifyListeners();
       }
+    }
+  }
+
+  Future<void> toggleProductStatus(
+    String marketId,
+    String categoryId,
+    ProductModel product,
+  ) async {
+    final index = products.indexWhere((p) => p.id == product.id);
+    if (index == -1) return;
+
+    final newStatus = !product.status;
+    final updated = product.copyWith(status: newStatus);
+
+    products[index] = updated;
+    _productsCache[categoryId] = products;
+    notifyListeners();
+
+    try {
+      await ProductService.updateProduct(
+        marketId,
+        categoryId,
+        product.id,
+        status: newStatus,
+      );
+      successMessage = newStatus ? 'تم تفعيل المنتج' : 'تم إيقاف المنتج';
+    } catch (e) {
+      products[index] = product;
+      _productsCache[categoryId] = products;
+      errorMessage = 'تعذر تغيير حالة المنتج';
+      notifyListeners();
     }
   }
 
@@ -266,6 +306,7 @@ class ManageProductsViewModel extends ChangeNotifier {
     if (index == -1) return;
     final original = products[index];
     products[index] = updated;
+    _productsCache[categoryId] = products; // تحديث الكاش
     notifyListeners();
     try {
       await ProductService.updateProduct(
@@ -294,9 +335,13 @@ class ManageProductsViewModel extends ChangeNotifier {
   }
 
   void updateProductLocally(ProductModel updated) {
+    if (selectedCategory == null) return;
+    final categoryId = selectedCategory!.id;
+    
     final index = products.indexWhere((p) => p.id == updated.id);
     if (index == -1) return;
     products[index] = updated;
+    _productsCache[categoryId] = products; // تحديث الكاش
     notifyListeners();
   }
 }

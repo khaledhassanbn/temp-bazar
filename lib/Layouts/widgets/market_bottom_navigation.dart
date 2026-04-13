@@ -55,7 +55,13 @@ class MarketBottomNavigation extends StatelessWidget {
         context.go('/addproduct');
         break;
       case 3:
-        context.go('/MyStorePage');
+        // تمرير marketId يتخطى قراءة users/{uid} في resolveMarketRoute ويقلل التأخير
+        // (مقارنة بفتح المتجر من الرئيسية برابط يحتوي المعرف مباشرة).
+        if (marketId != null && marketId.isNotEmpty) {
+          context.go('/MyStorePage?marketId=$marketId');
+        } else {
+          context.go('/MyStorePage');
+        }
         break;
       case 4:
         context.go('/AccountPage');

@@ -11,6 +11,11 @@ class MarketItemModel {
   final num? finalPrice;
   final String? imageUrl;
   final String? description;
+  final bool status;
+  final bool hasStockLimit;
+  final int stock;       // عدد القطع التي أدخلها التاجر
+  final int soldCount;   // عدد عمليات البيع الفعلية
+  final DateTime? endAt; // تاريخ إزالة المنتج التلقائية
 
   MarketItemModel({
     required this.id,
@@ -19,10 +24,31 @@ class MarketItemModel {
     this.finalPrice,
     this.imageUrl,
     this.description,
+    this.status = true,
+    this.hasStockLimit = false,
+    this.stock = 0,
+    this.soldCount = 0,
+    this.endAt,
   });
+
+  /// هل نفدت الكمية؟ (فقط لو التاجر فعّل حد الكمية)
+  bool get isOutOfStock => hasStockLimit && soldCount >= stock;
+
+  /// هل انتهى وقت عرض المنتج؟
+  bool get isExpired => endAt != null && DateTime.now().isAfter(endAt!);
+
+  /// هل يجب إخفاء المنتج من المتجر؟
+  bool get shouldBeHidden => !status || isOutOfStock || isExpired;
 
   factory MarketItemModel.fromDoc(DocumentSnapshot doc) {
     final data = doc.data() as Map<String, dynamic>? ?? {};
+    final endAtRaw = data['endAt'];
+    DateTime? endAt;
+    if (endAtRaw is Timestamp) {
+      endAt = endAtRaw.toDate();
+    } else if (endAtRaw is DateTime) {
+      endAt = endAtRaw;
+    }
     return MarketItemModel(
       id: doc.id,
       name: data['name']?.toString() ?? '',
@@ -30,6 +56,11 @@ class MarketItemModel {
       finalPrice: data['finalPrice'] as num?,
       imageUrl: data['image']?.toString(),
       description: data['description']?.toString(),
+      status: data['status'] ?? true,
+      hasStockLimit: data['hasStockLimit'] ?? false,
+      stock: (data['stock'] as num?)?.toInt() ?? 0,
+      soldCount: (data['soldCount'] as num?)?.toInt() ?? 0,
+      endAt: endAt,
     );
   }
 }
@@ -163,7 +194,7 @@ class MarketDetailsViewModel extends ChangeNotifier {
     }
   }
 
-  /// يبدأ جلب الفئات — تحميل أولي سريع بالتوازي ثم بث للتحديثات
+  /// يبدأ جلب الفئات — بث للتحديثات مع استخدام الذاكرة المخبئية بذكاء
   void startCategoriesStream() {
     final String marketId = (_store?.id.isNotEmpty == true) ? _store!.id : 'kb';
 
@@ -172,14 +203,6 @@ class MarketDetailsViewModel extends ChangeNotifier {
         .doc(marketId)
         .collection('products');
 
-    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-    // 1) تحميل أولي سريع بـ get() — أسرع من snapshots() للمرة الأولى
-    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-    _loadCategoriesOnce(productsCollection);
-
-    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-    // 2) بث للتحديثات في الخلفية (لو أضاف صاحب المتجر منتج جديد)
-    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
     _categoriesSubscription?.cancel();
     if (_isDisposed) return;
 
@@ -191,11 +214,31 @@ class MarketDetailsViewModel extends ChangeNotifier {
           .toList();
 
       final futures = rawCategories.map((category) async {
-        final itemsSnap = await productsCollection
-            .doc(category.id)
-            .collection('items')
-            .get();
-        final items = itemsSnap.docs.map(MarketItemModel.fromDoc).toList();
+        // إذا كان البث قادم من الكاش (تحميل محلي فوري)، نجلب المنتجات من الكاش لتسريع الفتح
+        final source = snapshot.metadata.isFromCache 
+            ? Source.cache 
+            : Source.serverAndCache;
+
+        QuerySnapshot itemsSnap;
+        try {
+          itemsSnap = await productsCollection
+              .doc(category.id)
+              .collection('items')
+              .orderBy('order')
+              .get(GetOptions(source: source));
+        } catch (e) {
+          // في حال فشل القراءة من الذاكرة لعدم توفرها بعد، نقرأ من السيرفر مباشرة
+          itemsSnap = await productsCollection
+              .doc(category.id)
+              .collection('items')
+              .orderBy('order')
+              .get(const GetOptions(source: Source.serverAndCache));
+        }
+
+        final items = itemsSnap.docs
+            .map(MarketItemModel.fromDoc)
+            .where((item) => !item.shouldBeHidden)
+            .toList();
         return category.copyWith(items: items);
       }).toList();
 
@@ -220,41 +263,6 @@ class MarketDetailsViewModel extends ChangeNotifier {
         _safeNotifyListeners();
       },
     );
-  }
-
-  /// تحميل أولي سريع — كل الفئات والـ items بالتوازي بدون stream
-  Future<void> _loadCategoriesOnce(CollectionReference productsCollection) async {
-    try {
-      final categoriesSnap = await productsCollection.get();
-      if (_isDisposed) return;
-
-      final rawCategories = categoriesSnap.docs
-          .map((d) => MarketCategoryModel.fromDoc(d))
-          .toList();
-
-      // جلب items لكل فئة بالتوازي
-      final futures = rawCategories.map((category) async {
-        final itemsSnap = await productsCollection
-            .doc(category.id)
-            .collection('items')
-            .get();
-        final items = itemsSnap.docs.map(MarketItemModel.fromDoc).toList();
-        return category.copyWith(items: items);
-      }).toList();
-
-      var withItems = await Future.wait(futures);
-      withItems = withItems.where((c) => c.items.isNotEmpty).toList();
-      withItems.sort((a, b) => a.order.compareTo(b.order));
-
-      if (_isDisposed) return;
-      _categories = withItems;
-      _safeNotifyListeners();
-    } catch (e) {
-      if (kDebugMode) {
-        print('_loadCategoriesOnce error: $e');
-      }
-      // الـ stream هيحاول تاني في الخلفية
-    }
   }
 
   @override

@@ -201,6 +201,7 @@ class _AddProductModernPageState extends State<AddProductModernPage> {
   int _currentPage = 0;
 
   final ImagePicker _picker = ImagePicker();
+  static const String _addCategoryValue = "➕ إضافة فئة جديدة";
 
   @override
   void dispose() {
@@ -259,7 +260,43 @@ class _AddProductModernPageState extends State<AddProductModernPage> {
     }
   }
 
-  // تم استبدال الحفظ المباشر بخطوة ترتيب المنتج
+  IconData _questionIcon(int index) {
+    switch (index) {
+      case 0:
+        return Icons.tune;
+      case 1:
+        return Icons.auto_awesome;
+      case 2:
+        return Icons.inventory_2_outlined;
+      case 3:
+        return Icons.local_offer_outlined;
+      default:
+        return Icons.schedule;
+    }
+  }
+
+  void _goToQuestion(int index) {
+    _pageController.animateToPage(
+      index,
+      duration: const Duration(milliseconds: 280),
+      curve: Curves.easeOut,
+    );
+  }
+
+  Future<void> _goToArrange(AddProductViewModel vm) async {
+    final err = vm.validationError;
+    if (err != null) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(err)));
+      return;
+    }
+    await vm.loadProductsForSelectedCategory();
+    final temp = vm.buildTemporaryProductForArrange();
+    vm.productsInSelectedCategory = [...vm.productsInSelectedCategory, temp];
+    if (!mounted) return;
+    Navigator.of(
+      context,
+    ).push(MaterialPageRoute(builder: (_) => const ArrangeProductPage()));
+  }
 
   Future<void> _debugFirebase() async {
     try {
@@ -313,7 +350,7 @@ class _AddProductModernPageState extends State<AddProductModernPage> {
 
   @override
   Widget build(BuildContext context) {
-    const backgroundColor = Color(0xFFE0F2F1);
+    final backgroundColor = AppColors.mainColor.withOpacity(0.08);
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final vm = context.read<AddProductViewModel>();
@@ -325,245 +362,360 @@ class _AddProductModernPageState extends State<AddProductModernPage> {
     return Scaffold(
       backgroundColor: backgroundColor,
       body: SafeArea(
-        child: SingleChildScrollView(
-          child: Column(
-            children: [
-              // ✅ الهيدر
-              Container(
-                height: 180,
-                width: double.infinity,
-                decoration: BoxDecoration(
-                  color: AppColors.mainColor,
-                  borderRadius: const BorderRadius.only(
-                    bottomLeft: Radius.circular(60),
-                  ),
-                ),
-                alignment: Alignment.topLeft,
-                padding: const EdgeInsets.all(16),
-                child: Row(
-                  children: [
-                    const CustomBackButton(),
-                    const Spacer(),
-                    IconButton(
-                      onPressed: _debugFirebase,
-                      icon: const Icon(Icons.bug_report, color: Colors.white),
-                      tooltip: 'تشخيص Firebase',
-                    ),
-                  ],
-                ),
-              ),
-
-              // ✅ الجسم الأبيض
-              Transform.translate(
-                offset: const Offset(0, -50),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 24,
-                    vertical: 32,
-                  ),
-                  margin: const EdgeInsets.symmetric(horizontal: 24),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(32),
-                    boxShadow: const [
-                      BoxShadow(
-                        color: Colors.black26,
-                        blurRadius: 10,
-                        offset: Offset(0, 4),
+        child: Consumer<AddProductViewModel>(
+          builder: (context, vm, _) {
+            if (vm.selectedStore != null &&
+                vm.selectedStore!.isLicenseExpired) {
+              return _buildLicenseExpiredMessage(context, vm.selectedStore!);
+            }
+            return SingleChildScrollView(
+              child: Column(
+                children: [
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.fromLTRB(20, 24, 20, 72),
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: [
+                          AppColors.mainColor,
+                          AppColors.mainColor.withOpacity(0.82),
+                        ],
+                        begin: Alignment.topRight,
+                        end: Alignment.bottomLeft,
                       ),
-                    ],
-                  ),
-                  child: Consumer<AddProductViewModel>(
-                    builder: (context, vm, _) {
-                      // ========================================
-                      // التحقق من صلاحية ترخيص المتجر
-                      // ========================================
-                      if (vm.selectedStore != null && vm.selectedStore!.isLicenseExpired) {
-                        return _buildLicenseExpiredMessage(context, vm.selectedStore!);
-                      }
-
-                      return Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          // ✅ صورة المنتج
-                          Consumer<AddProductViewModel>(
-                            builder: (context, vm, _) {
-                              return GestureDetector(
-                                onTap: _pickImage,
-                                child: Container(
-                                  height: 150,
-                                  decoration: BoxDecoration(
-                                    color: Colors.grey[200],
-                                    borderRadius: BorderRadius.circular(16),
-                                    border: Border.all(
-                                      color: (vm.productImage == null)
-                                          ? Colors.red.shade300
-                                          : Colors.grey.shade400,
-                                    ),
-                                  ),
-                                  child: vm.productImage != null
-                                      ? ClipRRect(
-                                          borderRadius: BorderRadius.circular(
-                                            16,
-                                          ),
-                                          child: Image.file(
-                                            vm.productImage!,
-                                            width: double.infinity,
-                                            height: 150,
-                                            fit: BoxFit.cover,
-                                          ),
-                                        )
-                                      : Column(
-                                          mainAxisAlignment:
-                                              MainAxisAlignment.center,
-                                          children: const [
-                                            Icon(
-                                              Icons.add_a_photo,
-                                              size: 40,
-                                              color: Colors.grey,
-                                            ),
-                                            SizedBox(height: 8),
-                                            Text(
-                                              'الصورة مطلوبة',
-                                              style: TextStyle(
-                                                color: Colors.red,
-                                                fontSize: 12,
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                ),
-                              );
-                            },
-                          ),
-                          const SizedBox(height: 24),
-
-                          // ✅ الحقول
-                          AppTextField(
-                            label: "اسم المنتج",
-                            hint: "أدخل اسم المنتج",
-                            onChanged: (v) => context
-                                .read<AddProductViewModel>()
-                                .setProductName(v),
-                          ),
-                          const SizedBox(height: 8),
-
-                          AppDropdownField(
-                            label: "حدد المتجر",
-                            value: vm.selectedStore?.name,
-                            items: vm.userStores
-                                .map((s) => s.name)
-                                .toSet()
-                                .toList(),
-                            required: true,
-                            onChanged: (val) {
-                              final store = vm.userStores.firstWhere(
-                                (s) => s.name == val,
-                                orElse: () => vm.userStores.isNotEmpty
-                                    ? vm.userStores.first
-                                    : vm.selectedStore!,
-                              );
-                              vm.setSelectedStore(store);
-                              setState(() {
-                                selectedCategoryName =
-                                    vm.selectedCategory?.name;
-                              });
-                            },
-                          ),
-                          const SizedBox(height: 8),
-
-                          AppTextField(
-                            label: "وصف المنتج",
-                            hint: "أدخل وصف المنتج",
-                            onChanged: (v) => context
-                                .read<AddProductViewModel>()
-                                .setProductDescription(v),
-                          ),
-                          const SizedBox(height: 8),
-
-                          AppTextField(
-                            label: "السعر",
-                            hint: "أدخل السعر",
-                            keyboardType: TextInputType.number,
-                            inputFormatters: [
-                              FilteringTextInputFormatter.digitsOnly,
-                            ],
-                            onChanged: (v) => context
-                                .read<AddProductViewModel>()
-                                .setProductPrice(v),
-                          ),
-                          const SizedBox(height: 8),
-
-                          // عرض رسالة تحميل الفئات
-                          if (vm.isLoadingCategories)
-                            const Center(
-                              child: Padding(
-                                padding: EdgeInsets.all(16.0),
-                                child: CircularProgressIndicator(),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            const CustomBackButton(),
+                            const Spacer(),
+                            IconButton(
+                              onPressed: _debugFirebase,
+                              icon: const Icon(
+                                Icons.bug_report,
+                                color: Colors.white,
                               ),
-                            )
-                          else
-                            AppDropdownField(
-                              label: "الفئة (ضمن المتجر)",
-                              value:
-                                  selectedCategoryName ??
-                                  vm.selectedCategory?.name,
-                              items: [
-                                ...vm.categories
-                                    .map((c) => c.name)
-                                    .toSet()
-                                    .toList(),
-                                "➕ إضافة فئة جديدة",
-                              ],
-                              required: true,
-                              onChanged: (val) {
-                                setState(() {
-                                  selectedCategoryName = val;
-                                  showNewCategoryField =
-                                      val == "➕ إضافة فئة جديدة";
-                                });
-                                if (val != null && val != "➕ إضافة فئة جديدة") {
-                                  vm.setSelectedCategoryByName(val);
-                                }
-                              },
-                            ),
-                          if (showNewCategoryField) ...[
-                            AppTextField(
-                              controller: newCategoryController,
-                              label: "الفئة الجديدة",
-                              hint: "أدخل اسم الفئة الجديدة",
-                              required: true,
-                            ),
-                            const SizedBox(height: 8),
-                            Row(
-                              children: [
-                                Expanded(
-                                  child: PrimaryButton(
-                                    text: "إضافة الفئة",
-                                    onPressed: _addNewCategory,
-                                  ),
-                                ),
-                                const SizedBox(width: 8),
-                                Expanded(
-                                  child: OutlinedButton(
-                                    onPressed: () {
-                                      setState(() {
-                                        showNewCategoryField = false;
-                                        newCategoryController.clear();
-                                      });
-                                    },
-                                    child: const Text("إلغاء"),
-                                  ),
-                                ),
-                              ],
+                              tooltip: 'تشخيص Firebase',
                             ),
                           ],
-
-                          const SizedBox(height: 16),
-
-                          // ✅ مجموعة الأسئلة (PageView أفقي + Indicator)
+                        ),
+                        const SizedBox(height: 12),
+                        const Text(
+                          "إضافة منتج جديد",
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 22,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          "أضف منتجك وخصائصه بخطوات بسيطة",
+                          style: TextStyle(
+                            color: Colors.white.withOpacity(0.8),
+                            fontSize: 13,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Transform.translate(
+                    offset: const Offset(0, -36),
+                    child: Container(
+                      margin: const EdgeInsets.symmetric(horizontal: 16),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(20),
+                        boxShadow: const [
+                          BoxShadow(
+                            color: Colors.black12,
+                            blurRadius: 24,
+                            offset: Offset(0, 4),
+                          ),
+                        ],
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          GestureDetector(
+                            onTap: _pickImage,
+                            child: Container(
+                              height: 200,
+                              decoration: const BoxDecoration(
+                                color: Color(0xFFF8FAFB),
+                                borderRadius: BorderRadius.vertical(
+                                  top: Radius.circular(20),
+                                ),
+                              ),
+                              child: Stack(
+                                children: [
+                                  Positioned.fill(
+                                    child: vm.productImage != null
+                                        ? ClipRRect(
+                                            borderRadius:
+                                                const BorderRadius.vertical(
+                                                  top: Radius.circular(20),
+                                                ),
+                                            child: Image.file(
+                                              vm.productImage!,
+                                              fit: BoxFit.cover,
+                                            ),
+                                          )
+                                        : Column(
+                                            mainAxisAlignment:
+                                                MainAxisAlignment.center,
+                                            children: [
+                                              Icon(
+                                                Icons.add_a_photo_outlined,
+                                                size: 36,
+                                                color: Colors.grey.shade500,
+                                              ),
+                                              const SizedBox(height: 8),
+                                              Text(
+                                                "اضغط لإضافة صورة المنتج",
+                                                style: TextStyle(
+                                                  fontSize: 13,
+                                                  color: Colors.grey.shade600,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                  ),
+                                  if (vm.productImage == null)
+                                    Positioned(
+                                      top: 12,
+                                      left: 12,
+                                      child: Container(
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 8,
+                                          vertical: 3,
+                                        ),
+                                        decoration: BoxDecoration(
+                                          color: Colors.red.shade50,
+                                          borderRadius: BorderRadius.circular(
+                                            6,
+                                          ),
+                                        ),
+                                        child: Text(
+                                          "مطلوب",
+                                          style: TextStyle(
+                                            fontSize: 11,
+                                            color: Colors.red.shade700,
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  if (vm.productImage != null)
+                                    Positioned(
+                                      bottom: 12,
+                                      right: 12,
+                                      child: Container(
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 14,
+                                          vertical: 6,
+                                        ),
+                                        decoration: BoxDecoration(
+                                          color: AppColors.mainColor,
+                                          borderRadius: BorderRadius.circular(
+                                            20,
+                                          ),
+                                        ),
+                                        child: const Text(
+                                          "تغيير الصورة",
+                                          style: TextStyle(
+                                            color: Colors.white,
+                                            fontSize: 12,
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                ],
+                              ),
+                            ),
+                          ),
+                          Padding(
+                            padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
+                            child: Text(
+                              "بيانات المنتج",
+                              style: TextStyle(
+                                color: AppColors.mainColor,
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                          Padding(
+                            padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
+                            child: Column(
+                              children: [
+                                AppTextField(
+                                  label: "اسم المنتج",
+                                  hint: "مثال: برجر دجاج مقرمش",
+                                  onChanged: (v) => vm.setProductName(v),
+                                ),
+                                const SizedBox(height: 8),
+                                AppDropdownField(
+                                  label: "المتجر",
+                                  value: vm.selectedStore?.name,
+                                  items: vm.userStores
+                                      .map((s) => s.name)
+                                      .toSet()
+                                      .toList(),
+                                  required: true,
+                                  onChanged: (val) {
+                                    final store = vm.userStores.firstWhere(
+                                      (s) => s.name == val,
+                                      orElse: () => vm.userStores.isNotEmpty
+                                          ? vm.userStores.first
+                                          : vm.selectedStore!,
+                                    );
+                                    vm.setSelectedStore(store);
+                                    setState(() {
+                                      selectedCategoryName =
+                                          vm.selectedCategory?.name;
+                                    });
+                                  },
+                                ),
+                                const SizedBox(height: 8),
+                                AppTextField(
+                                  label: "وصف المنتج",
+                                  hint: "صف منتجك بإيجاز للعملاء...",
+                                  maxLines: 2,
+                                  onChanged: (v) => vm.setProductDescription(v),
+                                ),
+                                const SizedBox(height: 8),
+                                Row(
+                                  children: [
+                                    Expanded(
+                                      child: AppTextField(
+                                        label: "السعر (جنيه)",
+                                        hint: "0",
+                                        keyboardType: TextInputType.number,
+                                        inputFormatters: [
+                                          FilteringTextInputFormatter
+                                              .digitsOnly,
+                                        ],
+                                        onChanged: (v) => vm.setProductPrice(v),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 12),
+                                    Expanded(
+                                      child: vm.isLoadingCategories
+                                          ? const Padding(
+                                              padding: EdgeInsets.only(top: 20),
+                                              child: Center(
+                                                child:
+                                                    CircularProgressIndicator(),
+                                              ),
+                                            )
+                                          : AppDropdownField(
+                                              label: "الفئة",
+                                              value:
+                                                  selectedCategoryName ??
+                                                  vm.selectedCategory?.name,
+                                              items: [
+                                                ...vm.categories
+                                                    .map((c) => c.name)
+                                                    .toSet()
+                                                    .toList(),
+                                                _addCategoryValue,
+                                              ],
+                                              required: true,
+                                              onChanged: (val) {
+                                                setState(() {
+                                                  selectedCategoryName = val;
+                                                  showNewCategoryField =
+                                                      val == _addCategoryValue;
+                                                });
+                                                if (val != null &&
+                                                    val != _addCategoryValue) {
+                                                  vm.setSelectedCategoryByName(
+                                                    val,
+                                                  );
+                                                }
+                                              },
+                                            ),
+                                    ),
+                                  ],
+                                ),
+                                if (showNewCategoryField) ...[
+                                  AppTextField(
+                                    controller: newCategoryController,
+                                    label: "الفئة الجديدة",
+                                    hint: "أدخل اسم الفئة الجديدة",
+                                    required: true,
+                                  ),
+                                  const SizedBox(height: 8),
+                                  Row(
+                                    children: [
+                                      Expanded(
+                                        child: PrimaryButton(
+                                          text: "إضافة الفئة",
+                                          onPressed: _addNewCategory,
+                                        ),
+                                      ),
+                                      const SizedBox(width: 8),
+                                      Expanded(
+                                        child: OutlinedButton(
+                                          onPressed: () {
+                                            setState(() {
+                                              showNewCategoryField = false;
+                                              newCategoryController.clear();
+                                            });
+                                          },
+                                          child: const Text("إلغاء"),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                              ],
+                            ),
+                          ),
+                          const Divider(height: 24, color: Color(0xFFF0F2F4)),
+                          Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 20),
+                            child: Text(
+                              "الإعدادات الإضافية",
+                              style: TextStyle(
+                                color: AppColors.mainColor,
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                          Padding(
+                            padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
+                            child: Row(
+                              children: [
+                                SmoothPageIndicator(
+                                  controller: _pageController,
+                                  count: 5,
+                                  onDotClicked: _goToQuestion,
+                                  effect: ExpandingDotsEffect(
+                                    activeDotColor: AppColors.mainColor,
+                                    dotColor: Colors.grey.shade300,
+                                    dotHeight: 8,
+                                    dotWidth: 8,
+                                    spacing: 6,
+                                  ),
+                                ),
+                                const Spacer(),
+                                Text(
+                                  "${_currentPage + 1} من 5",
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: Colors.grey.shade600,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(height: 14),
                           SizedBox(
-                            height: 560,
+                            height: 370,
                             child: Column(
                               children: [
                                 Expanded(
@@ -576,6 +728,7 @@ class _AddProductModernPageState extends State<AddProductModernPage> {
                                       QuestionPage(
                                         question:
                                             "هل تريد إضافة خيارات مطلوبة من العميل؟",
+                                        icon: _questionIcon(0),
                                         child: QuestionWithOptions(
                                           optionsControllers:
                                               requiredOptionControllers,
@@ -640,11 +793,12 @@ class _AddProductModernPageState extends State<AddProductModernPage> {
                                                 vm.setRequiredOptions(built);
                                               },
                                         ),
-                                        key: ValueKey("page_0_$_currentPage"),
+                                        key: const ValueKey("page_0"),
                                       ),
                                       QuestionPage(
                                         question:
                                             "هل تريد إضافة خيارات إضافية (غير مطلوبة) من العميل؟",
+                                        icon: _questionIcon(1),
                                         child: QuestionWithOptions(
                                           optionsControllers:
                                               extraOptionControllers,
@@ -709,38 +863,100 @@ class _AddProductModernPageState extends State<AddProductModernPage> {
                                                 vm.setExtraOptions(built);
                                               },
                                         ),
-                                        key: ValueKey("page_1_$_currentPage"),
+                                        key: const ValueKey("page_1"),
                                       ),
                                       QuestionPage(
                                         question:
                                             "هل تريد وضع عدد محدد من القطع للمنتج، بحيث يظهر (غير متاح) عند نفاد الكمية؟",
+                                        icon: _questionIcon(2),
                                         child: const QuantityQuestionWidget(),
-                                        key: ValueKey("page_2_$_currentPage"),
+                                        key: const ValueKey("page_2"),
                                       ),
                                       QuestionPage(
                                         question: "هل يوجد خصم على هذا المنتج؟",
+                                        icon: _questionIcon(3),
                                         child: const DiscountQuestionWidget(),
-                                        key: ValueKey("page_3_$_currentPage"),
+                                        key: const ValueKey("page_3"),
                                       ),
                                       QuestionPage(
                                         question:
                                             "هل تريد إزالة المنتج في وقت معين؟",
+                                        icon: _questionIcon(4),
                                         child: const EndDateQuestionWidget(),
-                                        key: ValueKey("page_4_$_currentPage"),
+                                        key: const ValueKey("page_4"),
                                       ),
                                     ],
                                   ),
                                 ),
-                                const SizedBox(height: 12),
-                                SmoothPageIndicator(
-                                  controller: _pageController,
-                                  count: 5, // ✅ عدد الأسئلة = 5
-                                  effect: ExpandingDotsEffect(
-                                    activeDotColor: AppColors.mainColor,
-                                    dotColor: Colors.grey.shade300,
-                                    dotHeight: 10,
-                                    dotWidth: 10,
-                                    spacing: 6,
+                                Padding(
+                                  padding: const EdgeInsets.fromLTRB(
+                                    20,
+                                    10,
+                                    20,
+                                    0,
+                                  ),
+                                  child: Row(
+                                    mainAxisAlignment:
+                                        MainAxisAlignment.spaceBetween,
+                                    children: [
+                                      SizedBox(
+                                        width: 36,
+                                        height: 36,
+                                        child: OutlinedButton(
+                                          style: OutlinedButton.styleFrom(
+                                            padding: EdgeInsets.zero,
+                                            side: BorderSide(
+                                              color: Colors.grey.shade300,
+                                            ),
+                                            shape: RoundedRectangleBorder(
+                                              borderRadius:
+                                                  BorderRadius.circular(10),
+                                            ),
+                                          ),
+                                          onPressed: _currentPage == 0
+                                              ? null
+                                              : () => _goToQuestion(
+                                                  _currentPage - 1,
+                                                ),
+                                          child: const Icon(
+                                            Icons.arrow_forward_ios,
+                                            size: 16,
+                                          ),
+                                        ),
+                                      ),
+                                      Text(
+                                        "السؤال ${_currentPage + 1}",
+                                        style: TextStyle(
+                                          fontSize: 13,
+                                          color: Colors.grey.shade600,
+                                        ),
+                                      ),
+                                      SizedBox(
+                                        width: 36,
+                                        height: 36,
+                                        child: OutlinedButton(
+                                          style: OutlinedButton.styleFrom(
+                                            padding: EdgeInsets.zero,
+                                            side: BorderSide(
+                                              color: Colors.grey.shade300,
+                                            ),
+                                            shape: RoundedRectangleBorder(
+                                              borderRadius:
+                                                  BorderRadius.circular(10),
+                                            ),
+                                          ),
+                                          onPressed: _currentPage == 4
+                                              ? null
+                                              : () => _goToQuestion(
+                                                  _currentPage + 1,
+                                                ),
+                                          child: const Icon(
+                                            Icons.arrow_back_ios_new,
+                                            size: 16,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
                                   ),
                                 ),
                               ],
@@ -822,43 +1038,20 @@ class _AddProductModernPageState extends State<AddProductModernPage> {
                           Consumer<AddProductViewModel>(
                             builder: (context, vm, _) {
                               return PrimaryButton(
-                                text: "ترتيب المنتج",
+                                text: "ترتيب المنتج والحفظ",
                                 isLoading: vm.isAddingProduct,
-                                onPressed: () async {
-                                  final err = vm.validationError;
-                                  if (err != null) {
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      SnackBar(content: Text(err)),
-                                    );
-                                    return;
-                                  }
-                                  await vm.loadProductsForSelectedCategory();
-                                  // أضف المنتج المؤقت للقائمة للعرض فقط
-                                  final temp = vm
-                                      .buildTemporaryProductForArrange();
-                                  vm.productsInSelectedCategory = [
-                                    ...vm.productsInSelectedCategory,
-                                    temp,
-                                  ];
-                                  if (!mounted) return;
-                                  Navigator.of(context).push(
-                                    MaterialPageRoute(
-                                      builder: (_) =>
-                                          const ArrangeProductPage(),
-                                    ),
-                                  );
-                                },
+                                onPressed: () => _goToArrange(vm),
                               );
                             },
                           ),
                         ],
-                      );
-                    },
+                      ),
+                    ),
                   ),
-                ),
+                ],
               ),
-            ],
-          ),
+            );
+          },
         ),
       ),
     );
@@ -896,19 +1089,13 @@ class _AddProductModernPageState extends State<AddProductModernPage> {
           Text(
             'لا يمكنك إضافة منتجات جديدة حتى تجدد ترخيص المتجر',
             textAlign: TextAlign.center,
-            style: TextStyle(
-              fontSize: 16,
-              color: Colors.grey.shade600,
-            ),
+            style: TextStyle(fontSize: 16, color: Colors.grey.shade600),
           ),
           const SizedBox(height: 8),
           if (store.licenseEndAt != null)
             Text(
               'انتهى في: ${store.licenseEndAt!.day}/${store.licenseEndAt!.month}/${store.licenseEndAt!.year}',
-              style: TextStyle(
-                fontSize: 14,
-                color: Colors.grey.shade500,
-              ),
+              style: TextStyle(fontSize: 14, color: Colors.grey.shade500),
             ),
           const SizedBox(height: 32),
           ElevatedButton.icon(
@@ -941,37 +1128,74 @@ class _AddProductModernPageState extends State<AddProductModernPage> {
 }
 
 /// 🔹 صفحة السؤال مع حركة اهتزاز
-class QuestionPage extends StatelessWidget {
+class QuestionPage extends StatefulWidget {
   final String question;
+  final IconData icon;
   final Widget child;
 
-  const QuestionPage({Key? key, required this.question, required this.child})
-    : super(key: key);
+  const QuestionPage({
+    Key? key,
+    required this.question,
+    required this.child,
+    required this.icon,
+  }) : super(key: key);
+
+  @override
+  State<QuestionPage> createState() => _QuestionPageState();
+}
+
+class _QuestionPageState extends State<QuestionPage> with AutomaticKeepAliveClientMixin {
+  @override
+  bool get wantKeepAlive => true;
 
   @override
   Widget build(BuildContext context) {
-    return SingleChildScrollView(
+    super.build(context);
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 20),
+      decoration: BoxDecoration(
+        border: Border.all(color: const Color(0xFFE8EAEC), width: 1.5),
+        borderRadius: BorderRadius.circular(16),
+      ),
       child: Column(
         children: [
-          Row(
-            children: [
-              Expanded(
-                child: Text(
-                  question,
-                  style: const TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
+          Container(
+            padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+            decoration: const BoxDecoration(
+              color: Color(0xFFFAFBFC),
+              borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+            ),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    widget.question,
+                    style: const TextStyle(
+                      fontSize: 13.5,
+                      fontWeight: FontWeight.w500,
+                      height: 1.5,
+                    ),
+                    textAlign: TextAlign.right,
                   ),
-                  maxLines: 2,
-                  softWrap: true,
                 ),
-              ),
-            ],
+                const SizedBox(width: 10),
+                Container(
+                  width: 32,
+                  height: 32,
+                  decoration: BoxDecoration(
+                    color: AppColors.mainColor.withOpacity(0.12),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Icon(widget.icon, size: 18, color: AppColors.mainColor),
+                ),
+              ],
+            ),
           ),
-          const SizedBox(height: 16),
-          Container(padding: const EdgeInsets.all(16.0), child: child)
-              .animate()
-              .shake(duration: 600.ms, hz: 3, offset: const Offset(8, 0)),
+          Expanded(
+            child: Container(padding: const EdgeInsets.all(16), child: widget.child)
+                .animate()
+                .shake(duration: 600.ms, hz: 3, offset: const Offset(8, 0)),
+          ),
         ],
       ),
     );

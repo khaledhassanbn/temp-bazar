@@ -446,16 +446,7 @@ class AddProductViewModel extends ChangeNotifier {
   }
 
   // Validation
-  bool get isFormValid {
-    return selectedStore != null &&
-        selectedCategory != null &&
-        productName.isNotEmpty &&
-        productPrice >= 1 &&
-        productImage != null &&
-        (!hasStockLimit || stockQuantity > 0) &&
-        (!hasDiscount || discountValue >= 0) &&
-        (!hasDiscount || (productPrice - discountValue) >= 1);
-  }
+  bool get isFormValid => validationError == null;
 
   String? get validationError {
     if (selectedStore == null) return 'اختر المتجر أولاً';
@@ -468,6 +459,23 @@ class AddProductViewModel extends ChangeNotifier {
     if (hasDiscount && (productPrice - discountValue) < 1) {
       return 'السعر النهائي يجب ألا يقل عن 1 جنيه';
     }
+
+    for (final opt in requiredOptions) {
+      if (opt.title.trim().isEmpty) return 'يرجى إدخال عنوان للخيارات المطلوبة أو إلغاء تفعيلها';
+      if (opt.choices.isEmpty) return 'يرجى إضافة خيارات للعنوان: ${opt.title}';
+      for (final choice in opt.choices) {
+        if (choice.name.trim().isEmpty) return 'يرجى إدخال اسم الخيار في: ${opt.title}';
+      }
+    }
+
+    for (final opt in extraOptions) {
+      if (opt.title.trim().isEmpty) return 'يرجى إدخال عنوان للخيارات الإضافية أو إلغاء تفعيلها';
+      if (opt.choices.isEmpty) return 'يرجى إضافة خيارات للعنوان: ${opt.title}';
+      for (final choice in opt.choices) {
+        if (choice.name.trim().isEmpty) return 'يرجى إدخال اسم الخيار في: ${opt.title}';
+      }
+    }
+
     return null;
   }
 

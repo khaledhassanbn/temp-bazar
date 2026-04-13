@@ -147,6 +147,7 @@ class ProductService {
         'endAt': endAt,
         'status': status,
         'inStock': inStock,
+        'soldCount': 0,  // يبدأ من صفر - يزيد مع كل عملية بيع
         'createdAt': FieldValue.serverTimestamp(),
         'updatedAt': FieldValue.serverTimestamp(),
         'order': computedOrder,
@@ -198,8 +199,8 @@ class ProductService {
     return null;
   }
 
-  // تحديث منتج موجود
-  static Future<void> updateProduct(
+  /// يعيد رابط الصورة الجديد فقط عند رفع صورة؛ وإلا `null` (لتفادي قراءة إضافية من Firestore).
+  static Future<String?> updateProduct(
     String marketId,
     String categoryId,
     String productId, {
@@ -238,14 +239,14 @@ class ProductService {
     if (status != null) updateData['status'] = status;
     if (inStock != null) updateData['inStock'] = inStock;
 
-    // رفع صورة جديدة إذا تم توفيرها
+    String? newImageUrl;
     if (imageFile != null) {
       final ref = _storage.ref().child(
         'markets/$marketId/products/$categoryId/items/$productId/${DateTime.now().millisecondsSinceEpoch}',
       );
       final task = await ref.putFile(imageFile);
-      final imageUrl = await task.ref.getDownloadURL();
-      updateData['image'] = imageUrl;
+      newImageUrl = await task.ref.getDownloadURL();
+      updateData['image'] = newImageUrl;
     }
 
     // حساب السعر النهائي إذا كان هناك خصم
@@ -261,6 +262,7 @@ class ProductService {
       marketId,
       categoryId,
     ).doc(productId).update(updateData);
+    return newImageUrl;
   }
 
   static Future<ProductModel> moveProduct({
@@ -302,6 +304,7 @@ class ProductService {
         marketId,
         toCategoryId,
       ).orderBy('order', descending: true).limit(1).get();
+
       final newOrder = orderSnap.docs.isNotEmpty
           ? (() {
               final data = orderSnap.docs.first.data() as Map<String, dynamic>;
@@ -351,6 +354,8 @@ class ProductService {
         'endAt': updatedProduct.endAt,
         'status': updatedProduct.status,
         'inStock': updatedProduct.inStock,
+        // ✅ نحافظ على soldCount عند نقل المنتج بين الفئات
+        'soldCount': (oldData['soldCount'] as num?)?.toInt() ?? updatedProduct.soldCount,
         'createdAt': createdAt ?? FieldValue.serverTimestamp(),
         'updatedAt': FieldValue.serverTimestamp(),
         'order': newOrder,
@@ -405,6 +410,28 @@ class ProductService {
     }, SetOptions(merge: true));
   }
 
+  // تسجيل عملية بيع لمنتج (يزيد soldCount بمقدار الكمية المباعة)
+  /// يُستدعى من cart_page بعد تأكيد الطلب
+  static Future<void> recordSale(
+    String marketId,
+    String categoryId,
+    String productId, {
+    int quantity = 1,
+  }) async {
+    try {
+      await _productsInCategoryCol(
+        marketId,
+        categoryId,
+      ).doc(productId).update({
+        'soldCount': FieldValue.increment(quantity),
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+    } catch (e) {
+      // لا نكسر مسار الطلب لو فشلت العملية - نسجل فقط
+      print('خطأ في تسجيل عملية البيع للمنتج $productId: $e');
+    }
+  }
+
   // جلب منتج واحد
   static Future<ProductModel?> getProduct(
     String marketId,
@@ -449,6 +476,12 @@ class ProductService {
         'updatedAt': FieldValue.serverTimestamp(),
       });
     }
+
+    // تحديث الفئة حتى يعمل Stream في MarketAnimatedPage ويعكس الترتيب
+    batch.set(_productsCol(marketId).doc(categoryId), {
+      'updatedAt': FieldValue.serverTimestamp(),
+    }, SetOptions(merge: true));
+
     await batch.commit();
   }
 

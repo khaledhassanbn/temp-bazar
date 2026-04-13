@@ -130,6 +130,15 @@ class _ManageProductsPageState extends State<ManageProductsPage> {
                       },
                       onEditProduct: _openEditProductPage,
                       onDeleteProduct: _confirmDelete,
+                      onToggleStatus: (product) {
+                        final category = viewModel.selectedCategory;
+                        if (category == null) return Future.value();
+                        return viewModel.toggleProductStatus(
+                          widget.marketId,
+                          category.id,
+                          product,
+                        );
+                      },
                     ),
                   ),
                 ],

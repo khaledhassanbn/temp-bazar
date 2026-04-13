@@ -295,7 +295,7 @@ class EditProductViewModel extends ChangeNotifier {
         _product = moved;
         _currentCategoryId = targetCategoryId;
       } else {
-        await ProductService.updateProduct(
+        final uploadedImageUrl = await ProductService.updateProduct(
           marketId,
           targetCategoryId,
           updatedProduct.id,
@@ -313,12 +313,9 @@ class EditProductViewModel extends ChangeNotifier {
           status: updatedProduct.status,
           inStock: updatedProduct.inStock,
         );
-        final refreshed = await ProductService.getProduct(
-          marketId,
-          targetCategoryId,
-          updatedProduct.id,
+        _product = updatedProduct.copyWith(
+          image: uploadedImageUrl ?? updatedProduct.image,
         );
-        _product = refreshed ?? updatedProduct;
       }
       newImageFile = null;
       successMessage = 'تم حفظ التعديلات بنجاح';

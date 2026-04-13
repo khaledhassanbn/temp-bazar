@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 
+import '../../../theme/app_color.dart';
 import '../../../widgets/primary_button.dart';
 import '../../add_product/models/product_models.dart';
 import '../viewmodels/edit_product_viewmodel.dart';
@@ -175,6 +176,14 @@ class _EditProductModernPageState extends State<EditProductModernPage> {
     ).showSnackBar(SnackBar(content: Text(message)));
   }
 
+  void _onBackRequested(EditProductViewModel vm) {
+    if (vm.isSaving) {
+      _showSnackBar('يرجى الانتظار حتى انتهاء الحفظ');
+      return;
+    }
+    Navigator.of(context).pop();
+  }
+
   @override
   Widget build(BuildContext context) {
     const backgroundColor = Color(0xFFE0F2F1);
@@ -200,34 +209,41 @@ class _EditProductModernPageState extends State<EditProductModernPage> {
                   }
                 });
 
-                return SingleChildScrollView(
-                  child: Column(
-                    children: [
-                      EditProductHeader(
-                        onBack: () => Navigator.of(context).pop(),
-                      ),
-                      Transform.translate(
-                        offset: const Offset(0, -40),
-                        child: Container(
-                          margin: const EdgeInsets.symmetric(horizontal: 24),
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 24,
-                            vertical: 32,
-                          ),
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(32),
-                            boxShadow: const [
-                              BoxShadow(
-                                color: Colors.black26,
-                                blurRadius: 10,
-                                offset: Offset(0, 4),
-                              ),
-                            ],
-                          ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.stretch,
-                            children: [
+                return PopScope(
+                  canPop: !vm.isSaving,
+                  onPopInvokedWithResult: (didPop, _) {
+                    if (!didPop && vm.isSaving && mounted) {
+                      _showSnackBar('يرجى الانتظار حتى انتهاء الحفظ');
+                    }
+                  },
+                  child: SingleChildScrollView(
+                    child: Column(
+                      children: [
+                        EditProductHeader(
+                          onBack: () => _onBackRequested(vm),
+                        ),
+                        Transform.translate(
+                          offset: const Offset(0, -40),
+                          child: Container(
+                            margin: const EdgeInsets.symmetric(horizontal: 24),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 24,
+                              vertical: 32,
+                            ),
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(32),
+                              boxShadow: const [
+                                BoxShadow(
+                                  color: Colors.black26,
+                                  blurRadius: 10,
+                                  offset: Offset(0, 4),
+                                ),
+                              ],
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: [
                               EditProductImagePicker(
                                 viewModel: vm,
                                 onPickImage: () => _pickImage(vm),
@@ -267,10 +283,43 @@ class _EditProductModernPageState extends State<EditProductModernPage> {
                                 isRequired: false,
                               ),
                               const SizedBox(height: 24),
-                              PrimaryButton(
-                                text: 'حفظ التعديلات',
-                                isLoading: vm.isSaving,
-                                onPressed: () => _save(vm),
+                              Row(
+                                crossAxisAlignment:
+                                    CrossAxisAlignment.stretch,
+                                children: [
+                                  Expanded(
+                                    child: PrimaryButton(
+                                      text: 'حفظ التعديلات',
+                                      isLoading: vm.isSaving,
+                                      onPressed: () => _save(vm),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 12),
+                                  Expanded(
+                                    child: OutlinedButton(
+                                      style: OutlinedButton.styleFrom(
+                                        foregroundColor: AppColors.mainColor,
+                                        side: const BorderSide(
+                                          color: AppColors.mainColor,
+                                        ),
+                                        padding: const EdgeInsets.symmetric(
+                                          vertical: 14,
+                                        ),
+                                        shape: RoundedRectangleBorder(
+                                          borderRadius:
+                                              BorderRadius.circular(12),
+                                        ),
+                                      ),
+                                      onPressed: vm.isSaving
+                                          ? null
+                                          : () => _onBackRequested(vm),
+                                      child: const Text(
+                                        'رجوع',
+                                        style: TextStyle(fontSize: 16),
+                                      ),
+                                    ),
+                                  ),
+                                ],
                               ),
                             ],
                           ),
@@ -278,6 +327,7 @@ class _EditProductModernPageState extends State<EditProductModernPage> {
                       ),
                     ],
                   ),
+                ),
                 );
               },
             ),

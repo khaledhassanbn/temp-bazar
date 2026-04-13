@@ -133,6 +133,7 @@ class ProductModel {
   final DateTime? endAt;
   final bool status;
   final bool inStock;
+  final int soldCount; // عدد عمليات البيع الفعلية
 
   ProductModel({
     required this.id,
@@ -154,6 +155,7 @@ class ProductModel {
     this.endAt,
     this.status = true,
     this.inStock = true,
+    this.soldCount = 0,
   });
 
   factory ProductModel.fromDoc(DocumentSnapshot doc) {
@@ -199,6 +201,7 @@ class ProductModel {
       endAt: (data['endAt'] as Timestamp?)?.toDate(),
       status: data['status'] ?? true,
       inStock: data['inStock'] ?? true,
+      soldCount: (data['soldCount'] as num?)?.toInt() ?? 0,
     );
   }
 
@@ -221,6 +224,7 @@ class ProductModel {
     'endAt': endAt,
     'status': status,
     'inStock': inStock,
+    'soldCount': soldCount,
   };
 
   /// إنشاء نسخة محدثة من المنتج
@@ -244,6 +248,7 @@ class ProductModel {
     DateTime? endAt,
     bool? status,
     bool? inStock,
+    int? soldCount,
   }) {
     return ProductModel(
       id: id ?? this.id,
@@ -265,6 +270,7 @@ class ProductModel {
       endAt: endAt ?? this.endAt,
       status: status ?? this.status,
       inStock: inStock ?? this.inStock,
+      soldCount: soldCount ?? this.soldCount,
     );
   }
 }

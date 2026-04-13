@@ -14,6 +14,7 @@ import 'package:go_router/go_router.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'dart:math';
+import 'package:bazar_suez/markets/add_product/services/product_service.dart';
 
 class CartPage extends StatefulWidget {
   const CartPage({super.key});
@@ -580,6 +581,23 @@ class _CartPageState extends State<CartPage> {
             .doc(orderId)
             .set(orderData);
       }
+
+      // ══════════════════════════════════════════════════════════════════
+      // 🔹 تسجيل عمليات البيع لكل منتج (يزيد soldCount في Firestore)
+      //    هذا يجعل حد الكمية وإزالة المنتج بالتاريخ يعملان فعلياً
+      // ══════════════════════════════════════════════════════════════════
+      final itemsSnapshot = cartViewModel.cartItems.toList();
+      // نسجل المبيعات في الخلفية بدون انتظار — لا نكسر مسار الطلب
+      Future(() async {
+        for (final item in itemsSnapshot) {
+          await ProductService.recordSale(
+            item.marketId,
+            item.categoryId,
+            item.productId,
+            quantity: item.quantity,
+          );
+        }
+      });
 
       Navigator.pop(context); // إغلاق loading
 
