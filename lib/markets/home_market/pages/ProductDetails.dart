@@ -33,7 +33,8 @@ class _ProductDetailsPageState extends State<ProductDetailsPage>
   late ScrollController _scrollController;
   late TabController _tabController;
 
-  double _scrollOffset = 0;
+  final ValueNotifier<double> _scrollOffsetNotifier = ValueNotifier(0);
+  bool _scrollOffsetNotifyScheduled = false;
   int quantity = 1;
   double basePrice = 0.0;
   double additionalPrice = 0.0;
@@ -52,11 +53,9 @@ class _ProductDetailsPageState extends State<ProductDetailsPage>
   @override
   void initState() {
     super.initState();
-    _scrollController = ScrollController()
-      ..addListener(
-        () => setState(() => _scrollOffset = _scrollController.offset),
-      );
-    _tabController = TabController(length: 0, vsync: this);
+    _scrollController = ScrollController()..addListener(_onProductScroll);
+    // طول 1 لأن TabController لا يقبل 0؛ شريط التبويب غير معروض عندما tabs فارغة
+    _tabController = TabController(length: 1, vsync: this);
 
     // If editing existing item, pre-fill the data
     if (widget.editItem != null) {
@@ -64,6 +63,20 @@ class _ProductDetailsPageState extends State<ProductDetailsPage>
     }
 
     _loadProduct();
+  }
+
+  void _onProductScroll() {
+    if (!_scrollController.hasClients) return;
+    if (_scrollOffsetNotifyScheduled) return;
+    _scrollOffsetNotifyScheduled = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _scrollOffsetNotifyScheduled = false;
+      if (!_scrollController.hasClients) return;
+      final offset = _scrollController.offset;
+      if (_scrollOffsetNotifier.value != offset) {
+        _scrollOffsetNotifier.value = offset;
+      }
+    });
   }
 
   /// Pre-fill form data when editing an existing cart item
@@ -88,11 +101,23 @@ class _ProductDetailsPageState extends State<ProductDetailsPage>
     }
 
     try {
-      final marketDoc = await FirebaseFirestore.instance
-          .collection('markets')
-          .doc(marketId)
-          .get();
-      final marketData = marketDoc.data() ?? {};
+      final futures = await Future.wait<Object?>([
+        FirebaseFirestore.instance.collection('markets').doc(marketId).get(),
+        FirebaseFirestore.instance
+            .collection('markets')
+            .doc(marketId)
+            .collection('products')
+            .doc(categoryId)
+            .collection('items')
+            .doc(itemId)
+            .get(),
+      ]);
+
+      final marketDoc = futures[0]! as DocumentSnapshot<Map<String, dynamic>>;
+      final doc = futures[1]! as DocumentSnapshot<Map<String, dynamic>>;
+
+      final Map<String, dynamic> marketData =
+          marketDoc.data() ?? <String, dynamic>{};
       _storeAvailable = marketData['available'] is bool
           ? marketData['available'] as bool
           : (marketData['storeStatus'] as bool? ?? true);
@@ -103,15 +128,6 @@ class _ProductDetailsPageState extends State<ProductDetailsPage>
         _storeClosedByWorkingHours = !weekly.isOpenAt(DateTime.now());
       }
 
-      final doc = await FirebaseFirestore.instance
-          .collection('markets')
-          .doc(marketId)
-          .collection('products')
-          .doc(categoryId)
-          .collection('items')
-          .doc(itemId)
-          .get();
-
       if (!doc.exists) {
         setState(() {
           _error = 'لم يتم العثور على المنتج';
@@ -120,7 +136,7 @@ class _ProductDetailsPageState extends State<ProductDetailsPage>
         return;
       }
 
-      final data = doc.data() ?? {};
+      final Map<String, dynamic> data = doc.data() ?? <String, dynamic>{};
       _name = data['name'] ?? '';
       _imageUrl = data['image'];
       _description = data['description'] ?? '';
@@ -189,14 +205,19 @@ class _ProductDetailsPageState extends State<ProductDetailsPage>
               ],
             ),
           ),
-          MarketAppBar(
-            scrollOffset: _scrollOffset,
-            isMerged: false,
-            tabController: _tabController,
-            tabBarHeight: 0,
-            onTabSelected: (_) {},
-            tabs: const [],
-            storeName: _name,
+          ValueListenableBuilder<double>(
+            valueListenable: _scrollOffsetNotifier,
+            builder: (context, scrollOffset, _) {
+              return MarketAppBar(
+                scrollOffset: scrollOffset,
+                isMerged: false,
+                tabController: _tabController,
+                tabBarHeight: 0,
+                onTabSelected: (_) {},
+                tabs: const [],
+                storeName: _name,
+              );
+            },
           ),
         ],
       ),
@@ -214,6 +235,14 @@ class _ProductDetailsPageState extends State<ProductDetailsPage>
         onDecrease: () => setState(() => quantity > 1 ? quantity-- : quantity),
       ),
     );
+  }
+
+  @override
+  void dispose() {
+    _scrollOffsetNotifier.dispose();
+    _scrollController.dispose();
+    _tabController.dispose();
+    super.dispose();
   }
 
   void _handleOptionSelection(

@@ -2,8 +2,6 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
-import 'package:firebase_auth/firebase_auth.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:bazar_suez/markets/home_page/viewmodels/home_data_provider.dart';
 
 // استيراد الودجات اللي قسمناها
@@ -44,6 +42,9 @@ class _MarketAnimatedPageState extends State<MarketAnimatedPage>
   Timer? _scrollDebounceTimer;
   String? _userMarketId;
 
+  /// دمج تحديثات التمرير في إطار واحد يقلّل إعادة بناء الغلاف وشريط التطبيق على كل بكسل.
+  bool _scrollOffsetNotifyScheduled = false;
+
   /// يتحقق إذا كان المستخدم الحالي هو صاحب المتجر
   bool _isStoreOwner(String storeId) {
     return _userMarketId != null && _userMarketId == storeId;
@@ -69,7 +70,7 @@ class _MarketAnimatedPageState extends State<MarketAnimatedPage>
 
     _scrollController.addListener(() {
       if (!_scrollController.hasClients) return;
-      _scrollOffsetNotifier.value = _scrollController.offset;
+      _scheduleScrollOffsetNotification();
 
       if (_isProgrammaticScroll) return;
 
@@ -78,6 +79,19 @@ class _MarketAnimatedPageState extends State<MarketAnimatedPage>
         const Duration(milliseconds: 50),
         _updateTabBasedOnScroll,
       );
+    });
+  }
+
+  void _scheduleScrollOffsetNotification() {
+    if (_scrollOffsetNotifyScheduled) return;
+    _scrollOffsetNotifyScheduled = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _scrollOffsetNotifyScheduled = false;
+      if (!_scrollController.hasClients) return;
+      final offset = _scrollController.offset;
+      if (_scrollOffsetNotifier.value != offset) {
+        _scrollOffsetNotifier.value = offset;
+      }
     });
   }
 
@@ -159,11 +173,8 @@ class _MarketAnimatedPageState extends State<MarketAnimatedPage>
       },
       child: Scaffold(
         backgroundColor: Colors.white,
-        body: ValueListenableBuilder<double>(
-          valueListenable: _scrollOffsetNotifier,
-          builder: (context, scrollOffset, _) {
-            final bool isMerged = scrollOffset >= mergePoint;
-            final vm = context.watch<MarketDetailsViewModel>();
+        body: Consumer<MarketDetailsViewModel>(
+          builder: (context, vm, _) {
             final bool isBusyStore = vm.store != null && !vm.store!.available;
             final bool isClosedStore =
                 vm.store != null && vm.store!.isClosedByWorkingHours;
@@ -225,14 +236,17 @@ class _MarketAnimatedPageState extends State<MarketAnimatedPage>
 
             final ordered = orderedCategories();
 
-            // تحديث TabController عند تغير عدد الفئات
+            // تحديث طول التبويبات: لا نستدعي dispose للـ controller القديم أثناء البناء
             final int desiredLength = ordered.isEmpty ? 1 : ordered.length;
             if (_tabController.length != desiredLength) {
-              _tabController.dispose();
+              final TabController oldController = _tabController;
               _tabController = TabController(
                 length: desiredLength,
                 vsync: this,
               );
+              WidgetsBinding.instance.addPostFrameCallback((_) {
+                oldController.dispose();
+              });
             }
 
             final bool tabReady =
@@ -244,11 +258,16 @@ class _MarketAnimatedPageState extends State<MarketAnimatedPage>
                   controller: _scrollController,
                   slivers: [
                     SliverToBoxAdapter(
-                      child: MarketCoverSection(
-                        coverHeight: coverHeight,
-                        infoBoxHeight: infoBoxHeight,
-                        scrollOffset: scrollOffset,
-                        store: vm.store,
+                      child: ValueListenableBuilder<double>(
+                        valueListenable: _scrollOffsetNotifier,
+                        builder: (context, scrollOffset, _) {
+                          return MarketCoverSection(
+                            coverHeight: coverHeight,
+                            infoBoxHeight: infoBoxHeight,
+                            scrollOffset: scrollOffset,
+                            store: vm.store,
+                          );
+                        },
                       ),
                     ),
                     if (tabReady)
@@ -323,34 +342,40 @@ class _MarketAnimatedPageState extends State<MarketAnimatedPage>
                       ),
                   ],
                 ),
-                MarketAppBar(
-                  scrollOffset: scrollOffset,
-                  isMerged: isMerged,
-                  tabController: _tabController,
-                  tabBarHeight: tabBarHeight,
-                  storeName: vm.store?.name,
-                  tabs: tabReady
-                      ? ordered.map((c) => c.name).toList()
-                      : const [],
-                  onTabSelected: (i) {
-                    if (!_isScrolling) _scrollToCategory(i);
-                  },
-                  onSearchPressed: vm.store != null && ordered.isNotEmpty
-                      ? () {
-                          final marketId = vm.store!.id;
-                          Navigator.of(context).push(
-                            MaterialPageRoute<void>(
-                              builder: (ctx) => ChangeNotifierProvider(
-                                create: (_) => SearchInMarketViewModel(
-                                  marketId: marketId,
-                                  categories: ordered,
+                ValueListenableBuilder<double>(
+                  valueListenable: _scrollOffsetNotifier,
+                  builder: (context, scrollOffset, _) {
+                    final bool isMerged = scrollOffset >= mergePoint;
+                    return MarketAppBar(
+                      scrollOffset: scrollOffset,
+                      isMerged: isMerged,
+                      tabController: _tabController,
+                      tabBarHeight: tabBarHeight,
+                      storeName: vm.store?.name,
+                      tabs: tabReady
+                          ? ordered.map((c) => c.name).toList()
+                          : const [],
+                      onTabSelected: (i) {
+                        if (!_isScrolling) _scrollToCategory(i);
+                      },
+                      onSearchPressed: vm.store != null && ordered.isNotEmpty
+                          ? () {
+                              final marketId = vm.store!.id;
+                              Navigator.of(context).push(
+                                MaterialPageRoute<void>(
+                                  builder: (ctx) => ChangeNotifierProvider(
+                                    create: (_) => SearchInMarketViewModel(
+                                      marketId: marketId,
+                                      categories: ordered,
+                                    ),
+                                    child: const SearchInMarketPage(),
+                                  ),
                                 ),
-                                child: const SearchInMarketPage(),
-                              ),
-                            ),
-                          );
-                        }
-                      : null,
+                              );
+                            }
+                          : null,
+                    );
+                  },
                 ),
                 if (!isOrderingBlocked) const FloatingCartBar(),
                 // === Overlay حجب الصفحة عند انتهاء الترخيص (لصاحب المتجر فقط) ===
