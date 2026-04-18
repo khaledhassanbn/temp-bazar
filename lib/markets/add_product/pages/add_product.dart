@@ -587,6 +587,7 @@ class _AddProductModernPageState extends State<AddProductModernPage> {
                                 ),
                                 const SizedBox(height: 8),
                                 Row(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
                                     Expanded(
                                       child: AppTextField(

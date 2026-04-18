@@ -33,7 +33,7 @@ class AppDropdownField extends StatelessWidget {
             ),
             textAlign: TextAlign.right,
           ),
-          const SizedBox(height: 6),
+          const SizedBox(height: 3),
           Container(
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(30),
@@ -46,6 +46,7 @@ class AppDropdownField extends StatelessWidget {
               ],
             ),
             child: DropdownButtonFormField<String>(
+              isExpanded: true,
               value: value != null && items.contains(value) ? value : null,
               decoration: InputDecoration(
                 filled: true,
@@ -64,7 +65,7 @@ class AppDropdownField extends StatelessWidget {
                   .map(
                     (item) => DropdownMenuItem(
                       value: item,
-                      child: Text(item, textAlign: TextAlign.right),
+                      child: Text(item, textAlign: TextAlign.right, overflow: TextOverflow.ellipsis),
                     ),
                   )
                   .toList(),
@@ -77,7 +78,6 @@ class AppDropdownField extends StatelessWidget {
               },
             ),
           ),
-          const SizedBox(height: 12),
         ],
       ),
     );
