@@ -1,23 +1,23 @@
 import 'dart:async';
-import 'package:firebase_core/firebase_core.dart';
+
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
-/// Background message handler - يجب أن يكون top-level function
-@pragma('vm:entry-point')
-Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
-  await Firebase.initializeApp();
-  debugPrint('📬 Background message received: ${message.notification?.title}');
-}
+import 'package:bazar_suez/router/app_navigation.dart';
+import 'package:bazar_suez/services/fcm_background_handler.dart'
+    show firebaseMessagingBackgroundHandler;
+import 'package:bazar_suez/services/order_notifications/order_notification_constants.dart';
+import 'package:bazar_suez/services/order_notifications/order_notification_coordinator.dart';
 
-/// خدمة إدارة FCM للإشعارات
-/// تتعامل مع التوكنات والإشعارات للتاجر والعميل
+/// خدمة FCM للتاجر والعميل — إشعار طلب جديد يتكامل مع [OrderNotificationCoordinator].
 class FcmService {
   static final FcmService _instance = FcmService._internal();
   factory FcmService() => _instance;
   FcmService._internal();
+
+  static FcmService get instance => _instance;
 
   final FirebaseMessaging _messaging = FirebaseMessaging.instance;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
@@ -25,54 +25,44 @@ class FcmService {
   String? _currentToken;
   String? get currentToken => _currentToken;
 
-  // StreamControllers للتعامل مع الإشعارات في أماكن أخرى من التطبيق
   static final StreamController<RemoteMessage> _foregroundMessageController =
       StreamController<RemoteMessage>.broadcast();
   static final StreamController<RemoteMessage> _messageOpenedController =
       StreamController<RemoteMessage>.broadcast();
 
-  /// Stream للرسائل في المقدمة
   Stream<RemoteMessage> get onForegroundMessage =>
       _foregroundMessageController.stream;
 
-  /// Stream للضغط على الإشعارات
   Stream<RemoteMessage> get onMessageOpened => _messageOpenedController.stream;
 
-  /// تهيئة خدمة FCM
+  /// تهيئة FCM ومعالجات الخلفية/المقدمة.
   Future<void> initialize() async {
     try {
-      // تسجيل معالج الرسائل في الخلفية
       FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
 
-      // طلب صلاحيات الإشعارات
       await _requestPermission();
 
-      // الحصول على التوكن وحفظه
       _currentToken = await _messaging.getToken();
       debugPrint('🔔 FCM Token: $_currentToken');
 
-      // الاستماع لتغيير التوكن (يحدث عند إعادة تثبيت التطبيق أو مسح البيانات)
       _messaging.onTokenRefresh.listen(_onTokenRefresh);
 
-      // التعامل مع الرسائل في المقدمة
       FirebaseMessaging.onMessage.listen(_handleForegroundMessage);
-
-      // التعامل مع الضغط على الإشعار (التطبيق كان في الخلفية)
       FirebaseMessaging.onMessageOpenedApp.listen(_handleMessageOpenedApp);
 
-      // التحقق من وجود إشعار أولي (التطبيق كان مغلقاً)
       final initialMessage = await _messaging.getInitialMessage();
       if (initialMessage != null) {
-        _handleMessageOpenedApp(initialMessage);
+        _handleNotificationOpen(
+          Map<String, dynamic>.from(initialMessage.data),
+        );
       }
 
       debugPrint('✅ FCM Service initialized successfully');
-    } catch (e) {
-      debugPrint('❌ Error initializing FCM: $e');
+    } catch (e, st) {
+      debugPrint('❌ Error initializing FCM: $e\n$st');
     }
   }
 
-  /// طلب صلاحيات الإشعارات
   Future<void> _requestPermission() async {
     final settings = await _messaging.requestPermission(
       alert: true,
@@ -87,25 +77,19 @@ class FcmService {
     debugPrint('🔐 Notification permission: ${settings.authorizationStatus}');
   }
 
-  /// معالجة تغيير التوكن
   void _onTokenRefresh(String newToken) {
     debugPrint('🔄 FCM Token refreshed: $newToken');
     _currentToken = newToken;
-    
-    // تحديث التوكن في قاعدة البيانات للمتجر والمستخدم الحالي
     _updateStoredTokens(newToken);
   }
 
-  /// تحديث التوكنات المخزنة في قاعدة البيانات
   Future<void> _updateStoredTokens(String token) async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return;
 
     try {
-      // تحديث توكن المستخدم
       await saveTokenForUser(user.uid);
 
-      // البحث عن المتاجر المملوكة لهذا المستخدم وتحديث توكناتها
       final storesQuery = await _firestore
           .collection('markets')
           .where('ownerId', isEqualTo: user.uid)
@@ -119,7 +103,7 @@ class FcmService {
     }
   }
 
-  /// حفظ التوكن لمتجر معين
+  /// يحفظ التوكن في `stores` (لـ Cloud Functions) و`markets` (للتوافق مع النسخة السابقة).
   Future<void> saveTokenForStore(String storeId) async {
     _currentToken ??= await _messaging.getToken();
 
@@ -128,18 +112,25 @@ class FcmService {
       return;
     }
 
+    final now = FieldValue.serverTimestamp();
+
     try {
-      await _firestore.collection('markets').doc(storeId).update({
+      await _firestore.collection('stores').doc(storeId).set({
         'fcmToken': _currentToken,
-        'fcmTokenUpdatedAt': FieldValue.serverTimestamp(),
-      });
-      debugPrint('✅ FCM token saved for store: $storeId');
+        'fcmTokenUpdatedAt': now,
+      }, SetOptions(merge: true));
+
+      await _firestore.collection('markets').doc(storeId).set({
+        'fcmToken': _currentToken,
+        'fcmTokenUpdatedAt': now,
+      }, SetOptions(merge: true));
+
+      debugPrint('✅ FCM token saved for store: $storeId (stores + markets)');
     } catch (e) {
       debugPrint('❌ Error saving token for store $storeId: $e');
     }
   }
 
-  /// حفظ التوكن للمستخدم الحالي
   Future<void> saveTokenForUser(String userId) async {
     _currentToken ??= await _messaging.getToken();
 
@@ -159,7 +150,6 @@ class FcmService {
     }
   }
 
-  /// حفظ التوكن للمستخدم الحالي تلقائياً
   Future<void> saveTokenForCurrentUser() async {
     final user = FirebaseAuth.instance.currentUser;
     if (user != null) {
@@ -167,35 +157,38 @@ class FcmService {
     }
   }
 
-  /// معالجة الرسائل في المقدمة (التطبيق مفتوح)
   void _handleForegroundMessage(RemoteMessage message) {
-    debugPrint('📱 Foreground message received:');
-    debugPrint('   Title: ${message.notification?.title}');
-    debugPrint('   Body: ${message.notification?.body}');
-    debugPrint('   Data: ${message.data}');
-
-    // إرسال الرسالة للـ Stream ليتم التعامل معها في أماكن أخرى
+    debugPrint('📱 Foreground FCM: ${message.data}');
+    _routeNewOrderFromData(Map<String, dynamic>.from(message.data));
     _foregroundMessageController.add(message);
   }
 
-  /// معالجة الضغط على الإشعار
   void _handleMessageOpenedApp(RemoteMessage message) {
-    debugPrint('👆 Message opened app:');
-    debugPrint('   Data: ${message.data}');
-
-    final type = message.data['type'];
-    final orderId = message.data['orderId'];
-    final storeId = message.data['storeId'];
-
-    debugPrint('   Type: $type, OrderId: $orderId, StoreId: $storeId');
-
-    // إرسال الرسالة للـ Stream ليتم التعامل معها في أماكن أخرى
+    debugPrint('👆 Notification opened app: ${message.data}');
+    _handleNotificationOpen(Map<String, dynamic>.from(message.data));
     _messageOpenedController.add(message);
   }
 
-  /// إغلاق الـ Streams
-  void dispose() {
-    _foregroundMessageController.close();
-    _messageOpenedController.close();
+  /// فتح التطبيق من الإشعار — الانتقال لشاشة الطلبات فقط (بدون إعادة عرض الحوار).
+  void _handleNotificationOpen(Map<String, dynamic> data) {
+    final type = data[FcmOrderDataKeys.type]?.toString();
+    if (type != FcmOrderDataKeys.newOrder) return;
+
+    final storeId = data[FcmOrderDataKeys.storeId]?.toString();
+    if (storeId != null && storeId.isNotEmpty) {
+      navigateToStoreOrders(storeId);
+    }
   }
+
+  void _routeNewOrderFromData(Map<String, dynamic> data) {
+    final type = data[FcmOrderDataKeys.type]?.toString();
+    if (type != FcmOrderDataKeys.newOrder) return;
+    final orderId = data[FcmOrderDataKeys.orderId]?.toString() ?? '';
+    if (orderId.isEmpty) return;
+    OrderNotificationCoordinator.instance.notifyNewOrder(orderId);
+  }
+
+  /// لا يُغلق الـ broadcast streams — الخدمة تبقى طوال عمر التطبيق.
+  @Deprecated('Singleton مُدارة لعمر التطبيق')
+  void dispose() {}
 }

@@ -337,7 +337,7 @@ class ManageProductsViewModel extends ChangeNotifier {
   void updateProductLocally(ProductModel updated) {
     if (selectedCategory == null) return;
     final categoryId = selectedCategory!.id;
-    
+
     final index = products.indexWhere((p) => p.id == updated.id);
     if (index == -1) return;
     products[index] = updated;

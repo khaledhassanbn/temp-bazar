@@ -1,3 +1,4 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
@@ -196,12 +197,17 @@ class _SearchProductTile extends StatelessWidget {
               ),
               ClipRRect(
                 borderRadius: BorderRadius.circular(12),
-                child: Image.network(
-                  item.imageUrl ?? _kImagePlaceholder,
+                child: CachedNetworkImage(
+                  imageUrl: item.imageUrl ?? '',
                   width: 100,
                   height: 100,
                   fit: BoxFit.cover,
-                  errorBuilder: (context, error, stackTrace) => Container(
+                  placeholder: (context, url) => Container(
+                    width: 100,
+                    height: 100,
+                    color: Colors.grey.shade200,
+                  ),
+                  errorWidget: (context, url, error) => Container(
                     width: 100,
                     height: 100,
                     color: Colors.grey.shade200,

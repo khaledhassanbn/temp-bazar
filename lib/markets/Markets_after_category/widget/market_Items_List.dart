@@ -1,3 +1,4 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
@@ -52,7 +53,15 @@ class CategoryItemsList extends StatelessWidget {
                       width: 85,
                       height: 85,
                       child: store.logoUrl != null && store.logoUrl!.isNotEmpty
-                          ? Image.network(store.logoUrl!, fit: BoxFit.cover)
+                          ? CachedNetworkImage(
+                              imageUrl: store.logoUrl!,
+                              fit: BoxFit.cover,
+                              placeholder: (_, __) => Container(color: Colors.grey.shade200),
+                              errorWidget: (_, __, ___) => Image.asset(
+                                'assets/images/egypt.jpg',
+                                fit: BoxFit.cover,
+                              ),
+                            )
                           : Image.asset(
                               'assets/images/egypt.jpg',
                               fit: BoxFit.cover,

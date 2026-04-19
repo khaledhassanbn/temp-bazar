@@ -25,6 +25,7 @@ import 'services/hive_adapters_setup.dart';
 
 // 🔔 FCM Notifications
 import 'services/fcm_service.dart';
+import 'services/order_notifications/local_notification_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -40,7 +41,8 @@ void main() async {
     await HiveAdaptersSetup.initializeHive();
     print('✅ Hive initialized successfully');
 
-    print('🔔 Initializing FCM Service...');
+    print('🔔 Initializing local notifications + FCM...');
+    await LocalNotificationService.instance.initialize();
     await FcmService().initialize();
     print('✅ FCM Service initialized successfully');
 

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'widgets/market_bottom_navigation.dart';
 import 'package:bazar_suez/router/widgets/app_back_guard.dart';
+import 'package:bazar_suez/widgets/order_notifications/store_order_notification_host.dart';
 
 class MarketLayout extends StatelessWidget {
   final Widget child;
@@ -10,13 +11,20 @@ class MarketLayout extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final currentIndex = _getIndexFromRoute(context);
-    return AppBackGuard(
-      homePath: '/HomePage',
-      bypassToPreviousPaths: const ['/edit-store'],
-      child: Scaffold(
-        body: child,
-        bottomNavigationBar: MarketBottomNavigation(currentIndex: currentIndex),
-      ),
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        AppBackGuard(
+          homePath: '/HomePage',
+          bypassToPreviousPaths: const ['/edit-store'],
+          child: Scaffold(
+            body: child,
+            bottomNavigationBar:
+                MarketBottomNavigation(currentIndex: currentIndex),
+          ),
+        ),
+        const StoreOrderNotificationHost(),
+      ],
     );
   }
 
@@ -26,8 +34,9 @@ class MarketLayout extends StatelessWidget {
     if (route.startsWith('/addproduct') ||
         route.startsWith('/ManageProducts') ||
         route.startsWith('/edit-store') ||
-        route.startsWith('/pricingpage'))
+        route.startsWith('/pricingpage')) {
       return 2;
+    }
     if (route.startsWith('/MyStorePage')) return 3;
     if (route.startsWith('/AccountPage')) return 4;
     return 0;

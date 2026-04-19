@@ -1,3 +1,4 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
@@ -222,32 +223,25 @@ class _CategoriesGridPageState extends State<CategoriesGridPage> {
     // التحقق من نوع الصورة: إذا كانت رابط Firebase (يبدأ بـ http)
     // أو إذا كانت اسم صورة محلية
     if (icon.startsWith('http://') || icon.startsWith('https://')) {
-      // رابط Firebase - استخدم Image.network
-      return Image.network(
-        icon,
+      // رابط Firebase - استخدم CachedNetworkImage للـ disk cache
+      return CachedNetworkImage(
+        imageUrl: icon,
         fit: BoxFit.cover,
         width: double.infinity,
         height: double.infinity,
-        errorBuilder: (context, _, __) => Container(
+        placeholder: (context, url) => Container(
+          color: Colors.grey[100],
+          child: Center(
+            child: CircularProgressIndicator(
+              strokeWidth: 2,
+              color: AppColors.mainColor,
+            ),
+          ),
+        ),
+        errorWidget: (context, url, error) => Container(
           color: Colors.grey[100],
           child: Icon(Icons.category, size: 50, color: AppColors.mainColor),
         ),
-        loadingBuilder: (context, child, loadingProgress) {
-          if (loadingProgress == null) return child;
-          return Container(
-            color: Colors.grey[100],
-            child: Center(
-              child: CircularProgressIndicator(
-                value: loadingProgress.expectedTotalBytes != null
-                    ? loadingProgress.cumulativeBytesLoaded /
-                          loadingProgress.expectedTotalBytes!
-                    : null,
-                strokeWidth: 2,
-                color: AppColors.mainColor,
-              ),
-            ),
-          );
-        },
       );
     } else {
       // اسم صورة محلية - استخدم Image.asset

@@ -1,3 +1,4 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -64,9 +65,9 @@ class MarketInfoCard extends StatelessWidget {
     }
   }
 
-  String get _phoneNumber =>
-      (phone != null && phone!.isNotEmpty) ? phone! : '01012345678';
-  String get _whatsappNumber => _phoneNumber; // بدون +
+  String? get _phoneNumber =>
+      (phone != null && phone!.trim().isNotEmpty) ? phone!.trim() : null;
+  String? get _whatsappNumber => _phoneNumber; // بدون +
   bool get _hasFacebook => facebook != null && facebook!.isNotEmpty;
   bool get _hasInstagram => instagram != null && instagram!.isNotEmpty;
   bool get _canShowLocation => showAddress && location != null;
@@ -99,15 +100,20 @@ class MarketInfoCard extends StatelessWidget {
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // ✅ شعار المتجر
+                // ✅ شعار المتجر مع cache
                 ClipRRect(
                   borderRadius: BorderRadius.circular(10),
-                  child: Image.network(
-                    marketLogo,
+                  child: CachedNetworkImage(
+                    imageUrl: marketLogo,
                     width: 70,
                     height: 70,
                     fit: BoxFit.cover,
-                    errorBuilder: (_, __, ___) => Container(
+                    placeholder: (_, __) => Container(
+                      width: 70,
+                      height: 70,
+                      color: Colors.grey.shade100,
+                    ),
+                    errorWidget: (_, __, ___) => Container(
                       width: 70,
                       height: 70,
                       color: Colors.grey.shade200,
@@ -223,19 +229,21 @@ class MarketInfoCard extends StatelessWidget {
                 // 🔸 أيقونات التواصل
                 Row(
                   children: [
-                    _buildIconButton(
-                      icon: FontAwesomeIcons.whatsapp,
-                      color: Colors.green,
-                      onTap: () => _launchUrl(
-                        'https://wa.me/$_whatsappNumber?text=مرحبًا!',
+                    if (_whatsappNumber != null)
+                      _buildIconButton(
+                        icon: FontAwesomeIcons.whatsapp,
+                        color: Colors.green,
+                        onTap: () => _launchUrl(
+                          'https://wa.me/${_whatsappNumber!}?text=مرحبًا!',
+                        ),
                       ),
-                    ),
-                    const SizedBox(width: 10),
-                    _buildIconButton(
-                      icon: Icons.call,
-                      color: Colors.blue,
-                      onTap: () => _launchUrl('tel:$_phoneNumber'),
-                    ),
+                    if (_phoneNumber != null) const SizedBox(width: 10),
+                    if (_phoneNumber != null)
+                      _buildIconButton(
+                        icon: Icons.call,
+                        color: Colors.blue,
+                        onTap: () => _launchUrl('tel:${_phoneNumber!}'),
+                      ),
                     if (_hasFacebook) const SizedBox(width: 10),
                     if (_hasFacebook)
                       _buildIconButton(

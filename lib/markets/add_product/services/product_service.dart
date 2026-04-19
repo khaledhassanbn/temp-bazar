@@ -132,6 +132,8 @@ class ProductService {
       }
 
       await _productsInCategoryCol(marketId, categoryId).doc(productId).set({
+        // مهم لاستعلام collectionGroup('items') في صفحة المتجر
+        'marketId': marketId,
         'name': name,
         'price': price,
         'image': imageUrl,
@@ -335,6 +337,8 @@ class ProductService {
       final batch = _firestore.batch();
 
       batch.set(newRef, {
+        // مهم لاستعلام collectionGroup('items') في صفحة المتجر
+        'marketId': marketId,
         'name': updatedProduct.name,
         'price': updatedProduct.price,
         'image': imageUrl,

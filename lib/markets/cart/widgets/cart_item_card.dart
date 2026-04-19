@@ -1,3 +1,4 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:bazar_suez/theme/app_color.dart';
 
@@ -46,12 +47,22 @@ class CartItemCard extends StatelessWidget {
               ),
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(12),
-                child: Image.network(
-                  item['image'] ?? '',
+                child: CachedNetworkImage(
+                  imageUrl: item['image'] ?? '',
                   width: 100,
                   height: 100,
                   fit: BoxFit.cover,
-                  errorBuilder: (context, error, stackTrace) => Center(
+                  placeholder: (context, url) => Container(
+                    color: const Color(0xFFD4F4DD),
+                    child: Center(
+                      child: Icon(
+                        Icons.image,
+                        size: 40,
+                        color: Colors.green[300],
+                      ),
+                    ),
+                  ),
+                  errorWidget: (context, url, error) => Center(
                     child: Icon(
                       Icons.image,
                       size: 50,

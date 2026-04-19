@@ -69,9 +69,19 @@ class MarketProductSection extends StatelessWidget {
         ),
       );
 
+      // ✅ المنتجات: حالة التحميل
+      if (category.items.isEmpty) {
+        sections.add(
+          const Padding(
+            padding: EdgeInsets.symmetric(vertical: 40),
+            child: Center(
+              child: CircularProgressIndicator(),
+            ),
+          ),
+        );
+      }
       // ✅ قسم "الأكثر مبيعا"
-      // ✅ قسم "الأكثر مبيعا"
-      if (normalizedName == 'الاكثر مبيعا') {
+      else if (normalizedName == 'الاكثر مبيعا') {
         sections.add(
           Directionality(
             textDirection: TextDirection.rtl,

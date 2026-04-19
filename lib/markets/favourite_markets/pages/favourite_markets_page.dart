@@ -1,3 +1,4 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
@@ -125,10 +126,13 @@ class FavouriteMarketsPage extends StatelessWidget {
                   width: 80,
                   height: 80,
                   child: store.logoUrl != null && store.logoUrl!.isNotEmpty
-                      ? Image.network(
-                          store.logoUrl!,
+                      ? CachedNetworkImage(
+                          imageUrl: store.logoUrl!,
                           fit: BoxFit.cover,
-                          errorBuilder: (_, __, ___) => Container(
+                          placeholder: (_, __) => Container(
+                            color: Colors.grey[200],
+                          ),
+                          errorWidget: (_, __, ___) => Container(
                             color: Colors.grey[200],
                             child: Icon(Icons.store,
                                 size: 40, color: Colors.grey[400]),

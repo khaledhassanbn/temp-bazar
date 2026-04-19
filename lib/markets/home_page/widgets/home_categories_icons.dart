@@ -1,3 +1,4 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
@@ -167,19 +168,16 @@ class HomeCategoriesIcons extends StatelessWidget {
   Widget _buildCategoryImage(CategoryModel category) {
     if (category.icon.isNotEmpty) {
       if (category.icon.startsWith('http')) {
-        return Image.network(
-          category.icon,
+        return CachedNetworkImage(
+          imageUrl: category.icon,
           fit: BoxFit.contain,
-          errorBuilder: (_, __, ___) => _buildFallbackIcon(category.id),
-          loadingBuilder: (context, child, loadingProgress) {
-            if (loadingProgress == null) return child;
-            return Center(
-              child: CircularProgressIndicator(
-                strokeWidth: 2,
-                color: AppColors.mainColor,
-              ),
-            );
-          },
+          placeholder: (context, url) => Center(
+            child: CircularProgressIndicator(
+              strokeWidth: 2,
+              color: AppColors.mainColor,
+            ),
+          ),
+          errorWidget: (context, url, error) => _buildFallbackIcon(category.id),
         );
       } else {
         // If it's a local asset but doesn't have the full path, add it

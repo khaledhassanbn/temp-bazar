@@ -1,6 +1,7 @@
 import 'package:bazar_suez/Layouts/admin_layout.dart';
 import 'package:bazar_suez/Layouts/market_layout.dart';
 import 'package:bazar_suez/Layouts/user_layout.dart';
+import 'package:bazar_suez/router/app_navigation.dart';
 import 'package:bazar_suez/authentication/guards/AuthGuard.dart';
 import 'package:bazar_suez/authentication/pages/signin_with_social.dart';
 import 'package:bazar_suez/markets/Markets_after_category/pages/category_market_page.dart';
@@ -25,7 +26,8 @@ Future<GoRouter> createRouter(AuthGuard authGuard) async {
     await authGuard.loadUserStatus();
     authGuard.startStatusListener();
 
-    return GoRouter(
+    final router = GoRouter(
+      navigatorKey: rootNavigatorKey,
       initialLocation: '/HomePage',
       refreshListenable: authGuard,
       redirect: (context, state) {
@@ -97,6 +99,8 @@ Future<GoRouter> createRouter(AuthGuard authGuard) async {
         ),
       ],
     );
+    registerAppRouter(router);
+    return router;
   } catch (e) {
     return GoRouter(
       initialLocation: '/login',

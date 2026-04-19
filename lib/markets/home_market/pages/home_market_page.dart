@@ -4,7 +4,6 @@ import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import 'package:bazar_suez/markets/home_page/viewmodels/home_data_provider.dart';
 
-// استيراد الودجات اللي قسمناها
 import 'package:bazar_suez/markets/home_market/widgets/market_cover_section.dart';
 import 'package:bazar_suez/markets/home_market/widgets/market_tabbar_section.dart';
 import 'package:bazar_suez/markets/home_market/widgets/market_appbar.dart';
@@ -15,6 +14,52 @@ import 'package:bazar_suez/markets/license/widgets/license_warning_banner.dart';
 import 'package:bazar_suez/markets/search_in_market/pages/search_in_market_page.dart';
 import 'package:bazar_suez/markets/search_in_market/viewmodels/search_in_market_viewmodel.dart';
 
+// ══════════════════════════════════════════════════════════════
+// دالة تطبيع عربية مشتركة (خارج build لتجنب إعادة الإنشاء)
+// ══════════════════════════════════════════════════════════════
+String _normalizeArabic(String input) {
+  final diacritics = RegExp('[\u064B-\u0652]');
+  return input
+      .replaceAll(diacritics, '')
+      .replaceAll('أ', 'ا')
+      .replaceAll('إ', 'ا')
+      .replaceAll('آ', 'ا')
+      .replaceAll('ى', 'ي')
+      .replaceAll('ة', 'ه')
+      .replaceAll('اً', 'ا')
+      .trim();
+}
+
+/// ترتيب الفئات: الأكثر مبيعاً → العروض → الباقي
+List<MarketCategoryModel> _orderedCategories(
+    List<MarketCategoryModel> categories) {
+  MarketCategoryModel? best;
+  MarketCategoryModel? offers;
+  final others = <MarketCategoryModel>[];
+
+  for (final cat in categories) {
+    // ❌ تم إزالة: `if (cat.items.isEmpty) continue;`
+    // لأن الفئات أثناء التحميل تكون .isEmpty وتخطيها يمنع الـ Tabs من الظهور
+    final key = _normalizeArabic(cat.name);
+    if (key == 'الاكثر مبيعا') {
+      best ??= cat;
+    } else if (key == 'العروض') {
+      offers ??= cat;
+    } else {
+      others.add(cat);
+    }
+  }
+
+  others.sort((a, b) => a.order.compareTo(b.order));
+
+  return [
+    if (best != null) best,
+    if (offers != null) offers,
+    ...others,
+  ];
+}
+
+// ══════════════════════════════════════════════════════════════
 class MarketAnimatedPage extends StatefulWidget {
   final String? marketLink;
   const MarketAnimatedPage({super.key, this.marketLink});
@@ -34,36 +79,42 @@ class _MarketAnimatedPageState extends State<MarketAnimatedPage>
 
   late TabController _tabController;
 
-  // 🔹 مفاتيح الأقسام لتحديد أماكنها
   Map<String, GlobalKey> _sectionKeys = {};
-
   bool _isProgrammaticScroll = false;
   bool _isScrolling = false;
   Timer? _scrollDebounceTimer;
   String? _userMarketId;
+  late final MarketDetailsViewModel _vm;
 
-  /// دمج تحديثات التمرير في إطار واحد يقلّل إعادة بناء الغلاف وشريط التطبيق على كل بكسل.
   bool _scrollOffsetNotifyScheduled = false;
 
-  /// يتحقق إذا كان المستخدم الحالي هو صاحب المتجر
+  // آخر قائمة فئات مرتبة — لتجنب إعادة الحساب في كل rebuild
+  List<MarketCategoryModel> _lastOrdered = [];
+  int _lastOrderedHash = 0;
+
   bool _isStoreOwner(String storeId) {
     return _userMarketId != null && _userMarketId == storeId;
   }
 
-  /// يأخذ معرف متجر المستخدم من HomeDataProvider (بدون query إضافي)
   void _resolveUserMarketId() {
     try {
       final homeData = context.read<HomeDataProvider>();
       _userMarketId = homeData.myStore?.id;
-    } catch (_) {
-      // HomeDataProvider مش متاح — نتجاهل
-    }
+    } catch (_) {}
   }
 
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 1, vsync: this);
+    _vm = MarketDetailsViewModel();
+
+    if (widget.marketLink != null && widget.marketLink!.isNotEmpty) {
+      _vm.loadByLink(widget.marketLink!);
+    } else {
+      _vm.startCategoriesStream();
+    }
+
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _resolveUserMarketId();
     });
@@ -71,9 +122,7 @@ class _MarketAnimatedPageState extends State<MarketAnimatedPage>
     _scrollController.addListener(() {
       if (!_scrollController.hasClients) return;
       _scheduleScrollOffsetNotification();
-
       if (_isProgrammaticScroll) return;
-
       _scrollDebounceTimer?.cancel();
       _scrollDebounceTimer = Timer(
         const Duration(milliseconds: 50),
@@ -98,17 +147,16 @@ class _MarketAnimatedPageState extends State<MarketAnimatedPage>
   void _updateTabBasedOnScroll() {
     for (int i = 0; i < _sectionKeys.length; i++) {
       final key = _sectionKeys.values.elementAt(i);
-      final context = key.currentContext;
-      if (context == null) continue;
+      final ctx = key.currentContext;
+      if (ctx == null) continue;
 
-      final box = context.findRenderObject() as RenderBox;
+      final box = ctx.findRenderObject() as RenderBox;
       final position = box.localToGlobal(Offset.zero).dy;
-      final topPadding = MediaQuery.of(context).padding.top;
+      final topPadding = MediaQuery.of(ctx).padding.top;
       final appBarHeight = kToolbarHeight + topPadding;
       final totalHeaderHeight = appBarHeight + tabBarHeight;
 
-      if (position < totalHeaderHeight + 20 &&
-          position > -box.size.height / 2) {
+      if (position < totalHeaderHeight + 20 && position > -box.size.height / 2) {
         if (_tabController.index != i) {
           _tabController.animateTo(
             i,
@@ -129,7 +177,6 @@ class _MarketAnimatedPageState extends State<MarketAnimatedPage>
     final key = _sectionKeys.values.elementAt(index);
     try {
       await Future.delayed(const Duration(milliseconds: 50));
-
       if (key.currentContext == null) return;
 
       final box = key.currentContext!.findRenderObject() as RenderBox;
@@ -149,10 +196,38 @@ class _MarketAnimatedPageState extends State<MarketAnimatedPage>
         curve: Curves.easeInOutCubic,
       );
     } catch (_) {
-      // تجاهل أي خطأ طفيف
     } finally {
       _isScrolling = false;
       _isProgrammaticScroll = false;
+    }
+  }
+
+  /// يُعيد بناء _tabController فقط عند تغيير عدد الفئات — وليس داخل build()
+  void _updateTabControllerIfNeeded(int desiredLength) {
+    if (_tabController.length == desiredLength) return;
+    final old = _tabController;
+    _tabController = TabController(length: desiredLength, vsync: this);
+    WidgetsBinding.instance.addPostFrameCallback((_) => old.dispose());
+  }
+
+  /// حساب الترتيب مرة واحدة حتى لا يُعاد عند كل notify
+  List<MarketCategoryModel> _getOrdered(List<MarketCategoryModel> categories) {
+    final hash = Object.hashAll(categories.map((c) => Object.hash(c.id, c.items.length)));
+    if (hash == _lastOrderedHash) return _lastOrdered;
+    _lastOrdered = _orderedCategories(categories);
+    _lastOrderedHash = hash;
+    return _lastOrdered;
+  }
+
+  @override
+  void didUpdateWidget(covariant MarketAnimatedPage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.marketLink != widget.marketLink) {
+      if (widget.marketLink != null && widget.marketLink!.isNotEmpty) {
+        _vm.loadByLink(widget.marketLink!);
+      } else {
+        _vm.startCategoriesStream();
+      }
     }
   }
 
@@ -161,91 +236,32 @@ class _MarketAnimatedPageState extends State<MarketAnimatedPage>
     final double mergePoint =
         coverHeight + 40 - kToolbarHeight - MediaQuery.of(context).padding.top;
 
-    return ChangeNotifierProvider(
-      create: (_) {
-        final vm = MarketDetailsViewModel();
-        if (widget.marketLink != null && widget.marketLink!.isNotEmpty) {
-          vm.loadByLink(widget.marketLink!);
-        } else {
-          vm.startCategoriesStream();
-        }
-        return vm;
-      },
+    return ChangeNotifierProvider.value(
+      value: _vm,
       child: Scaffold(
         backgroundColor: Colors.white,
         body: Consumer<MarketDetailsViewModel>(
           builder: (context, vm, _) {
-            final bool isBusyStore = vm.store != null && !vm.store!.available;
-            final bool isClosedStore =
-                vm.store != null && vm.store!.isClosedByWorkingHours;
-            final bool isOrderingBlocked = isBusyStore || isClosedStore;
-
-            // ═══════════════════════════════════════════════════════════════
-            // 🔒 التحقق من صلاحية الترخيص للمستخدمين الآخرين
-            // إذا كان الترخيص منتهياً والزائر ليس صاحب المتجر = عرض صفحة غير متاح
-            // ═══════════════════════════════════════════════════════════════
+            // ══════ فحص الترخيص ══════
             if (vm.store != null &&
                 vm.store!.isLicenseExpired &&
                 !_isStoreOwner(vm.store!.id)) {
               return _buildStoreUnavailablePage(context, vm.store!);
             }
 
-            // 🔹 ترتيب الفئات (الأكثر مبيعاً -> العروض -> الباقي)
-            List<MarketCategoryModel> orderedCategories() {
-              String normalizeArabic(String input) {
-                final diacritics = RegExp('[\u064B-\u0652]');
-                return input
-                    .replaceAll(diacritics, '')
-                    .replaceAll('أ', 'ا')
-                    .replaceAll('إ', 'ا')
-                    .replaceAll('آ', 'ا')
-                    .replaceAll('ى', 'ي')
-                    .replaceAll('ة', 'ه')
-                    .trim();
-              }
+            final bool isBusyStore = vm.store != null && !vm.store!.available;
+            final bool isClosedStore =
+                vm.store != null && vm.store!.isClosedByWorkingHours;
+            final bool isOrderingBlocked = isBusyStore || isClosedStore;
 
-              final normalizedCategories = vm.categories
-                  .map((c) => MapEntry(normalizeArabic(c.name), c))
-                  .toList();
+            // ══════ الفئات المرتبة (محفوظة بالكاش) ══════
+            final ordered = _getOrdered(vm.categories);
 
-              MarketCategoryModel? best;
-              MarketCategoryModel? offers;
-              final others = <MarketCategoryModel>[];
-
-              for (final entry in normalizedCategories) {
-                final key = entry.key;
-                final cat = entry.value;
-                if (cat.items.isEmpty) continue;
-                if (key == 'الاكثر مبيعا') {
-                  best ??= cat;
-                } else if (key == 'العروض') {
-                  offers ??= cat;
-                } else {
-                  others.add(cat);
-                }
-              }
-
-              others.sort((a, b) => a.order.compareTo(b.order));
-
-              final ordered = <MarketCategoryModel>[];
-              if (best != null) ordered.add(best);
-              if (offers != null) ordered.add(offers);
-              ordered.addAll(others);
-              return ordered;
-            }
-
-            final ordered = orderedCategories();
-
-            // تحديث طول التبويبات: لا نستدعي dispose للـ controller القديم أثناء البناء
+            // ══════ TabController (يُحدَّث خارج build عبر postFrameCallback) ══════
             final int desiredLength = ordered.isEmpty ? 1 : ordered.length;
             if (_tabController.length != desiredLength) {
-              final TabController oldController = _tabController;
-              _tabController = TabController(
-                length: desiredLength,
-                vsync: this,
-              );
               WidgetsBinding.instance.addPostFrameCallback((_) {
-                oldController.dispose();
+                if (mounted) _updateTabControllerIfNeeded(desiredLength);
               });
             }
 
@@ -257,6 +273,7 @@ class _MarketAnimatedPageState extends State<MarketAnimatedPage>
                 CustomScrollView(
                   controller: _scrollController,
                   slivers: [
+                    // ══════ غلاف المتجر (يتحرك بـ ValueListenable فقط) ══════
                     SliverToBoxAdapter(
                       child: ValueListenableBuilder<double>(
                         valueListenable: _scrollOffsetNotifier,
@@ -270,6 +287,8 @@ class _MarketAnimatedPageState extends State<MarketAnimatedPage>
                         },
                       ),
                     ),
+
+                    // ══════ شريط التبويبات (مثبت) ══════
                     if (tabReady)
                       SliverPersistentHeader(
                         pinned: true,
@@ -282,6 +301,8 @@ class _MarketAnimatedPageState extends State<MarketAnimatedPage>
                           tabs: ordered.map((c) => c.name).toList(),
                         ),
                       ),
+
+                    // ══════ تحذير إغلاق المتجر ══════
                     if (isOrderingBlocked)
                       SliverToBoxAdapter(
                         child: Container(
@@ -306,6 +327,8 @@ class _MarketAnimatedPageState extends State<MarketAnimatedPage>
                           ),
                         ),
                       ),
+
+                    // ══════ حالة التحميل / الخطأ / المحتوى ══════
                     if (vm.isLoading)
                       const SliverToBoxAdapter(
                         child: Padding(
@@ -316,7 +339,7 @@ class _MarketAnimatedPageState extends State<MarketAnimatedPage>
                     else if (vm.errorMessage != null)
                       SliverToBoxAdapter(
                         child: Padding(
-                          padding: EdgeInsets.all(16),
+                          padding: const EdgeInsets.all(16),
                           child: Text(
                             'حدث خطأ: ${vm.errorMessage!}',
                             textAlign: TextAlign.center,
@@ -327,10 +350,13 @@ class _MarketAnimatedPageState extends State<MarketAnimatedPage>
                       SliverToBoxAdapter(
                         child: Builder(
                           builder: (context) {
-                            _sectionKeys = {
-                              for (final c in ordered)
-                                c.name: _sectionKeys[c.name] ?? GlobalKey(),
-                            };
+                            // تحديث مفاتيح الأقسام بكفاءة
+                            final newKeys = <String, GlobalKey>{};
+                            for (final c in ordered) {
+                              newKeys[c.name] =
+                                  _sectionKeys[c.name] ?? GlobalKey();
+                            }
+                            _sectionKeys = newKeys;
 
                             return MarketProductSection(
                               sectionKeys: _sectionKeys,
@@ -342,6 +368,8 @@ class _MarketAnimatedPageState extends State<MarketAnimatedPage>
                       ),
                   ],
                 ),
+
+                // ══════ AppBar العائم (يتحرك بـ ValueListenable فقط) ══════
                 ValueListenableBuilder<double>(
                   valueListenable: _scrollOffsetNotifier,
                   builder: (context, scrollOffset, _) {
@@ -377,8 +405,9 @@ class _MarketAnimatedPageState extends State<MarketAnimatedPage>
                     );
                   },
                 ),
+
                 if (!isOrderingBlocked) const FloatingCartBar(),
-                // === Overlay حجب الصفحة عند انتهاء الترخيص (لصاحب المتجر فقط) ===
+
                 if (vm.store != null && _isStoreOwner(vm.store!.id))
                   LicenseExpiredOverlay(store: vm.store!),
               ],
@@ -395,10 +424,10 @@ class _MarketAnimatedPageState extends State<MarketAnimatedPage>
     _scrollController.dispose();
     _tabController.dispose();
     _scrollOffsetNotifier.dispose();
+    _vm.dispose();
     super.dispose();
   }
 
-  /// صفحة تظهر للمستخدمين الآخرين عندما يكون ترخيص المتجر منتهياً
   Widget _buildStoreUnavailablePage(BuildContext context, store) {
     return Scaffold(
       backgroundColor: const Color(0xFFF8F9FA),
@@ -407,9 +436,7 @@ class _MarketAnimatedPageState extends State<MarketAnimatedPage>
         elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: Colors.black87),
-          onPressed: () {
-            context.go('/HomePage');
-          },
+          onPressed: () => context.go('/HomePage'),
         ),
         title: Text(
           store.name ?? 'المتجر',
@@ -426,7 +453,6 @@ class _MarketAnimatedPageState extends State<MarketAnimatedPage>
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              // أيقونة المتجر المغلق
               Container(
                 width: 120,
                 height: 120,
@@ -441,7 +467,6 @@ class _MarketAnimatedPageState extends State<MarketAnimatedPage>
                 ),
               ),
               const SizedBox(height: 32),
-              // العنوان
               const Text(
                 'المتجر غير متاح حالياً',
                 style: TextStyle(
@@ -452,7 +477,6 @@ class _MarketAnimatedPageState extends State<MarketAnimatedPage>
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 16),
-              // الوصف
               Text(
                 'هذا المتجر غير متاح للزيارة في الوقت الحالي.\nيرجى المحاولة لاحقاً.',
                 style: TextStyle(
@@ -463,7 +487,6 @@ class _MarketAnimatedPageState extends State<MarketAnimatedPage>
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 40),
-              // زر العودة للصفحة الرئيسية
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton.icon(

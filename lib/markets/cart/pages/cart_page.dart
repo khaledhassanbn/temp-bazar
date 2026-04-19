@@ -8,6 +8,7 @@ import 'package:bazar_suez/markets/cart/viewmodels/cart_view_model.dart';
 import 'package:bazar_suez/markets/home_market/pages/ProductDetails.dart';
 import 'package:bazar_suez/markets/saved_locations/viewmodels/saved_locations_viewmodel.dart';
 import 'package:bazar_suez/services/delivery_fee/delivery_fee_service.dart';
+import 'package:bazar_suez/services/order_notifications/order_index_service.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
@@ -571,6 +572,13 @@ class _CartPageState extends State<CartPage> {
           .collection('present_order')
           .doc(orderId)
           .set(orderData);
+
+      // سجل علوي `orders` — يفعّل Cloud Function + إشعارات المتجر (status: new)
+      await OrderIndexService.instance.createOrUpdateOrderIndex(
+        orderId: orderId,
+        storeId: marketId,
+        userId: currentUser?.uid ?? '',
+      );
 
       // حفظ الطلب في قاعدة بيانات العميل أيضاً
       if (currentUser != null) {

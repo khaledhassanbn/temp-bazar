@@ -1,7 +1,10 @@
 "use strict";
 /**
- * إرسال إشعار للتاجر عند وصول طلب جديد
- * Trigger: إضافة document جديد في present_order
+ * إشعار الطلبات للتاجر — مسار الإنتاج
+ *
+ * Trigger: مستند جديد في مجموعة `orders` (سجل موحّد للطلبات).
+ * مصدر توكن FCM: `stores/{storeId}` أولاً، ثم احتياطي `markets/{storeId}`
+ * للتوافق مع التطبيقات القديمة.
  */
 var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
     if (k2 === undefined) k2 = k;
@@ -41,61 +44,62 @@ exports.sendNewOrderNotification = void 0;
 const functions = __importStar(require("firebase-functions/v2"));
 const firestore_1 = require("firebase-admin/firestore");
 const messaging_1 = require("firebase-admin/messaging");
+async function resolveStoreFcmToken(storeId) {
+    const db = (0, firestore_1.getFirestore)();
+    const storesSnap = await db.collection("stores").doc(storeId).get();
+    const fromStores = storesSnap.data()?.fcmToken;
+    if (typeof fromStores === "string" && fromStores.length > 0) {
+        return fromStores;
+    }
+    const marketSnap = await db.collection("markets").doc(storeId).get();
+    const fromMarkets = marketSnap.data()?.fcmToken;
+    if (typeof fromMarkets === "string" && fromMarkets.length > 0) {
+        return fromMarkets;
+    }
+    return undefined;
+}
 exports.sendNewOrderNotification = functions.firestore.onDocumentCreated({
-    document: "markets/{storeId}/present_order/{orderId}",
+    document: "orders/{orderId}",
     region: "europe-west1",
 }, async (event) => {
-    const storeId = event.params.storeId;
     const orderId = event.params.orderId;
     const orderData = event.data?.data();
     if (!orderData) {
-        console.log(`No order data for order ${orderId}`);
+        console.log(`sendNewOrderNotification: no payload for ${orderId}`);
         return;
     }
-    console.log(`📦 New order created: ${orderId} for store ${storeId}`);
+    const storeId = orderData.storeId;
+    if (!storeId) {
+        console.log(`sendNewOrderNotification: missing storeId on order ${orderId}`);
+        return;
+    }
+    console.log(`📦 orders/onCreate → notify store=${storeId} order=${orderId}`);
     try {
-        // جلب FCM token من بيانات المتجر
-        const storeDoc = await (0, firestore_1.getFirestore)()
-            .collection("markets")
-            .doc(storeId)
-            .get();
-        if (!storeDoc.exists) {
-            console.log(`Store ${storeId} not found`);
-            return;
-        }
-        const storeData = storeDoc.data();
-        const fcmToken = storeData?.fcmToken;
+        const fcmToken = await resolveStoreFcmToken(storeId);
         if (!fcmToken) {
-            console.log(`No FCM token for store ${storeId}`);
+            console.log(`No FCM token for store ${storeId} (stores/markets)`);
             return;
         }
-        // حساب إجمالي الطلب
-        const totalAmount = orderData.totalAmount || 0;
-        const itemsCount = orderData.items?.length || 0;
+        const dataTitle = "طلب جديد";
+        const dataBody = "فيه طلب جديد عندك";
+        // رسالة بيانات فقط — التطبيق يعرض الإشعار المحلي في الخلفية عبر flutter_local_notifications.
         const message = {
             token: fcmToken,
-            notification: {
-                title: "🛒 طلب جديد!",
-                body: `لديك طلب جديد رقم ${orderId} - ${itemsCount} منتجات بقيمة ${totalAmount} ج.م`,
-            },
             data: {
-                type: "new_order",
-                orderId: orderId,
-                storeId: storeId,
-                totalAmount: totalAmount.toString(),
+                type: "NEW_ORDER",
+                orderId: String(orderId),
+                storeId: String(storeId),
+                title: dataTitle,
+                body: dataBody,
                 click_action: "FLUTTER_NOTIFICATION_CLICK",
             },
             android: {
                 priority: "high",
-                notification: {
-                    sound: "default",
-                    channelId: "orders",
-                    icon: "notification_icon",
-                },
             },
             apns: {
                 payload: {
                     aps: {
+                        "content-available": 1,
                         sound: "default",
                         badge: 1,
                     },
@@ -103,10 +107,10 @@ exports.sendNewOrderNotification = functions.firestore.onDocumentCreated({
             },
         };
         await (0, messaging_1.getMessaging)().send(message);
-        console.log(`✅ New order notification sent to store ${storeId} for order ${orderId}`);
+        console.log(`✅ FCM sent for order ${orderId} → store ${storeId}`);
     }
     catch (error) {
-        console.error(`❌ Error sending notification for order ${orderId}:`, error);
+        console.error(`❌ sendNewOrderNotification failed for ${orderId}:`, error);
     }
 });
 //# sourceMappingURL=sendOrderNotification.js.map

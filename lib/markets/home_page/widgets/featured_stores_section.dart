@@ -1,3 +1,4 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:flutter_animate/flutter_animate.dart';
@@ -83,10 +84,11 @@ class FeaturedStoresSection extends StatelessWidget {
                     height: 160,
                     width: double.infinity,
                     child: result.store.coverUrl?.isNotEmpty == true
-                        ? Image.network(
-                            result.store.coverUrl!,
+                        ? CachedNetworkImage(
+                            imageUrl: result.store.coverUrl!,
                             fit: BoxFit.fill,
-                            errorBuilder: (_, __, ___) =>
+                            placeholder: (_, __) => _buildImagePlaceholder(),
+                            errorWidget: (_, __, ___) =>
                                 _buildImagePlaceholder(),
                           )
                         : _buildImagePlaceholder(),
@@ -113,9 +115,14 @@ class FeaturedStoresSection extends StatelessWidget {
                         ],
                       ),
                       child: ClipOval(
-                        child: Image.network(
-                          result.store.logoUrl!,
+                        child: CachedNetworkImage(
+                          imageUrl: result.store.logoUrl!,
                           fit: BoxFit.cover,
+                          placeholder: (_, __) => Container(color: Colors.grey.shade100),
+                          errorWidget: (_, __, ___) => Container(
+                            color: Colors.grey.shade200,
+                            child: const Icon(Icons.store, color: Colors.grey),
+                          ),
                         ),
                       ),
                     ),

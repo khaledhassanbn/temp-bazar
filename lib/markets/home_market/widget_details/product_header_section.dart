@@ -1,3 +1,4 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 
 class ProductHeaderSection extends StatelessWidget {
@@ -14,23 +15,23 @@ class ProductHeaderSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final double dpr = MediaQuery.devicePixelRatioOf(context);
-    final int cacheW = (MediaQuery.sizeOf(context).width * dpr).round();
-    final int cacheH = (300 * dpr).round();
-
     return Column(
       crossAxisAlignment: CrossAxisAlignment.end,
       children: [
         RepaintBoundary(
-          child: Image.network(
-            imageUrl ?? '',
+          child: CachedNetworkImage(
+            imageUrl: imageUrl ?? '',
             width: double.infinity,
             height: 300,
             fit: BoxFit.cover,
-            cacheWidth: cacheW,
-            cacheHeight: cacheH,
             filterQuality: FilterQuality.medium,
-            errorBuilder: (context, error, stackTrace) => Container(
+            placeholder: (context, url) => Container(
+              height: 300,
+              color: Colors.grey[200],
+              alignment: Alignment.center,
+              child: const CircularProgressIndicator(strokeWidth: 2),
+            ),
+            errorWidget: (context, url, error) => Container(
               height: 300,
               color: Colors.grey[300],
               alignment: Alignment.center,
