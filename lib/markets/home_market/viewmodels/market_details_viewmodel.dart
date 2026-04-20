@@ -116,6 +116,9 @@ class MarketDetailsViewModel extends ChangeNotifier {
   /// الفئات الخام (بدون منتجات) من الـ stream الرئيسي
   final Map<String, MarketCategoryModel> _rawCategoriesById = {};
 
+  // عدد المهام المتوازية لجلب منتجات الأقسام (لتسريع الظهور بدون انتظار طويل)
+  static const int _maxConcurrentCategoryFetches = 4;
+
   bool _isDisposed = false;
 
   List<MarketCategoryModel> _categories = [];
@@ -243,14 +246,9 @@ class MarketDetailsViewModel extends ChangeNotifier {
       }
       await Future.wait(firstFutures);
 
-      // الباقي يتم جلبه "بالتتالي" مع فاصل زمني لتجنب Throttling واختناق الردود
-      // مما يحل مشكلة الـ 55 ثانية
+      // الباقي يتم جلبه بتوازي محدود (pool) بدل التسلسل الذي قد يسبب 20-30 ثانية انتظار
       final remaining = catsList.skip(2).toList();
-      for (final cat in remaining) {
-        if (_isDisposed) break;
-        await _fetchItemsForCategory(productsRef, cat.id);
-        await Future.delayed(const Duration(milliseconds: 150));
-      }
+      await _fetchRemainingCategoriesWithConcurrency(productsRef, remaining);
 
     } catch (e) {
       if (!_isDisposed) {
@@ -273,10 +271,11 @@ class MarketDetailsViewModel extends ChangeNotifier {
     String categoryId,
   ) async {
     try {
-      // القراءة لمرة واحدة، وبدون orderBy على السيرفر
       final snap = await productsRef
           .doc(categoryId)
           .collection('items')
+          // ترتيب على السيرفر باستخدام فهرس بسيط (أفضل من ترتيب محلي لقوائم كبيرة)
+          .orderBy('order')
           .get();
       
       if (_isDisposed) return;
@@ -285,9 +284,6 @@ class MarketDetailsViewModel extends ChangeNotifier {
           .map(MarketItemModel.fromDoc)
           .where((item) => !item.shouldBeHidden)
           .toList();
-
-      // ترتيب محلي بدلاً من تكليف السيرفر لتقليل وقت الاستجابة
-      items.sort((a, b) => a.order.compareTo(b.order));
       
       _itemsCacheByCategoryId[categoryId] = items;
       
@@ -298,6 +294,23 @@ class MarketDetailsViewModel extends ChangeNotifier {
       if (kDebugMode) print('Items fetch error ($categoryId): $e');
       _itemsCacheByCategoryId[categoryId] = []; // تعيين كفارِغ في حالة الخطأ
       _rebuildCategories();
+    }
+  }
+
+  Future<void> _fetchRemainingCategoriesWithConcurrency(
+    CollectionReference<Map<String, dynamic>> productsRef,
+    List<MarketCategoryModel> remaining,
+  ) async {
+    if (remaining.isEmpty) return;
+
+    var i = 0;
+    while (i < remaining.length && !_isDisposed) {
+      final end = (i + _maxConcurrentCategoryFetches).clamp(0, remaining.length);
+      final batch = remaining.sublist(i, end);
+      await Future.wait(batch.map((c) => _fetchItemsForCategory(productsRef, c.id)));
+      i = end;
+      // اترك مساحة للـUI بين الدُفعات بدل delay ثابت كبير
+      await Future<void>.delayed(const Duration(milliseconds: 10));
     }
   }
 

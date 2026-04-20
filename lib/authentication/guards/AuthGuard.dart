@@ -42,6 +42,10 @@ class AuthGuard extends ChangeNotifier {
   User? get currentUser => _auth.currentUser;
   String? userStatus; // user | market_owner
   bool _hasSetupLocation = false;
+  String? _marketId;
+
+  /// ✅ معرّف متجر المستخدم (إن وُجد)
+  String? get marketId => _marketId;
 
   /// ✅ هل المستخدم داخل التطبيق؟
   bool get isAuthenticated => currentUser != null;
@@ -72,16 +76,20 @@ class AuthGuard extends ChangeNotifier {
         final data = doc.data();
         userStatus = data?['status'] ?? 'user';
         _hasSetupLocation = data?['hasSetupLocation'] ?? false;
+        final dynamic mid = data?['market_id'] ?? data?['marketId'];
+        _marketId = mid is String && mid.isNotEmpty ? mid : null;
         debugPrint('✅ User status loaded: $userStatus, hasSetupLocation: $_hasSetupLocation');
       } else {
         userStatus = 'user';
         _hasSetupLocation = false;
+        _marketId = null;
         debugPrint('⚠️ User document not found, defaulting to user');
       }
     } catch (e) {
       debugPrint('⚠️ Error loading user status: $e');
       userStatus = 'user';
       _hasSetupLocation = false;
+      _marketId = null;
     }
 
     _safeNotifyListeners();
@@ -111,6 +119,9 @@ class AuthGuard extends ChangeNotifier {
             final data = snapshot.data();
             final newStatus = data?['status'] ?? 'user';
             final newHasSetupLocation = data?['hasSetupLocation'] ?? false;
+            final dynamic mid = data?['market_id'] ?? data?['marketId'];
+            final String? newMarketId =
+                mid is String && mid.isNotEmpty ? mid : null;
             
             bool changed = false;
             if (newStatus != userStatus) {
@@ -121,6 +132,11 @@ class AuthGuard extends ChangeNotifier {
             if (newHasSetupLocation != _hasSetupLocation) {
               _hasSetupLocation = newHasSetupLocation;
               debugPrint('🔄 Location setup status updated: $_hasSetupLocation');
+              changed = true;
+            }
+            if (newMarketId != _marketId) {
+              _marketId = newMarketId;
+              debugPrint('🔄 marketId updated: $_marketId');
               changed = true;
             }
             

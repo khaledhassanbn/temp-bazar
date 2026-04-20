@@ -6,6 +6,7 @@ import 'package:provider/provider.dart';
 import 'package:bazar_suez/markets/cart/viewmodels/cart_view_model.dart';
 import 'package:bazar_suez/markets/cart/models/cart_item_model.dart';
 import 'package:bazar_suez/markets/create_market/models/working_hours.dart';
+import 'package:bazar_suez/theme/app_color.dart';
 
 class ProductDetailsPage extends StatefulWidget {
   final String? marketId;
@@ -47,9 +48,9 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
   // AppBar opacity based on scroll
   final ValueNotifier<double> _appBarOpacity = ValueNotifier(0.0);
 
-  static const Color _primaryGreen = Color(0xFF1D9E75);
-  static const Color _darkGreen = Color(0xFF0F6E56);
-  static const Color _lightGreen = Color(0xFFE1F5EE);
+  static const Color _primaryGreen = AppColors.mainColor;
+  static const Color _darkGreen = Color(0xFF2A5C6D);
+  static const Color _lightGreen = Color(0xFFE0F2F7);
   static const Color _bgGray = Color(0xFFF5F5F5);
 
   @override
@@ -305,11 +306,7 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
               ),
             )
           else
-            Positioned(
-              top: 60,
-              right: 16,
-              child: _statusBadge('متوفر', _primaryGreen),
-            ),
+            const SizedBox.shrink(),
         ],
       ),
     );
@@ -378,32 +375,6 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
                   color: Color(0xFF1A1A1A),
                 ),
               ),
-              const SizedBox(height: 8),
-              // Rating row
-              Row(
-                mainAxisAlignment: MainAxisAlignment.end,
-                children: [
-                  const Text(
-                    '(128 تقييم)',
-                    style: TextStyle(fontSize: 12, color: Color(0xFF888780)),
-                  ),
-                  const SizedBox(width: 6),
-                  const Text(
-                    '4.9',
-                    style: TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600,
-                      color: Color(0xFF1A1A1A),
-                    ),
-                  ),
-                  const SizedBox(width: 4),
-                  const Icon(
-                    Icons.star_rounded,
-                    color: Color(0xFFEF9F27),
-                    size: 16,
-                  ),
-                ],
-              ),
               const SizedBox(height: 10),
               // Description
               if (_description.isNotEmpty)
@@ -422,34 +393,7 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
               // Price + delivery
               Row(
                 children: [
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 10,
-                      vertical: 5,
-                    ),
-                    decoration: BoxDecoration(
-                      color: _lightGreen,
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Row(
-                      children: [
-                        const Icon(
-                          Icons.access_time_rounded,
-                          size: 13,
-                          color: _primaryGreen,
-                        ),
-                        const SizedBox(width: 4),
-                        Text(
-                          '20–30 دقيقة',
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: _darkGreen,
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
+                  const SizedBox.shrink(),
                 const Spacer(),
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.end,
@@ -1091,7 +1035,7 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
       if (!success) {
         await _showMarketReplacementDialog(cartViewModel, cartItem);
       } else {
-        _showSuccessSnackBar('تم إضافة المنتج للسلة بنجاح');
+        // _showSuccessSnackBar('تم إضافة المنتج للسلة بنجاح');
         Navigator.pop(context);
       }
     } catch (e) {

@@ -1,5 +1,5 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
 import 'package:bazar_suez/authentication/guards/AuthGuard.dart';
@@ -20,7 +20,21 @@ class _StoreOrderNotificationHostState extends State<StoreOrderNotificationHost>
   late final AuthGuard _auth;
   StoreNewOrderListener? _listener;
   String? _attachedStoreId;
+  String? _attachedUid;
+  String? _lastLocation;
   bool _busy = false;
+
+  bool _isEligibleLocation(String? location) {
+    if (location == null || location.isEmpty) return false;
+    // شغّل الاستماع فقط داخل صفحات التاجر التي تحتاج تنبيه فعلي للطلبات
+    // لتجنب ثِقل فتح صفحات مثل MarketAnimatedPage.
+    if (location.startsWith('/myorder')) return true;
+    if (location.startsWith('/PastOrders')) return true;
+    if (location.startsWith('/MyStorePage')) return true;
+    if (location.startsWith('/ManageProducts')) return true;
+    if (location.startsWith('/SalesStatsPage')) return true;
+    return false;
+  }
 
   @override
   void initState() {
@@ -40,24 +54,37 @@ class _StoreOrderNotificationHostState extends State<StoreOrderNotificationHost>
   Future<void> _onAuthChanged() async {
     if (_busy) return;
 
+    final location = _lastLocation;
+    if (!_isEligibleLocation(location)) {
+      // لا نحتاج listener هنا، فنتأكد أنه متوقف
+      await _listener?.dispose();
+      _listener = null;
+      _attachedStoreId = null;
+      _attachedUid = null;
+      return;
+    }
+
     if (!_auth.isMarketOwner || _auth.currentUser == null) {
       await _listener?.dispose();
       _listener = null;
       _attachedStoreId = null;
+      _attachedUid = null;
       return;
     }
 
     _busy = true;
     try {
       final uid = _auth.currentUser!.uid;
-      final snap =
-          await FirebaseFirestore.instance.collection('users').doc(uid).get();
-      final data = snap.data();
-      final dynamic mid = data?['market_id'] ?? data?['marketId'];
-      if (mid is! String || mid.isEmpty) {
+      if (_attachedUid == uid && _attachedStoreId != null && _listener != null) {
+        return;
+      }
+
+      final mid = _auth.marketId;
+      if (mid == null || mid.isEmpty) {
         await _listener?.dispose();
         _listener = null;
         _attachedStoreId = null;
+        _attachedUid = uid;
         return;
       }
 
@@ -65,8 +92,12 @@ class _StoreOrderNotificationHostState extends State<StoreOrderNotificationHost>
 
       await _listener?.dispose();
       _attachedStoreId = mid;
+      _attachedUid = uid;
 
-      await FcmService.instance.saveTokenForStore(mid);
+      // لا ننتظر الكتابة على الشبكة هنا حتى لا تؤخر فتح الصفحة
+      // ومحدودة بـ throttle داخل FcmService.
+      // ignore: unawaited_futures
+      FcmService.instance.saveTokenForStore(mid);
 
       _listener = StoreNewOrderListener(mid)..start();
     } finally {
@@ -76,6 +107,11 @@ class _StoreOrderNotificationHostState extends State<StoreOrderNotificationHost>
 
   @override
   Widget build(BuildContext context) {
+    final location = GoRouterState.of(context).matchedLocation;
+    if (_lastLocation != location) {
+      _lastLocation = location;
+      WidgetsBinding.instance.addPostFrameCallback((_) => _onAuthChanged());
+    }
     return const SizedBox.shrink();
   }
 }

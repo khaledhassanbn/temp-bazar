@@ -11,16 +11,26 @@ class StoreNewOrderListener {
 
   final String storeId;
   StreamSubscription<QuerySnapshot<Map<String, dynamic>>>? _sub;
+  bool _seenInitialSnapshot = false;
 
   void start() {
     _sub?.cancel();
+    _seenInitialSnapshot = false;
     _sub = FirebaseFirestore.instance
         .collection('orders')
         .where(OrderNotificationFields.storeId, isEqualTo: storeId)
         .where(OrderNotificationFields.status, isEqualTo: OrderIndexStatus.newOrder)
+        // حماية من تحميل/معالجة عدد ضخم من الطلبات القديمة عند فتح التطبيق.
+        .limit(50)
         .snapshots()
         .listen(
           (snapshot) {
+            // أول snapshot غالباً يحتوي على كل المستندات الحالية ويظهر كـ "added" في docChanges.
+            // تجاهله يمنع ثِقل فتح الصفحات/عرض حوارات متتالية لطلبات قديمة.
+            if (!_seenInitialSnapshot) {
+              _seenInitialSnapshot = true;
+              return;
+            }
             for (final change in snapshot.docChanges) {
               if (change.type == DocumentChangeType.added) {
                 OrderNotificationCoordinator.instance.notifyNewOrder(change.doc.id);

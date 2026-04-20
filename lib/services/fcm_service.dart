@@ -25,6 +25,11 @@ class FcmService {
   String? _currentToken;
   String? get currentToken => _currentToken;
 
+  // تقليل الكتابات على Firestore (خصوصًا عند فتح صفحات المتجر)
+  static const Duration _tokenWriteThrottle = Duration(hours: 6);
+  final Map<String, DateTime> _storeTokenLastWriteAttempt = <String, DateTime>{};
+  final Map<String, DateTime> _userTokenLastWriteAttempt = <String, DateTime>{};
+
   static final StreamController<RemoteMessage> _foregroundMessageController =
       StreamController<RemoteMessage>.broadcast();
   static final StreamController<RemoteMessage> _messageOpenedController =
@@ -104,7 +109,14 @@ class FcmService {
   }
 
   /// يحفظ التوكن في `stores` (لـ Cloud Functions) و`markets` (للتوافق مع النسخة السابقة).
-  Future<void> saveTokenForStore(String storeId) async {
+  Future<void> saveTokenForStore(String storeId, {bool force = false}) async {
+    final last = _storeTokenLastWriteAttempt[storeId];
+    final nowLocal = DateTime.now();
+    if (!force && last != null && nowLocal.difference(last) < _tokenWriteThrottle) {
+      return;
+    }
+    _storeTokenLastWriteAttempt[storeId] = nowLocal;
+
     _currentToken ??= await _messaging.getToken();
 
     if (_currentToken == null) {
@@ -132,6 +144,13 @@ class FcmService {
   }
 
   Future<void> saveTokenForUser(String userId) async {
+    final last = _userTokenLastWriteAttempt[userId];
+    final nowLocal = DateTime.now();
+    if (last != null && nowLocal.difference(last) < _tokenWriteThrottle) {
+      return;
+    }
+    _userTokenLastWriteAttempt[userId] = nowLocal;
+
     _currentToken ??= await _messaging.getToken();
 
     if (_currentToken == null) {
