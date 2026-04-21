@@ -65,6 +65,7 @@ dependencies:
   # 💳 بوابة الدفع
   webview_flutter: ^4.9.0
   cached_network_image: ^3.4.1
+  shared_preferences: ^2.5.5
 
 dev_dependencies:
   flutter_test:

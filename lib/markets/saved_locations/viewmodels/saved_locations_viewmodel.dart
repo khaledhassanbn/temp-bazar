@@ -3,6 +3,8 @@ import 'package:flutter/foundation.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
+import 'dart:async';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../../models/saved_location_model.dart';
 import '../../../services/saved_locations_service.dart';
 
@@ -96,52 +98,71 @@ class SavedLocationsViewModel extends ChangeNotifier {
     }
   }
 
-  /// الكشف التلقائي عن الموقع الحالي
+  /// الكشف التلقائي عن الموقع الحالي (Progressive Location Strategy)
   Future<void> detectCurrentLocation() async {
+    // 1️⃣ المستوى الأول: Cache محلي (فوري)
+    final cached = await _loadFromCache();
+    if (cached != null) {
+      _currentLocation = cached['location'];
+      _currentAddress = cached['address'];
+      _hasLocation = true;
+      _safeNotifyListeners(); // ✅ عرض فوري للمستخدم
+      
+      // حسّن في الخلفية بدون انتظار
+      _refreshLocationInBackground();
+      return;
+    }
+
+    // 2️⃣ المستوى الثاني: آخر موقع معروف (سريع جداً)
     try {
-      // التحقق من تفعيل خدمة الموقع
-      bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
-      if (!serviceEnabled) {
-        _locationPermissionDenied = true;
+      final lastKnown = await Geolocator.getLastKnownPosition();
+      if (lastKnown != null) {
+        _currentLocation = GeoPoint(lastKnown.latitude, lastKnown.longitude);
+        _hasLocation = true;
+        _safeNotifyListeners(); // ✅ عرض سريع
+        
+        // جلب العنوان والتحسين في الخلفية
+        _fetchAddressInBackground(_currentLocation!);
+        _refreshLocationInBackground();
+        return;
+      }
+    } catch (_) {}
+
+    // 3️⃣ المستوى الثالث: GPS مع Timeout محدود
+    _isLoading = true;
+    _safeNotifyListeners();
+
+    try {
+      final permission = await _checkAndRequestPermission();
+      if (!permission) {
+        _isLoading = false;
         _safeNotifyListeners();
         return;
       }
 
-      // التحقق من الصلاحيات
-      LocationPermission permission = await Geolocator.checkPermission();
-      if (permission == LocationPermission.denied) {
-        permission = await Geolocator.requestPermission();
-        if (permission == LocationPermission.denied) {
-          _locationPermissionDenied = true;
-          _safeNotifyListeners();
-          return;
-        }
-      }
-
-      if (permission == LocationPermission.deniedForever) {
-        _locationPermissionDenied = true;
-        _safeNotifyListeners();
-        return;
-      }
-
-      // الحصول على الموقع الحالي
-      _isLoading = true;
-      _safeNotifyListeners();
-
-      Position position = await Geolocator.getCurrentPosition(
-        desiredAccuracy: LocationAccuracy.high,
+      // ⚠️ الفرق الجوهري: timeout + accuracy أقل أولاً
+      final position = await Geolocator.getCurrentPosition(
+        desiredAccuracy: LocationAccuracy.medium, // أسرع من high
+      ).timeout(
+        const Duration(seconds: 5),
+        onTimeout: () => throw TimeoutException('GPS timeout'),
       );
 
       _currentLocation = GeoPoint(position.latitude, position.longitude);
-      
-      // جلب العنوان من الإحداثيات
-      await _fetchAddressFromCoordinates(position.latitude, position.longitude);
-
       _hasLocation = true;
-      _locationPermissionDenied = false;
       _isLoading = false;
       _safeNotifyListeners();
 
+      // جلب العنوان في الخلفية
+      _fetchAddressInBackground(_currentLocation!);
+
+      // تحسين الدقة لاحقاً في الخلفية
+      _improveAccuracyInBackground();
+
+    } on TimeoutException {
+      // ✅ مش كارثة - عرض الخريطة بدون موقع
+      _isLoading = false;
+      _safeNotifyListeners();
     } catch (e) {
       debugPrint('خطأ في الكشف عن الموقع: $e');
       _locationPermissionDenied = true;
@@ -150,41 +171,135 @@ class SavedLocationsViewModel extends ChangeNotifier {
     }
   }
 
-  /// جلب العنوان من الإحداثيات باستخدام Google Geocoding API
+  // ================================================
+  // Helpers
+  // ================================================
+
+
+Future<bool> _checkAndRequestPermission() async {
+    bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
+    if (!serviceEnabled) {
+      _locationPermissionDenied = true;
+      _safeNotifyListeners(); // ← ضروري عشان الـ UI يتحدث
+      return false;
+    }
+
+    LocationPermission permission = await Geolocator.checkPermission();
+    if (permission == LocationPermission.denied) {
+      permission = await Geolocator.requestPermission();
+      if (permission == LocationPermission.denied) {
+        _locationPermissionDenied = true;
+        return false;
+      }
+    }
+
+    if (permission == LocationPermission.deniedForever) {
+      _locationPermissionDenied = true;
+      return false;
+    }
+    
+    _locationPermissionDenied = false;
+    return true;
+  }
+
+  void _refreshLocationInBackground() {
+    _improveAccuracyInBackground();
+  }
+
+  void _improveAccuracyInBackground() {
+    Future.microtask(() async {
+      try {
+        final position = await Geolocator.getCurrentPosition(
+          desiredAccuracy: LocationAccuracy.high,
+        ).timeout(const Duration(seconds: 15));
+        
+        _currentLocation = GeoPoint(position.latitude, position.longitude);
+        _hasLocation = true;
+        _safeNotifyListeners();
+        
+        _fetchAddressInBackground(_currentLocation!);
+      } catch (_) {}
+    });
+  }
+
+  void _fetchAddressInBackground(GeoPoint location) {
+    Future.microtask(() async {
+      await _fetchAddressFromCoordinates(
+        location.latitude,
+        location.longitude,
+      );
+    });
+  }
+
   Future<void> _fetchAddressFromCoordinates(double lat, double lng) async {
     try {
-      final url =
-          "https://maps.googleapis.com/maps/api/geocode/json?latlng=$lat,$lng&language=ar&key=$_apiKey";
-      final res = await http.get(Uri.parse(url));
+      final url = "https://maps.googleapis.com/maps/api/geocode/json?latlng=$lat,$lng&language=ar&key=$_apiKey";
+      
+      final res = await http.get(Uri.parse(url)).timeout(const Duration(seconds: 4)); // ✅ timeout ضروري
+
       final data = json.decode(res.body);
-
       if (data["status"] == "OK" && data["results"].isNotEmpty) {
-        final results = data["results"] as List;
+        _currentAddress = _extractNeighborhood(data["results"]);
+        _safeNotifyListeners();
+        
+        if (_currentLocation != null) {
+          await _saveToCache(_currentLocation!, _currentAddress!); // حفظ للمرة الجاية
+        }
+      }
+    } on TimeoutException {
+      if (_currentAddress == null) _currentAddress = 'موقعك الحالي';
+      _safeNotifyListeners();
+    } catch (e) {
+      debugPrint('خطأ في جلب العنوان: $e');
+      if (_currentAddress == null) _currentAddress = 'موقعك الحالي';
+      _safeNotifyListeners();
+    }
+  }
 
-        // نحاول نلاقي اسم الحي
-        String? neighborhoodName;
-        for (var r in results) {
-          final types = (r["types"] as List?)?.cast<String>() ?? [];
-          if (types.contains("neighborhood")) {
-            final comps = (r["address_components"] as List)
-                .cast<Map<String, dynamic>>();
-            for (var c in comps) {
-              final cTypes = (c["types"] as List?)?.cast<String>() ?? [];
-              if (cTypes.contains("neighborhood")) {
-                neighborhoodName = c["short_name"] ?? c["long_name"];
-                break;
-              }
-            }
+  String _extractNeighborhood(List<dynamic> results) {
+    String? neighborhoodName;
+    for (var r in results) {
+      final types = (r["types"] as List?)?.cast<String>() ?? [];
+      if (types.contains("neighborhood")) {
+        final comps = (r["address_components"] as List).cast<Map<String, dynamic>>();
+        for (var c in comps) {
+          final cTypes = (c["types"] as List?)?.cast<String>() ?? [];
+          if (cTypes.contains("neighborhood")) {
+            neighborhoodName = c["short_name"] ?? c["long_name"];
             break;
           }
         }
-
-        _currentAddress = neighborhoodName ?? data["results"][0]["formatted_address"];
+        break;
       }
-    } catch (e) {
-      debugPrint('خطأ في جلب العنوان: $e');
-      _currentAddress = 'موقعك الحالي';
     }
+    return neighborhoodName ?? results[0]["formatted_address"] ?? 'موقعك الحالي';
+  }
+
+  Future<Map<String, dynamic>?> _loadFromCache() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final lat = prefs.getDouble('cached_lat');
+      final lng = prefs.getDouble('cached_lng');
+      final address = prefs.getString('cached_address');
+      final timestamp = prefs.getInt('cached_timestamp') ?? 0;
+      
+      // Cache صالح لمدة 30 دقيقة فقط
+      final age = DateTime.now().millisecondsSinceEpoch - timestamp;
+      if (lat != null && lng != null && address != null && age < 30 * 60 * 1000) {
+        return {'location': GeoPoint(lat, lng), 'address': address};
+      }
+    } catch (_) {}
+    return null;
+  }
+
+  Future<void> _saveToCache(GeoPoint location, String address) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setDouble('cached_lat', location.latitude);
+      await prefs.setDouble('cached_lng', location.longitude);
+      await prefs.setString('cached_address', address);
+      await prefs.setInt('cached_timestamp', DateTime.now().millisecondsSinceEpoch);
+    } catch (_) {}
   }
 
   /// تحميل العناوين المحفوظة

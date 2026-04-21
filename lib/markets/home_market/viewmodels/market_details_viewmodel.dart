@@ -116,8 +116,10 @@ class MarketDetailsViewModel extends ChangeNotifier {
   /// الفئات الخام (بدون منتجات) من الـ stream الرئيسي
   final Map<String, MarketCategoryModel> _rawCategoriesById = {};
 
-  // عدد المهام المتوازية لجلب منتجات الأقسام (لتسريع الظهور بدون انتظار طويل)
-  static const int _maxConcurrentCategoryFetches = 4;
+  // عدد المهام المتوازية لجلب منتجات الأقسام (تم زيادته لتسريع الظهور)
+  static const int _maxConcurrentCategoryFetches = 15;
+
+  Timer? _rebuildDebounceTimer;
 
   bool _isDisposed = false;
 
@@ -238,17 +240,19 @@ class MarketDetailsViewModel extends ChangeNotifier {
         return a.order.compareTo(b.order);
       });
 
-      // جلب أهم 2 أقسام بالتوازي لتكون جاهزة للمستخدم فوراً
-      final firstBatch = catsList.take(2).toList();
+      // جلب أهم أقسام بالتوازي لتكون جاهزة للمستخدم فوراً
+      final firstBatch = catsList.take(3).toList();
       final firstFutures = <Future<void>>[];
       for (final cat in firstBatch) {
         firstFutures.add(_fetchItemsForCategory(productsRef, cat.id));
       }
-      await Future.wait(firstFutures);
+      
+      // لا نستخدم await هنا لكي يعمل في الخلفية بسرعة 
+      Future.wait(firstFutures);
 
-      // الباقي يتم جلبه بتوازي محدود (pool) بدل التسلسل الذي قد يسبب 20-30 ثانية انتظار
-      final remaining = catsList.skip(2).toList();
-      await _fetchRemainingCategoriesWithConcurrency(productsRef, remaining);
+      // الباقي يتم جلبه بتوازي معتدل
+      final remaining = catsList.skip(3).toList();
+      _fetchRemainingCategoriesWithConcurrency(productsRef, remaining);
 
     } catch (e) {
       if (!_isDisposed) {
@@ -271,10 +275,32 @@ class MarketDetailsViewModel extends ChangeNotifier {
     String categoryId,
   ) async {
     try {
+      // 1. محاولة الجلب السريع جداً من الكاش لظهور فوري
+      try {
+        final cacheSnap = await productsRef
+            .doc(categoryId)
+            .collection('items')
+            .orderBy('order')
+            .get(const GetOptions(source: Source.cache));
+            
+        if (cacheSnap.docs.isNotEmpty && !_isDisposed) {
+          final cachedItems = cacheSnap.docs
+              .map(MarketItemModel.fromDoc)
+              .where((item) => !item.shouldBeHidden)
+              .toList();
+          _itemsCacheByCategoryId[categoryId] = cachedItems;
+          _scheduleRebuild();
+        }
+      } catch (_) {
+        // تجاهل الخطأ في حالة أن الكاش فارغ
+      }
+
+      if (_isDisposed) return;
+
+      // 2. تحديث المنتجات من السيرفر
       final snap = await productsRef
           .doc(categoryId)
           .collection('items')
-          // ترتيب على السيرفر باستخدام فهرس بسيط (أفضل من ترتيب محلي لقوائم كبيرة)
           .orderBy('order')
           .get();
       
@@ -286,14 +312,14 @@ class MarketDetailsViewModel extends ChangeNotifier {
           .toList();
       
       _itemsCacheByCategoryId[categoryId] = items;
-      
-      // تحديث قائمة الفئات لتظهر محتوياتها بمجرد جاهزيتها
-      _rebuildCategories();
+      _scheduleRebuild();
       
     } catch (e) {
       if (kDebugMode) print('Items fetch error ($categoryId): $e');
-      _itemsCacheByCategoryId[categoryId] = []; // تعيين كفارِغ في حالة الخطأ
-      _rebuildCategories();
+      if (_itemsCacheByCategoryId[categoryId] == null) {
+        _itemsCacheByCategoryId[categoryId] = []; // تعيين كفارِغ في حالة الخطأ فقط لو مفيش كاش
+      }
+      _scheduleRebuild();
     }
   }
 
@@ -317,6 +343,15 @@ class MarketDetailsViewModel extends ChangeNotifier {
   // ════════════════════════════════════════════════
   // إعادة بناء قائمة الفئات بكفاءة
   // ════════════════════════════════════════════════
+  void _scheduleRebuild() {
+    if (_isDisposed) return;
+    _rebuildDebounceTimer?.cancel();
+    // تأخير لجمع عدة تحديثات بدفعة واحدة لمنع تقطيع واجهة المستخدم
+    _rebuildDebounceTimer = Timer(const Duration(milliseconds: 60), () {
+      _rebuildCategories();
+    });
+  }
+
   void _rebuildCategories() {
     if (_isDisposed) return;
 
@@ -324,7 +359,7 @@ class MarketDetailsViewModel extends ChangeNotifier {
     for (final raw in _rawCategoriesById.values) {
       final items = _itemsCacheByCategoryId[raw.id];
       if (items != null) {
-        // اكتمل تحميل القسم، إظهار الفئة فقط إذا كان لها منتجات
+        // اكتمل تحميل القسم أو تم جلبه من الكاش، إظهار الفئة فقط إذا كان لها منتجات
         if (items.isNotEmpty) {
           built.add(raw.copyWith(items: items));
         }
@@ -346,6 +381,7 @@ class MarketDetailsViewModel extends ChangeNotifier {
   @override
   void dispose() {
     _isDisposed = true;
+    _rebuildDebounceTimer?.cancel();
     _categoriesSubscription?.cancel();
     for (final sub in _itemSubscriptions.values) {
       sub.cancel();
