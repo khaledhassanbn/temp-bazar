@@ -63,9 +63,10 @@ class LocalNotificationService {
     if (payload == null || payload.isEmpty) return;
     final parts = payload.split(_payloadSep);
     if (parts.length < 2) return;
+    final orderId = parts[0];
     final storeId = parts[1];
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      navigateToStoreOrders(storeId);
+      navigateToStoreOrders(storeId, orderId: orderId);
     });
   }
 

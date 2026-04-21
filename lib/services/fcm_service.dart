@@ -110,6 +110,27 @@ class FcmService {
 
   /// يحفظ التوكن في `stores` (لـ Cloud Functions) و`markets` (للتوافق مع النسخة السابقة).
   Future<void> saveTokenForStore(String storeId, {bool force = false}) async {
+    // حماية: لا نسمح لأي مستخدم غير صاحب المتجر أن يكتب token داخل مستند المتجر.
+    // الخطأ الشائع: عميل يفتح صفحة تمرّر marketId فيكتب token جهازه داخل markets/{storeId}
+    // وبذلك تصل إشعارات "طلب جديد" للعميل بدل التاجر.
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
+
+    try {
+      final marketDoc = await _firestore.collection('markets').doc(storeId).get();
+      final ownerId = marketDoc.data()?['ownerId'];
+      if (ownerId is! String || ownerId.isEmpty || ownerId != user.uid) {
+        debugPrint(
+          '⛔ Refused to save store token: user=${user.uid} is not owner of store=$storeId',
+        );
+        return;
+      }
+    } catch (e) {
+      // لو فشلنا في التحقق لا نكتب التوكن (أماناً).
+      debugPrint('⛔ Could not verify store ownership for $storeId: $e');
+      return;
+    }
+
     final last = _storeTokenLastWriteAttempt[storeId];
     final nowLocal = DateTime.now();
     if (!force && last != null && nowLocal.difference(last) < _tokenWriteThrottle) {
@@ -176,35 +197,72 @@ class FcmService {
     }
   }
 
-  void _handleForegroundMessage(RemoteMessage message) {
+  Future<bool> _isUserAuthorizedForStore(String storeId) async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return false;
+
+    try {
+      final userDoc = await _firestore.collection('users').doc(user.uid).get();
+      final data = userDoc.data();
+      if (data != null) {
+        final mid = data['market_id'] ?? data['marketId'] ?? data['market']?['id'];
+        if (mid == storeId) return true;
+      }
+    } catch (_) {}
+
+    try {
+      final marketDoc = await _firestore.collection('markets').doc(storeId).get();
+      final ownerId = marketDoc.data()?['ownerId'];
+      if (ownerId == user.uid) return true;
+    } catch (_) {}
+
+    return false;
+  }
+
+  void _handleForegroundMessage(RemoteMessage message) async {
     debugPrint('📱 Foreground FCM: ${message.data}');
-    _routeNewOrderFromData(Map<String, dynamic>.from(message.data));
+    await _routeNewOrderFromData(Map<String, dynamic>.from(message.data));
     _foregroundMessageController.add(message);
   }
 
-  void _handleMessageOpenedApp(RemoteMessage message) {
+  void _handleMessageOpenedApp(RemoteMessage message) async {
     debugPrint('👆 Notification opened app: ${message.data}');
-    _handleNotificationOpen(Map<String, dynamic>.from(message.data));
+    await _handleNotificationOpen(Map<String, dynamic>.from(message.data));
     _messageOpenedController.add(message);
   }
 
   /// فتح التطبيق من الإشعار — الانتقال لشاشة الطلبات فقط (بدون إعادة عرض الحوار).
-  void _handleNotificationOpen(Map<String, dynamic> data) {
+  Future<void> _handleNotificationOpen(Map<String, dynamic> data) async {
     final type = data[FcmOrderDataKeys.type]?.toString();
     if (type != FcmOrderDataKeys.newOrder) return;
 
     final storeId = data[FcmOrderDataKeys.storeId]?.toString();
+    final orderId = data[FcmOrderDataKeys.orderId]?.toString();
     if (storeId != null && storeId.isNotEmpty) {
-      navigateToStoreOrders(storeId);
+      if (!await _isUserAuthorizedForStore(storeId)) {
+        debugPrint('⛔ Access denied: Current user is not authorized for store $storeId on notification open.');
+        return;
+      }
+      navigateToStoreOrders(storeId, orderId: orderId);
     }
   }
 
-  void _routeNewOrderFromData(Map<String, dynamic> data) {
+  Future<void> _routeNewOrderFromData(Map<String, dynamic> data) async {
     final type = data[FcmOrderDataKeys.type]?.toString();
     if (type != FcmOrderDataKeys.newOrder) return;
     final orderId = data[FcmOrderDataKeys.orderId]?.toString() ?? '';
-    if (orderId.isEmpty) return;
-    OrderNotificationCoordinator.instance.notifyNewOrder(orderId);
+    final storeId = data[FcmOrderDataKeys.storeId]?.toString() ?? '';
+    if (orderId.isEmpty || storeId.isEmpty) return;
+
+    if (!await _isUserAuthorizedForStore(storeId)) {
+      debugPrint('⛔ Access denied: Current user is not authorized for store $storeId for incoming foreground push.');
+      return;
+    }
+
+    OrderNotificationCoordinator.instance.notifyNewOrder(
+      orderId: orderId,
+      storeId: storeId,
+    );
   }
 
   /// لا يُغلق الـ broadcast streams — الخدمة تبقى طوال عمر التطبيق.

@@ -26,6 +26,34 @@ async function resolveStoreFcmToken(storeId: string): Promise<string | undefined
     return undefined;
 }
 
+async function buildOrderProductsPreview(storeId: string, orderId: string): Promise<string | undefined> {
+    const db = getFirestore();
+    try {
+        const snap = await db
+            .collection("markets")
+            .doc(storeId)
+            .collection("present_order")
+            .doc(orderId)
+            .get();
+        const data = snap.data();
+        const items = (data?.items as any[]) ?? [];
+        if (!Array.isArray(items) || items.length === 0) return undefined;
+
+        const preview = items.slice(0, 3).map((it) => {
+            const name = typeof it?.productName === "string" && it.productName.trim().length > 0 ? it.productName.trim() : "منتج";
+            const qty = typeof it?.quantity === "number" ? it.quantity : Number(it?.quantity ?? 1);
+            const qtyText = Number.isFinite(qty) && qty > 0 ? String(qty) : "1";
+            return `${name} ×${qtyText}`;
+        });
+        const extra = items.length - preview.length;
+        const suffix = extra > 0 ? ` (+${extra})` : "";
+        return `المنتجات: ${preview.join("، ")}${suffix}`;
+    } catch (e) {
+        console.log("buildOrderProductsPreview failed:", e);
+        return undefined;
+    }
+}
+
 export const sendNewOrderNotification = functions.firestore.onDocumentCreated(
     {
         document: "orders/{orderId}",
@@ -56,7 +84,8 @@ export const sendNewOrderNotification = functions.firestore.onDocumentCreated(
             }
 
             const dataTitle = "طلب جديد";
-            const dataBody = "فيه طلب جديد عندك";
+            const productsPreview = await buildOrderProductsPreview(storeId, orderId);
+            const dataBody = productsPreview ?? "فيه طلب جديد عندك";
 
             // رسالة بيانات فقط — التطبيق يعرض الإشعار المحلي في الخلفية عبر flutter_local_notifications.
             const message = {

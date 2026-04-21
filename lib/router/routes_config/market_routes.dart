@@ -52,7 +52,10 @@ final marketRoutes = [
     path: '/myorder',
     builder: (context, state) => resolveMarketRoute(
       state,
-      (marketId) => MarketOrdersPage(marketId: marketId),
+      (marketId) => MarketOrdersPage(
+        marketId: marketId,
+        initialOrderId: state.uri.queryParameters['orderId'],
+      ),
     ),
   ),
   GoRoute(

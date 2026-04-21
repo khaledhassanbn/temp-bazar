@@ -176,6 +176,18 @@ class _AccountPageState extends State<AccountPage> {
             subtitle: 'إدارة رصيدك وعملياتك',
             onTap: () => context.push('/wallet'),
           ),
+          _MenuTileData(
+            icon: Icons.shopping_bag_outlined,
+            label: 'مشترياتي',
+            subtitle: 'متابعة طلباتك التي قمت بشرائها',
+            onTap: () => context.push('/user-orders'),
+          ),
+          _MenuTileData(
+            icon: Icons.location_on_outlined,
+            label: 'عناوين التوصيل',
+            subtitle: 'إدارة عناوينك المحفوظة',
+            onTap: () => context.push('/delivery-addresses'),
+          ),
         ],
       ),
       const SizedBox(height: 16),

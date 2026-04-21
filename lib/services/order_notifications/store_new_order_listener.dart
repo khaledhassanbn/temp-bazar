@@ -33,7 +33,10 @@ class StoreNewOrderListener {
             }
             for (final change in snapshot.docChanges) {
               if (change.type == DocumentChangeType.added) {
-                OrderNotificationCoordinator.instance.notifyNewOrder(change.doc.id);
+                OrderNotificationCoordinator.instance.notifyNewOrder(
+                  orderId: change.doc.id,
+                  storeId: storeId,
+                );
               }
             }
           },

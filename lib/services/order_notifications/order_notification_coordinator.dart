@@ -25,11 +25,14 @@ class OrderNotificationCoordinator {
   Future<void> _chain = Future<void>.value();
 
   /// طلب جديد من أي مصدر (Firestore / FCM foreground).
-  void notifyNewOrder(String orderId) {
-    if (orderId.isEmpty) return;
-    if (_queuedOrShown.contains(orderId)) return;
-    _queuedOrShown.add(orderId);
-    _queue.addLast(orderId);
+  ///
+  /// [storeId] مطلوب لعرض تفاصيل المنتجات وربط زر "عرض الطلب" بالمتجر الصحيح.
+  void notifyNewOrder({required String orderId, required String storeId}) {
+    if (orderId.isEmpty || storeId.isEmpty) return;
+    final key = '$storeId::$orderId';
+    if (_queuedOrShown.contains(key)) return;
+    _queuedOrShown.add(key);
+    _queue.addLast(key);
     _chain = _chain.then((_) => _runQueue());
   }
 
@@ -44,7 +47,14 @@ class OrderNotificationCoordinator {
       }
       if (navigatorCtx == null) break;
 
-      final orderId = _queue.first;
+      final composite = _queue.first;
+      final parts = composite.split('::');
+      final storeId = parts.length >= 2 ? parts[0] : '';
+      final orderId = parts.length >= 2 ? parts[1] : composite;
+      if (storeId.isEmpty || orderId.isEmpty) {
+        _queue.removeFirst();
+        continue;
+      }
 
       await _sound.startAlertLoop();
 
@@ -58,6 +68,7 @@ class OrderNotificationCoordinator {
           barrierDismissible: false,
           builder: (dialogCtx) => NewOrderAlertDialog(
             orderId: orderId,
+            storeId: storeId,
             onAccept: () async {
               await _persistResponse(orderId, accepted: true);
               if (dialogCtx.mounted) Navigator.of(dialogCtx).pop();

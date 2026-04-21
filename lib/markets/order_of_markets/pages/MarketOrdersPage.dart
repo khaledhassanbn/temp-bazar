@@ -13,11 +13,15 @@ import 'package:bazar_suez/markets/order_of_markets/widget/OrderCollapsibleHeade
 import 'package:bazar_suez/markets/order_of_markets/widget/OrderCard.dart';
 import 'package:bazar_suez/markets/order_of_markets/widget/OrderStats.dart';
 import 'package:bazar_suez/markets/order_of_markets/viewmodels/MarketOrdersViewModel.dart';
-import 'package:bazar_suez/services/fcm_service.dart';
 
 class MarketOrdersPage extends StatefulWidget {
   final String marketId;
-  const MarketOrdersPage({super.key, required this.marketId});
+  final String? initialOrderId;
+  const MarketOrdersPage({
+    super.key,
+    required this.marketId,
+    this.initialOrderId,
+  });
 
   @override
   State<MarketOrdersPage> createState() => _MarketOrdersPageState();
@@ -168,24 +172,16 @@ class _MarketOrdersPageState extends State<MarketOrdersPage>
   void initState() {
     super.initState();
     _viewModel = MarketOrdersViewModel(marketId: widget.marketId)..init();
+    final oid = widget.initialOrderId;
+    if (oid != null && oid.trim().isNotEmpty) {
+      _viewModel.setSearchQuery(oid.trim());
+    }
     _animController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 400),
       lowerBound: 0.95,
       upperBound: 1.0,
     )..repeat(reverse: true);
-
-    // حفظ FCM token للمتجر لاستقبال إشعارات الطلبات الجديدة
-    _saveFcmToken();
-  }
-
-  /// حفظ FCM token للمتجر
-  Future<void> _saveFcmToken() async {
-    try {
-      await FcmService().saveTokenForStore(widget.marketId);
-    } catch (e) {
-      debugPrint('⚠️ Error saving FCM token: $e');
-    }
   }
 
   // helper methods moved to ViewModel
