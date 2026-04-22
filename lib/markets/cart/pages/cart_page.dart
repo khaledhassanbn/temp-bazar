@@ -14,6 +14,7 @@ import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'dart:math';
 import 'package:bazar_suez/markets/add_product/services/product_service.dart';
 
@@ -49,7 +50,9 @@ String generateOrderId(String marketId) {
 class _CartPageState extends State<CartPage> {
   String? _marketName;
   String? _marketLogo;
+  final TextEditingController _notesController = TextEditingController();
   int _cartItemCount = 0;
+  bool _isSubmittingOrder = false;
   final GlobalKey<CartUserInfoSectionState> _userInfoKey =
       GlobalKey<CartUserInfoSectionState>();
 
@@ -57,6 +60,12 @@ class _CartPageState extends State<CartPage> {
   void initState() {
     super.initState();
     _fetchMarketName();
+  }
+
+  @override
+  void dispose() {
+    _notesController.dispose();
+    super.dispose();
   }
 
   /// جلب بيانات المتجر من Firestore وحساب رسوم التوصيل
@@ -95,11 +104,16 @@ class _CartPageState extends State<CartPage> {
   }
 
   /// حساب وتعيين رسوم التوصيل بناءً على المسافة
-  Future<void> _calculateAndSetDeliveryFee(Map<String, dynamic>? storeData) async {
+  Future<void> _calculateAndSetDeliveryFee(
+    Map<String, dynamic>? storeData,
+  ) async {
     if (!mounted) return;
 
     final cartViewModel = Provider.of<CartViewModel>(context, listen: false);
-    final locationVm = Provider.of<SavedLocationsViewModel>(context, listen: false);
+    final locationVm = Provider.of<SavedLocationsViewModel>(
+      context,
+      listen: false,
+    );
     final deliveryFeeService = DeliveryFeeService();
 
     try {
@@ -229,10 +243,7 @@ class _CartPageState extends State<CartPage> {
             const SizedBox(height: 8),
             Text(
               "أضف بعض المنتجات لتبدأ التسوق",
-              style: TextStyle(
-                fontSize: 14,
-                color: Colors.grey[600],
-              ),
+              style: TextStyle(fontSize: 14, color: Colors.grey[600]),
             ),
           ],
         ),
@@ -274,7 +285,7 @@ class _CartPageState extends State<CartPage> {
                   const SizedBox(height: 16),
 
                   /// الملاحظات
-                  const CartNotesSection(),
+                  CartNotesSection(notesController: _notesController),
                   const SizedBox(height: 16),
 
                   /// القسيمة
@@ -352,10 +363,7 @@ class _CartPageState extends State<CartPage> {
                 ),
                 Text(
                   'متجرك المفضل',
-                  style: TextStyle(
-                    fontSize: 13,
-                    color: Colors.grey[600],
-                  ),
+                  style: TextStyle(fontSize: 13, color: Colors.grey[600]),
                 ),
               ],
             ),
@@ -385,7 +393,14 @@ class _CartPageState extends State<CartPage> {
           backgroundColor: Colors.transparent,
           leading: IconButton(
             icon: const Icon(Icons.arrow_back_ios, color: Colors.black87),
-            onPressed: () => Navigator.pop(context),
+            onPressed: () {
+              final navigator = Navigator.of(context);
+              if (navigator.canPop()) {
+                navigator.pop();
+                return;
+              }
+              context.go('/HomePage');
+            },
           ),
           title: Row(
             children: const [
@@ -475,11 +490,15 @@ class _CartPageState extends State<CartPage> {
 
   /// حفظ الطلب في Firebase
   Future<void> _saveOrderToFirestore(CartUserInfoSectionState userInfo) async {
+    if (_isSubmittingOrder) return;
+    _isSubmittingOrder = true;
+
     try {
       // إظهار loading indicator
       showDialog(
         context: context,
         barrierDismissible: false,
+        useRootNavigator: true,
         builder: (context) => const Center(child: CircularProgressIndicator()),
       );
 
@@ -487,7 +506,7 @@ class _CartPageState extends State<CartPage> {
       final marketId = cartViewModel.currentMarketId;
 
       if (marketId == null) {
-        Navigator.pop(context); // إغلاق loading
+        _closeLoadingDialog(); // إغلاق loading
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('لا يمكن تحديد المتجر'),
@@ -523,6 +542,13 @@ class _CartPageState extends State<CartPage> {
 
       // توليد ID للطلب
       final orderId = generateOrderId(marketId);
+
+      final notes = _notesController.text.trim();
+      final marketDoc = await FirebaseFirestore.instance
+          .collection('markets')
+          .doc(marketId)
+          .get();
+      final marketData = marketDoc.data() ?? <String, dynamic>{};
 
       // إعداد بيانات الطلب
       final orderData = {
@@ -563,6 +589,7 @@ class _CartPageState extends State<CartPage> {
         'deliveryFee': cartViewModel.deliveryFee,
         'serviceFee': cartViewModel.serviceFee,
         'totalAmount': cartViewModel.totalAmount,
+        'notes': notes,
       };
 
       // حفظ الطلب في Firebase - في قاعدة بيانات المتجر
@@ -607,7 +634,7 @@ class _CartPageState extends State<CartPage> {
         }
       });
 
-      Navigator.pop(context); // إغلاق loading
+      _closeLoadingDialog(); // إغلاق loading
 
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -616,15 +643,29 @@ class _CartPageState extends State<CartPage> {
         ),
       );
 
+      await _tryLaunchWhatsappForStore(
+        marketData: marketData,
+        customerName: customerName,
+        customerPhone: userInfo.phoneNumber ?? '',
+        customerAddress: userInfo.selectedAddress ?? '',
+        cartViewModel: cartViewModel,
+        notes: notes,
+      );
+
       // مسح السلة بعد حفظ الطلب
       await cartViewModel.clearCart();
 
       // العودة للصفحة السابقة
       if (context.mounted) {
-        Navigator.pop(context);
+        final navigator = Navigator.of(context);
+        if (navigator.canPop()) {
+          navigator.pop();
+        } else {
+          context.go('/HomePage');
+        }
       }
     } catch (e) {
-      Navigator.pop(context); // إغلاق loading في حالة الخطأ
+      _closeLoadingDialog(); // إغلاق loading في حالة الخطأ
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -634,6 +675,16 @@ class _CartPageState extends State<CartPage> {
           ),
         );
       }
+    } finally {
+      _isSubmittingOrder = false;
+    }
+  }
+
+  void _closeLoadingDialog() {
+    if (!mounted) return;
+    final rootNavigator = Navigator.of(context, rootNavigator: true);
+    if (rootNavigator.canPop()) {
+      rootNavigator.pop();
     }
   }
 
@@ -650,5 +701,94 @@ class _CartPageState extends State<CartPage> {
         ),
       );
     }
+  }
+
+  Future<void> _tryLaunchWhatsappForStore({
+    required Map<String, dynamic> marketData,
+    required String customerName,
+    required String customerPhone,
+    required String customerAddress,
+    required CartViewModel cartViewModel,
+    required String notes,
+  }) async {
+    final whatsappEnabled = marketData['whatsappOrdersEnabled'] == true;
+    if (!whatsappEnabled) return;
+
+    final storePhoneRaw = (marketData['phone'] ?? '').toString().trim();
+    final storePhone = _normalizePhoneForWhatsapp(storePhoneRaw);
+    if (storePhone.isEmpty) return;
+
+    final message = _buildWhatsappOrderMessage(
+      customerName: customerName.isEmpty ? 'عميل' : customerName,
+      customerPhone: customerPhone,
+      customerAddress: customerAddress,
+      cartViewModel: cartViewModel,
+      notes: notes,
+    );
+
+    final url = Uri.parse(
+      'https://wa.me/$storePhone?text=${Uri.encodeComponent(message)}',
+    );
+
+    if (!await launchUrl(url, mode: LaunchMode.externalApplication) &&
+        mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('تم إرسال الطلب لكن تعذر فتح واتساب تلقائيًا'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+    }
+  }
+
+  String _normalizePhoneForWhatsapp(String phone) {
+    final digits = phone.replaceAll(RegExp(r'[^0-9]'), '');
+    if (digits.isEmpty) return '';
+    if (digits.startsWith('20')) return digits;
+    if (digits.startsWith('0')) return '20${digits.substring(1)}';
+    return '20$digits';
+  }
+
+  String _buildWhatsappOrderMessage({
+    required String customerName,
+    required String customerPhone,
+    required String customerAddress,
+    required CartViewModel cartViewModel,
+    required String notes,
+  }) {
+    final items = cartViewModel.cartItems;
+    final buffer = StringBuffer()
+      ..writeln('🛒 طلب جديد في تطبيق bazaarsuez')
+      ..writeln()
+      ..writeln('👤 الاسم: $customerName')
+      ..writeln('📞 الهاتف: $customerPhone')
+      ..writeln('📍 العنوان: $customerAddress')
+      ..writeln()
+      ..writeln('━━━━━━━━━━━━━━━')
+      ..writeln()
+      ..writeln('📦 تفاصيل الطلب:');
+
+    for (int i = 0; i < items.length; i++) {
+      final item = items[i];
+      buffer.writeln('${i + 1}️⃣ ${item.productName} × ${item.quantity}');
+    }
+
+    final now = TimeOfDay.fromDateTime(DateTime.now());
+    final time = now.format(context);
+    buffer
+      ..writeln()
+      ..writeln('━━━━━━━━━━━━━━━')
+      ..writeln()
+      ..writeln(
+        '💰 الإجمالي: ${cartViewModel.totalAmount.toStringAsFixed(2)} جنيه',
+      )
+      ..writeln('🕒 الوقت: $time')
+      ..writeln()
+      ..writeln('━━━━━━━━━━━━━━━')
+      ..writeln()
+      ..writeln('📌 ملاحظات:')
+      ..writeln(notes.isEmpty ? 'لا يوجد ملاحظات' : notes);
+
+    return buffer.toString();
   }
 }

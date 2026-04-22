@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
 
 class CartNotesSection extends StatelessWidget {
-  const CartNotesSection({super.key});
+  final TextEditingController notesController;
+
+  const CartNotesSection({super.key, required this.notesController});
 
   @override
   Widget build(BuildContext context) {
-    final TextEditingController notesController = TextEditingController();
-
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,

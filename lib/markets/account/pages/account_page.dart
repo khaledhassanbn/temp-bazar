@@ -402,13 +402,16 @@ class _AccountPageState extends State<AccountPage> {
   Future<void> _signOut() async {
     if (_isSigningOut) return;
     if (!mounted) return;
+    final navigator = Navigator.of(context);
+    final router = GoRouter.of(context);
     setState(() => _isSigningOut = true);
     try {
       await FirebaseAuth.instance.signOut();
-      if (mounted) {
-        Navigator.of(context).pop(); // close bottom sheet
-        context.go('/login');
+      if (!mounted) return;
+      if (navigator.canPop()) {
+        navigator.pop(); // close bottom sheet
       }
+      router.go('/login');
     } catch (e) {
       _showSnack('فشل تسجيل الخروج، حاول مرة أخرى');
     } finally {

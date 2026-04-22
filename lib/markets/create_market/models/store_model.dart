@@ -35,6 +35,7 @@ class StoreModel {
   final bool showAddress; // Show address/map icon on store page
   final bool available; // Store availability (active/busy)
   final bool? isOpenNow; // Set by Cloud Function based on working hours
+  final bool whatsappOrdersEnabled; // Open WhatsApp after successful checkout
 
   StoreModel({
     required this.id,
@@ -68,6 +69,7 @@ class StoreModel {
     this.showAddress = false,
     this.available = true,
     this.isOpenNow,
+    this.whatsappOrdersEnabled = false,
   });
 
   factory StoreModel.fromMap(String id, Map<String, dynamic> map) {
@@ -127,6 +129,7 @@ class StoreModel {
           ? map['available'] as bool
           : (map['storeStatus'] is bool ? map['storeStatus'] as bool : true),
       isOpenNow: map['isOpenNow'] as bool?,
+      whatsappOrdersEnabled: map['whatsappOrdersEnabled'] == true,
     );
   }
 
@@ -166,6 +169,7 @@ class StoreModel {
       'show_adress': showAddress,
       'available': available,
       if (isOpenNow != null) 'isOpenNow': isOpenNow,
+      'whatsappOrdersEnabled': whatsappOrdersEnabled,
     };
   }
 
@@ -201,6 +205,7 @@ class StoreModel {
     bool? showAddress,
     bool? available,
     bool? isOpenNow,
+    bool? whatsappOrdersEnabled,
   }) {
     return StoreModel(
       id: id ?? this.id,
@@ -234,6 +239,8 @@ class StoreModel {
       showAddress: showAddress ?? this.showAddress,
       available: available ?? this.available,
       isOpenNow: isOpenNow ?? this.isOpenNow,
+      whatsappOrdersEnabled:
+          whatsappOrdersEnabled ?? this.whatsappOrdersEnabled,
     );
   }
 

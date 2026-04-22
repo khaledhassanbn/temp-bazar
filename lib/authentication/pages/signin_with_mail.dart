@@ -23,6 +23,13 @@ class _EmailLoginPageState extends State<EmailLoginPage> {
   final TextEditingController _passwordController = TextEditingController();
 
   @override
+  void dispose() {
+    _emailController.dispose();
+    _passwordController.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     final authVM = Provider.of<AuthViewModel>(context);
 
@@ -73,9 +80,11 @@ class _EmailLoginPageState extends State<EmailLoginPage> {
                 text: "تسجيل الدخول",
                 isLoading: authVM.isLoading,
                 onPressed: () async {
+                  final scaffoldMessenger = ScaffoldMessenger.of(context);
+                  final authGuard = context.read<AuthGuard>();
                   if (_emailController.text.trim().isEmpty ||
                       _passwordController.text.trim().isEmpty) {
-                    ScaffoldMessenger.of(context).showSnackBar(
+                    scaffoldMessenger.showSnackBar(
                       const SnackBar(
                         content: Text("من فضلك أدخل البريد وكلمة المرور"),
                         backgroundColor: Colors.red,
@@ -88,19 +97,16 @@ class _EmailLoginPageState extends State<EmailLoginPage> {
                     _emailController.text.trim(),
                     _passwordController.text.trim(),
                   );
+                  if (!mounted) return;
 
                   if (user != null) {
-                    // تحميل حالة المستخدم من Firestore
-                    final authGuard = Provider.of<AuthGuard>(
-                      context,
-                      listen: false,
-                    );
                     await authGuard.loadUserStatus();
+                    if (!mounted) return;
 
                     // ✅ إعادة التوجيه إلى صفحة الفئات بعد تسجيل الدخول
                     context.go('/CategoriesGrid');
                   } else {
-                    ScaffoldMessenger.of(context).showSnackBar(
+                    scaffoldMessenger.showSnackBar(
                       SnackBar(
                         content: Text(authVM.errorMessage ?? "خطأ غير متوقع"),
                         backgroundColor: Colors.red,

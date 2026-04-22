@@ -61,19 +61,18 @@ class _LoginPageState extends State<LoginPage> {
               icon: FontAwesomeIcons.google,
               color: Colors.red,
               onPressed: () async {
+                final authGuard = context.read<AuthGuard>();
+                final scaffoldMessenger = ScaffoldMessenger.of(context);
                 final UserModel? user = await authVM.signInWithGoogle();
+                if (!mounted) return;
                 if (user != null) {
-                  // تحميل حالة المستخدم لضمان بناء الواجهة الصحيحة
-                  final authGuard = Provider.of<AuthGuard>(
-                    context,
-                    listen: false,
-                  );
                   await authGuard.loadUserStatus();
+                  if (!mounted) return;
 
                   // ✅ إعادة التوجيه إلى صفحة الفئات بعد تسجيل الدخول
                   context.go('/CategoriesGrid');
                 } else {
-                  ScaffoldMessenger.of(context).showSnackBar(
+                  scaffoldMessenger.showSnackBar(
                     const SnackBar(content: Text("فشل تسجيل الدخول بجوجل")),
                   );
                 }
@@ -88,19 +87,18 @@ class _LoginPageState extends State<LoginPage> {
               icon: FontAwesomeIcons.facebook,
               color: Colors.blue,
               onPressed: () async {
+                final authGuard = context.read<AuthGuard>();
+                final scaffoldMessenger = ScaffoldMessenger.of(context);
                 final UserModel? user = await authVM.signInWithFacebook();
+                if (!mounted) return;
                 if (user != null) {
-                  // تحميل حالة المستخدم لضمان بناء الواجهة الصحيحة
-                  final authGuard = Provider.of<AuthGuard>(
-                    context,
-                    listen: false,
-                  );
                   await authGuard.loadUserStatus();
+                  if (!mounted) return;
 
                   // ✅ إعادة التوجيه إلى صفحة الفئات بعد تسجيل الدخول
                   context.go('/CategoriesGrid');
                 } else {
-                  ScaffoldMessenger.of(context).showSnackBar(
+                  scaffoldMessenger.showSnackBar(
                     const SnackBar(content: Text("فشل تسجيل الدخول بالفيسبوك")),
                   );
                 }

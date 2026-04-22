@@ -50,6 +50,7 @@ class EditStoreViewModel extends ChangeNotifier {
   bool loading = false;
   bool showAddress = false;
   bool available = true;
+  bool whatsappOrdersEnabled = false;
 
   // حقول الفئات
   String? selectedCategoryId;
@@ -104,6 +105,7 @@ class EditStoreViewModel extends ChangeNotifier {
       available = data['available'] is bool
           ? data['available'] as bool
           : store.storeStatus;
+      whatsappOrdersEnabled = data['whatsappOrdersEnabled'] == true;
 
       if (store.location != null) {
         location = LatLng(store.location!.latitude, store.location!.longitude);
@@ -163,6 +165,11 @@ class EditStoreViewModel extends ChangeNotifier {
 
   void setAvailable(bool value) {
     available = value;
+    notifyListeners();
+  }
+
+  void setWhatsappOrdersEnabled(bool value) {
+    whatsappOrdersEnabled = value;
     notifyListeners();
   }
 
@@ -329,6 +336,7 @@ class EditStoreViewModel extends ChangeNotifier {
         'show_adress': showAddress,
         'available': available,
         'storeStatus': available,
+        'whatsappOrdersEnabled': whatsappOrdersEnabled,
         'workingHours': workingHours?.toMap(),
       };
 

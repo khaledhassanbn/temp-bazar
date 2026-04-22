@@ -171,6 +171,8 @@ class _EditStorePageState extends State<EditStorePage> {
                                   children: [
                                     _statusCard(vm),
                                     const SizedBox(height: 12),
+                                    _whatsappOrdersCard(vm),
+                                    const SizedBox(height: 12),
 
                                     _sectionCard(
                                       title: 'معلومات المتجر',
@@ -302,7 +304,6 @@ class _EditStorePageState extends State<EditStorePage> {
           backgroundColor: Colors.green,
         ),
       );
-      final navigator = Navigator.of(context);
       context.go('/HomePage');
     } catch (e) {
       if (!mounted) return;
@@ -542,6 +543,27 @@ class _EditStorePageState extends State<EditStorePage> {
             },
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _whatsappOrdersCard(EditStoreViewModel vm) {
+    return _sectionCard(
+      title: 'طلبات واتساب',
+      child: SwitchListTile(
+        value: vm.whatsappOrdersEnabled,
+        contentPadding: EdgeInsets.zero,
+        activeColor: AppColors.mainColor,
+        title: const Text(
+          'تفعيل إرسال الطلبات عبر واتساب',
+          textAlign: TextAlign.right,
+          style: TextStyle(fontWeight: FontWeight.w600),
+        ),
+        subtitle: const Text(
+          'عند تفعيله سيتم فتح واتساب للعميل بعد تأكيد الطلب.',
+          textAlign: TextAlign.right,
+        ),
+        onChanged: vm.loading ? null : vm.setWhatsappOrdersEnabled,
       ),
     );
   }
