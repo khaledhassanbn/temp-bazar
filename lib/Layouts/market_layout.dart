@@ -18,9 +18,11 @@ class MarketLayout extends StatelessWidget {
           homePath: '/HomePage',
           bypassToPreviousPaths: const ['/edit-store'],
           child: Scaffold(
+            extendBody: true,
             body: child,
-            bottomNavigationBar:
-                MarketBottomNavigation(currentIndex: currentIndex),
+            bottomNavigationBar: MarketBottomNavigation(
+              currentIndex: currentIndex,
+            ),
           ),
         ),
         const StoreOrderNotificationHost(),

@@ -32,9 +32,7 @@ Future<GoRouter> createRouter(AuthGuard authGuard) async {
       refreshListenable: authGuard,
       redirect: (context, state) {
         final loggedIn = authGuard.isAuthenticated;
-        final isMarketOwner = authGuard.isMarketOwner;
         final isAdmin = authGuard.userStatus == 'admin';
-        final hasSetupLocation = authGuard.hasSetupLocation;
         final location = state.matchedLocation;
         final path = state.uri.path;
 

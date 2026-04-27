@@ -1,3 +1,4 @@
+import 'dart:ui';
 import 'package:bazar_suez/theme/app_color.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
@@ -67,7 +68,7 @@ class _CustomBottomAppBarState extends State<CustomBottomAppBar> {
         final size = MediaQuery.of(context).size;
         const double menuWidth = 220;
         final double left = (size.width - menuWidth) / 2;
-        final double bottom = MediaQuery.of(context).padding.bottom + 90;
+        final double bottom = MediaQuery.of(context).padding.bottom + 80;
 
         return Stack(
           children: [
@@ -131,26 +132,30 @@ class _CustomBottomAppBarState extends State<CustomBottomAppBar> {
   Widget build(BuildContext context) {
     return Directionality(
       textDirection: TextDirection.rtl,
-      child: SafeArea(
-        top: false,
-        child: Container(
-          height: 65,
-          decoration: const BoxDecoration(
-            color: Colors.white,
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black12,
-                blurRadius: 6,
-                offset: Offset(0, -2),
-              ),
-            ],
-          ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+      child: ClipRect(
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+          child: Container(
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.8),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.08),
+                  blurRadius: 20,
+                  offset: const Offset(0, -4),
+                ),
+              ],
+            ),
+            child: SafeArea(
+              top: false,
+              child: SizedBox(
+                height: 70,
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceAround,
             children: [
               _buildNavItem(
                 context,
-                Icons.home,
+                Icons.home_rounded,
                 'الرئيسية',
                 0,
                 onTapOverride: () => _handleNavigation(0),
@@ -166,14 +171,14 @@ class _CustomBottomAppBarState extends State<CustomBottomAppBar> {
               ),
               _buildNavItem(
                 context,
-                Icons.storefront,
+                Icons.storefront_rounded,
                 'متجري',
                 3,
                 onTapOverride: () => _handleNavigation(3),
               ),
               _buildNavItem(
                 context,
-                Icons.person,
+                Icons.person_outline_rounded,
                 'حسابي',
                 4,
                 onTapOverride: () => _handleNavigation(4),
@@ -182,27 +187,30 @@ class _CustomBottomAppBarState extends State<CustomBottomAppBar> {
           ),
         ),
       ),
+    ),
+  ),
+),
     );
   }
 
   Widget _buildOrdersItem(BuildContext context) {
-    return Expanded(
-      child: InkWell(
-        borderRadius: BorderRadius.circular(12),
-        splashColor: AppColors.mainColor.withOpacity(0.2),
-        onTap: () => _handleNavigation(1),
+    final isActive = widget.currentIndex == 1 && !_manageMenuOpen;
+    return GestureDetector(
+      onTap: () => _handleNavigation(1),
+      behavior: HitTestBehavior.opaque,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
         child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
+          mainAxisSize: MainAxisSize.min,
           children: [
             Stack(
               clipBehavior: Clip.none,
               children: [
                 Icon(
-                  Icons.receipt_long,
-                  color: widget.currentIndex == 1
-                      ? AppColors.mainColor
-                      : Colors.grey,
-                  size: 26,
+                  Icons.receipt_long_rounded,
+                  color: isActive ? AppColors.mainColor : Colors.grey,
+                  size: 24,
                 ),
                 if (widget.ordersCount > 0)
                   Positioned(
@@ -231,10 +239,14 @@ class _CustomBottomAppBarState extends State<CustomBottomAppBar> {
                   ),
               ],
             ),
-            const SizedBox(height: 2),
-            const Text(
+            const SizedBox(height: 4),
+            Text(
               'الطلبات',
-              style: TextStyle(fontSize: 11),
+              style: TextStyle(
+                fontSize: 11,
+                color: isActive ? AppColors.mainColor : Colors.grey,
+                fontWeight: isActive ? FontWeight.w700 : FontWeight.w400,
+              ),
               overflow: TextOverflow.ellipsis,
             ),
           ],
@@ -253,26 +265,27 @@ class _CustomBottomAppBarState extends State<CustomBottomAppBar> {
   }) {
     final isActive =
         isActiveOverride || widget.currentIndex == index && !_manageMenuOpen;
-    return Expanded(
-      child: InkWell(
-        borderRadius: BorderRadius.circular(12),
-        splashColor: AppColors.mainColor.withOpacity(0.2),
-        onTap: onTapOverride ?? () => _handleNavigation(index),
+    return GestureDetector(
+      onTap: onTapOverride ?? () => _handleNavigation(index),
+      behavior: HitTestBehavior.opaque,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
         child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
+          mainAxisSize: MainAxisSize.min,
           children: [
             Icon(
               icon,
               color: isActive ? AppColors.mainColor : Colors.grey,
-              size: 26,
+              size: 24,
             ),
-            const SizedBox(height: 2),
+            const SizedBox(height: 4),
             Text(
               label,
               style: TextStyle(
                 fontSize: 11,
                 color: isActive ? AppColors.mainColor : Colors.grey,
-                fontWeight: isActive ? FontWeight.bold : FontWeight.normal,
+                fontWeight: isActive ? FontWeight.w700 : FontWeight.w400,
               ),
               overflow: TextOverflow.ellipsis,
             ),
