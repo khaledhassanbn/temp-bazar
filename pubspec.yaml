@@ -86,6 +86,7 @@ flutter:
     - assets/images/adsmarket.jpg
     - assets/images/busy.png
     - assets/images/closed.png
+    - assets/images/appbar.png
     - assets/sounds/notification.mp3
 
   fonts:
