@@ -29,6 +29,7 @@ class StoreModel {
   final DateTime createdAt;
   final double averageRating;
   final int totalReviews;
+  final int completedOrderCount;
   final String? fcmToken; // FCM token for push notifications
   final double? deliveryFee; // Calculated delivery fee
   final int? deliveryTime; // Calculated delivery time in minutes
@@ -63,6 +64,7 @@ class StoreModel {
     required this.createdAt,
     this.averageRating = 0.0,
     this.totalReviews = 0,
+    this.completedOrderCount = 0,
     this.fcmToken,
     this.deliveryFee,
     this.deliveryTime,
@@ -121,6 +123,7 @@ class StoreModel {
       createdAt: (map['createdAt'] as Timestamp).toDate(),
       averageRating: (map['averageRating'] ?? 0.0).toDouble(),
       totalReviews: map['totalReviews'] ?? 0,
+      completedOrderCount: (map['completedOrderCount'] as num?)?.toInt() ?? 0,
       fcmToken: map['fcmToken'] as String?,
       deliveryFee: (map['deliveryFee'] ?? 0.0).toDouble(),
       deliveryTime: map['deliveryTime'] as int?,
@@ -164,6 +167,7 @@ class StoreModel {
       'createdAt': Timestamp.fromDate(createdAt),
       'averageRating': averageRating,
       'totalReviews': totalReviews,
+      'completedOrderCount': completedOrderCount,
       'deliveryFee': deliveryFee,
       'deliveryTime': deliveryTime,
       'show_adress': showAddress,
@@ -199,6 +203,7 @@ class StoreModel {
     DateTime? createdAt,
     double? averageRating,
     int? totalReviews,
+    int? completedOrderCount,
     String? fcmToken,
     double? deliveryFee,
     int? deliveryTime,
@@ -233,6 +238,7 @@ class StoreModel {
       createdAt: createdAt ?? this.createdAt,
       averageRating: averageRating ?? this.averageRating,
       totalReviews: totalReviews ?? this.totalReviews,
+      completedOrderCount: completedOrderCount ?? this.completedOrderCount,
       fcmToken: fcmToken ?? this.fcmToken,
       deliveryFee: deliveryFee ?? this.deliveryFee,
       deliveryTime: deliveryTime ?? this.deliveryTime,

@@ -7,6 +7,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:bazar_suez/markets/grid_of_categories/ViewModel/ViewModel.dart';
 import 'package:bazar_suez/markets/grid_of_categories/Model/model.dart';
 import 'package:bazar_suez/markets/Markets_after_category/viewmodel/category_filter_viewmodel.dart';
+import 'package:bazar_suez/markets/Markets_after_category/widget/category_stores_filter_bar.dart';
 import 'package:bazar_suez/markets/create_market/models/store_model.dart';
 
 import '../../cart/viewmodels/cart_view_model.dart';
@@ -20,7 +21,7 @@ class HomeAppColors {
   static const primaryDark = Color(0xFF4E99B4);
   static const primaryLight = Color(0xFF5BA8E8);
   static const accent = Color(0xFF4CBBF5);
-  static const background = Color.fromARGB(255, 251, 253, 255);
+  static const background = Color.fromARGB(255, 255, 255, 255);
   static const cardBg = Colors.white;
   static const textDark = Color(0xFF4E99B4);
   static const textMed = Color(0xFF5A6A8A);
@@ -30,10 +31,6 @@ class HomeAppColors {
   static const gradStart = Color.fromARGB(255, 29, 102, 148);
   static const gradEnd = Color(0xFF4E99B4);
 }
-
-
-
-
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -140,7 +137,6 @@ class _HomePageState extends State<HomePage>
               fontWeight: FontWeight.w800,
             ),
           ),
-        
         ],
       ),
     );
@@ -186,7 +182,8 @@ class _HomePageState extends State<HomePage>
                           Consumer<SavedLocationsViewModel>(
                             builder: (context, locationVm, _) {
                               final isBusy =
-                                  locationVm.isInitializing || locationVm.isLoading;
+                                  locationVm.isInitializing ||
+                                  locationVm.isLoading;
 
                               final title = isBusy
                                   ? 'جاري تحديد الموقع...'
@@ -204,14 +201,17 @@ class _HomePageState extends State<HomePage>
                                     ),
                                     const SizedBox(width: 4),
                                     ConstrainedBox(
-                                      constraints:
-                                          const BoxConstraints(maxWidth: 180),
+                                      constraints: const BoxConstraints(
+                                        maxWidth: 180,
+                                      ),
                                       child: Text(
                                         title,
                                         maxLines: 1,
                                         overflow: TextOverflow.ellipsis,
                                         style: TextStyle(
-                                          color: locationVm.locationPermissionDenied
+                                          color:
+                                              locationVm
+                                                  .locationPermissionDenied
                                               ? Colors.white.withOpacity(0.85)
                                               : Colors.white,
                                           fontSize: 16,
@@ -227,9 +227,10 @@ class _HomePageState extends State<HomePage>
                                         height: 14,
                                         child: CircularProgressIndicator(
                                           strokeWidth: 2,
-                                          valueColor: AlwaysStoppedAnimation<Color>(
-                                            Colors.white,
-                                          ),
+                                          valueColor:
+                                              AlwaysStoppedAnimation<Color>(
+                                                Colors.white,
+                                              ),
                                         ),
                                       )
                                     else
@@ -324,14 +325,20 @@ class _HomePageState extends State<HomePage>
             .snapshots(),
         builder: (context, snapshot) {
           final data = snapshot.data?.data();
-          final rawAds = (data?['ads'] is List) ? (data?['ads'] as List) : const [];
+          final rawAds = (data?['ads'] is List)
+              ? (data?['ads'] as List)
+              : const [];
 
-          final ads = rawAds
-              .map((e) => e is Map<String, dynamic> ? AdModel.fromMap(e) : null)
-              .whereType<AdModel>()
-              .where((ad) => ad.isValid)
-              .toList()
-            ..sort((a, b) => a.slotId.compareTo(b.slotId));
+          final ads =
+              rawAds
+                  .map(
+                    (e) =>
+                        e is Map<String, dynamic> ? AdModel.fromMap(e) : null,
+                  )
+                  .whereType<AdModel>()
+                  .where((ad) => ad.isValid)
+                  .toList()
+                ..sort((a, b) => a.slotId.compareTo(b.slotId));
 
           // Always prepend a default banner depending on user type.
           final totalCount = 1 + ads.length;
@@ -375,8 +382,8 @@ class _HomePageState extends State<HomePage>
                       onTap: marketLink == null || marketLink.isEmpty
                           ? null
                           : () => context.push(
-                                '/HomeMarketPage?marketLink=$marketLink',
-                              ),
+                              '/HomeMarketPage?marketLink=$marketLink',
+                            ),
                     );
                   },
                 ),
@@ -503,69 +510,21 @@ class _HomePageState extends State<HomePage>
           });
         }
 
-        final stores = (_selectedCategoryId != null &&
+        final stores =
+            (_selectedCategoryId != null &&
                 filterVm.selectedCategoryId == _selectedCategoryId)
-            ? filterVm.stores.take(8).toList()
+            ? filterVm.sortedStores.take(8).toList()
             : <StoreModel>[];
 
         return Padding(
-          padding: const EdgeInsets.fromLTRB(0, 24, 0, 0),
+          padding: const EdgeInsets.fromLTRB(0, 0, 0, 0),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // ── الفئات الفرعية للفئة المختارة (بديل عنوان "تسوق حسب الفئة")
-              if (filterVm.subCategories.isNotEmpty) ...[
-                SizedBox(
-                  height: 44,
-                  child: ListView.separated(
-                    scrollDirection: Axis.horizontal,
-                    physics: const BouncingScrollPhysics(),
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    itemCount: filterVm.subCategories.length,
-                    separatorBuilder: (_, __) => const SizedBox(width: 10),
-                    itemBuilder: (ctx, i) {
-                      final sub = filterVm.subCategories[i];
-                      final selected = filterVm.selectedSubCategoryId == sub.id;
-                      return GestureDetector(
-                        onTap: () {
-                          final nextId = selected ? null : sub.id;
-                          filterVm.setSubCategory(nextId);
-                        },
-                        child: AnimatedContainer(
-                          duration: const Duration(milliseconds: 250),
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 16,
-                            vertical: 10,
-                          ),
-                          decoration: BoxDecoration(
-                            color: selected
-                                ? HomeAppColors.primary
-                                : Colors.transparent,
-                            borderRadius: BorderRadius.circular(24),
-                            border: Border.all(
-                              color: selected
-                                  ? HomeAppColors.primary
-                                  : HomeAppColors.textLight
-                                      .withValues(alpha: 0.5),
-                              width: 1.5,
-                            ),
-                          ),
-                          child: Text(
-                            sub.name,
-                            style: TextStyle(
-                              color: selected ? Colors.white : HomeAppColors.textMed,
-                              fontSize: 13,
-                              fontWeight: selected
-                                  ? FontWeight.w600
-                                  : FontWeight.w400,
-                            ),
-                          ),
-                        ),
-                      );
-                    },
-                  ),
-                ),
-                const SizedBox(height: 14),
+              if (_selectedCategoryId != null &&
+                  filterVm.selectedCategoryId == _selectedCategoryId) ...[
+                CategoryStoresFilterBar(primaryColor: HomeAppColors.primary),
+                const SizedBox(height: 8),
               ],
 
               // ── قائمة المتاجر
@@ -601,8 +560,7 @@ class _HomePageState extends State<HomePage>
                     padding: const EdgeInsets.symmetric(horizontal: 16),
                     itemCount: stores.length,
                     separatorBuilder: (_, __) => const SizedBox(width: 14),
-                    itemBuilder: (ctx, i) =>
-                        _HomeStoreCard(store: stores[i]),
+                    itemBuilder: (ctx, i) => _HomeStoreCard(store: stores[i]),
                   ),
                 ),
             ],
@@ -612,8 +570,6 @@ class _HomePageState extends State<HomePage>
     );
   }
 }
-
-
 
 class _SearchBar extends StatelessWidget {
   @override
@@ -679,31 +635,31 @@ class _BannerCard extends StatelessWidget {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-      margin: const EdgeInsets.symmetric(horizontal: 2),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(24),
-        boxShadow: [
-          BoxShadow(
-            color: HomeAppColors.primary.withOpacity(0.25),
-            blurRadius: 20,
-            offset: const Offset(0, 8),
-          ),
-        ],
-      ),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(24),
-        child: Stack(
-          fit: StackFit.expand,
-          children: [
-            Image(
-              image: image,
-              fit: BoxFit.cover,
-              errorBuilder: (_, __, ___) =>
-                  Container(color: HomeAppColors.primaryLight),
+        margin: const EdgeInsets.symmetric(horizontal: 2),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(24),
+          boxShadow: [
+            BoxShadow(
+              color: HomeAppColors.primary.withOpacity(0.25),
+              blurRadius: 20,
+              offset: const Offset(0, 8),
             ),
           ],
         ),
-      ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(24),
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              Image(
+                image: image,
+                fit: BoxFit.cover,
+                errorBuilder: (_, __, ___) =>
+                    Container(color: HomeAppColors.primaryLight),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -774,8 +730,9 @@ class _CategoryCard extends StatelessWidget {
       );
     }
     // صورة محلية
-    final path =
-        icon.startsWith('assets/') ? icon : 'assets/images/categories/$icon';
+    final path = icon.startsWith('assets/')
+        ? icon
+        : 'assets/images/categories/$icon';
     return Image.asset(
       path,
       fit: BoxFit.cover,
@@ -825,9 +782,7 @@ class _HomeStoreCard extends StatelessWidget {
                       height: 120,
                       child: Stack(
                         fit: StackFit.expand,
-                        children: [
-                          _coverImage(),
-                        ],
+                        children: [_coverImage()],
                       ),
                     ),
 
@@ -978,7 +933,8 @@ class _LogoBadge extends StatelessWidget {
         ],
       ),
       child: ClipOval(
-        child: (logoUrl != null &&
+        child:
+            (logoUrl != null &&
                 logoUrl!.isNotEmpty &&
                 (logoUrl!.startsWith('http://') ||
                     logoUrl!.startsWith('https://')))
@@ -1000,4 +956,3 @@ class _LogoBadge extends StatelessWidget {
     );
   }
 }
-

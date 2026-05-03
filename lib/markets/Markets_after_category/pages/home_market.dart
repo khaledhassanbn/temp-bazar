@@ -1,12 +1,14 @@
-import 'package:bazar_suez/markets/Markets_after_category/widget/CategorySelector.dart';
+
 import 'package:bazar_suez/markets/Markets_after_category/widget/best_restaurants_section.dart';
 import 'package:bazar_suez/markets/Markets_after_category/widget/restaurant_card.dart';
 import 'package:bazar_suez/markets/Markets_after_category/widget/auto_scrolling_ads.dart';
 import 'package:bazar_suez/markets/Markets_after_category/widget/market_Items_List.dart';
+import 'package:bazar_suez/markets/Markets_after_category/widget/category_stores_filter_bar.dart';
 import 'package:flutter/material.dart';
 import 'package:bazar_suez/markets/Markets_after_category/widget/collapsible_header.dart'; // ← الودجت الجديدة
 import 'package:provider/provider.dart';
 import 'package:bazar_suez/markets/Markets_after_category/viewmodel/category_filter_viewmodel.dart';
+import 'package:bazar_suez/theme/app_color.dart';
 
 class FoodHomePage extends StatefulWidget {
   final String? categoryId;
@@ -114,9 +116,13 @@ class _FoodHomePageState extends State<FoodHomePage> {
               ),
             ),
 
-            // 🧭 اختيار التصنيفات الفرعية إن وجدت للفئة المحددة
-            if (vm.subCategories.isNotEmpty)
-              const SliverToBoxAdapter(child: CategorySelector()),
+            if (vm.selectedCategoryId != null)
+              const SliverToBoxAdapter(
+                child: Padding(
+                  padding: EdgeInsets.only(bottom: 12),
+                  child: CategoryStoresFilterBar(primaryColor: AppColors.mainColor),
+                ),
+              ),
 
             // 📋 قائمة المتاجر بناءً على الفئة/التصنيف الفرعي
             SliverToBoxAdapter(child: CategoryItemsList()),

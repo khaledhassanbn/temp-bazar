@@ -28,11 +28,19 @@ class _StoreOrderNotificationHostState extends State<StoreOrderNotificationHost>
     if (location == null || location.isEmpty) return false;
     // شغّل الاستماع فقط داخل صفحات التاجر التي تحتاج تنبيه فعلي للطلبات
     // لتجنب ثِقل فتح صفحات مثل MarketAnimatedPage.
+    //
+    // ملاحظة: بعد تحديثات مسارات التطبيق أصبحت صفحات التبويب الأساسية (مثل /HomePage)
+    // هي المكان الافتراضي الذي يقضي فيه التاجر أغلب الوقت، لذا يجب أن تكون ضمن القائمة.
+    if (location.startsWith('/HomePage')) return true;
     if (location.startsWith('/myorder')) return true;
     if (location.startsWith('/PastOrders')) return true;
+    if (location.startsWith('/addproduct')) return true;
     if (location.startsWith('/MyStorePage')) return true;
     if (location.startsWith('/ManageProducts')) return true;
     if (location.startsWith('/SalesStatsPage')) return true;
+    if (location.startsWith('/AccountPage')) return true;
+    if (location.startsWith('/pricingpage')) return true;
+    if (location.startsWith('/edit-store')) return true;
     return false;
   }
 

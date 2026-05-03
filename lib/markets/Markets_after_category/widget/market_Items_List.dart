@@ -17,7 +17,7 @@ class CategoryItemsList extends StatelessWidget {
       );
     }
 
-    final items = vm.stores;
+    final items = vm.sortedStores;
 
     if (items.isEmpty) {
       return const SizedBox.shrink();
@@ -56,7 +56,8 @@ class CategoryItemsList extends StatelessWidget {
                           ? CachedNetworkImage(
                               imageUrl: store.logoUrl!,
                               fit: BoxFit.cover,
-                              placeholder: (_, __) => Container(color: Colors.grey.shade200),
+                              placeholder: (_, __) =>
+                                  Container(color: Colors.grey.shade200),
                               errorWidget: (_, __, ___) => Image.asset(
                                 'assets/images/egypt.jpg',
                                 fit: BoxFit.cover,

@@ -11,6 +11,7 @@ import 'package:bazar_suez/markets/create_market/services/categories_service.dar
 import 'package:bazar_suez/markets/home_page/services/featured_stores_service.dart';
 import 'package:bazar_suez/markets/saved_locations/widgets/saved_locations_sheet.dart';
 import 'package:bazar_suez/markets/Markets_after_category/widget/search_bar_widget.dart';
+import 'package:bazar_suez/markets/Markets_after_category/widget/category_stores_filter_bar.dart';
 import 'package:bazar_suez/theme/app_color.dart';
 import 'package:bazar_suez/services/delivery_fee/delivery_fee_service.dart';
 import 'package:bazar_suez/services/delivery_fee/delivery_fee_settings.dart';
@@ -152,7 +153,7 @@ class _CategoryMarketPageState extends State<CategoryMarketPage> {
     final cartVm = context.watch<CartViewModel>();
     final locationVm = context.watch<SavedLocationsViewModel>();
 
-    final filteredStores = _filterStores(vm.stores, _searchController.text);
+    final filteredStores = _filterStores(vm.sortedStores, _searchController.text);
 
     return Directionality(
       textDirection: TextDirection.rtl,
@@ -332,7 +333,7 @@ class _CategoryMarketPageState extends State<CategoryMarketPage> {
                                   ),
                                   const SizedBox(width: 6),
                                   Text(
-                                    '${vm.stores.length}',
+                                    '${vm.sortedStores.length}',
                                     style: const TextStyle(
                                       color: Colors.white,
                                       fontWeight: FontWeight.w600,
@@ -402,55 +403,10 @@ class _CategoryMarketPageState extends State<CategoryMarketPage> {
                           ),
                         ),
 
-                      const SizedBox(height: 24),
+                      const SizedBox(height: 10),
 
-                      // Filter Chips
-                      if (vm.subCategories.isNotEmpty) ...[
-                        SingleChildScrollView(
-                          scrollDirection: Axis.horizontal,
-                          child: Row(
-                            children: vm.subCategories.map((sub) {
-                              final isSelected =
-                                  vm.selectedSubCategoryId == sub.id;
-                              return GestureDetector(
-                                onTap: () {
-                                  final newId = isSelected ? null : sub.id;
-                                  vm.setSubCategory(newId);
-                                },
-                                child: Container(
-                                  margin: const EdgeInsets.only(left: 8),
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 16,
-                                    vertical: 10,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: isSelected
-                                        ? AppColors.mainColor
-                                        : Colors.white,
-                                    border: Border.all(
-                                      color: isSelected
-                                          ? AppColors.mainColor
-                                          : Colors.grey[300]!,
-                                    ),
-                                    borderRadius: BorderRadius.circular(25),
-                                  ),
-                                  child: Text(
-                                    sub.name,
-                                    style: TextStyle(
-                                      color: isSelected
-                                          ? Colors.white
-                                          : Colors.black,
-                                      fontSize: 14,
-                                      fontWeight: FontWeight.w500,
-                                    ),
-                                  ),
-                                ),
-                              );
-                            }).toList(),
-                          ),
-                        ),
-                        const SizedBox(height: 20),
-                      ],
+                      CategoryStoresFilterBar(primaryColor: AppColors.mainColor),
+                      const SizedBox(height: 8),
 
                       // Category Name
                       Text(
