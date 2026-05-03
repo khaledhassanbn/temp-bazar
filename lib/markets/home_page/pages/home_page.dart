@@ -417,45 +417,76 @@ class _HomePageState extends State<HomePage>
   Widget _buildCategoriesSection() {
     return Consumer<CategoryViewModel>(
       builder: (context, vm, _) {
-        // تحميل الفئات إذا لم تُحمَّل بعد
         if (!vm.hasLoaded && !vm.isLoading) {
           Future.microtask(() => vm.fetchCategories());
         }
 
         final displayCats = vm.categories.take(8).toList();
 
-        return Padding(
-          padding: const EdgeInsets.fromLTRB(16, 24, 16, 0),
+        return Container(
+          margin: const EdgeInsets.only(top: 16),
+          width: double.infinity,
+          decoration: const BoxDecoration(
+            color: Colors.white,
+          ),
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 20),
           child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              // ── Header
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  const Text(
-                    'الفئات',
-                    style: TextStyle(
-                      color: HomeAppColors.textDark,
-                      fontSize: 20,
-                      fontWeight: FontWeight.w800,
-                    ),
+                  Row(
+                    children: [
+                      Container(
+                        width: 4,
+                        height: 22,
+                        decoration: BoxDecoration(
+                          color: HomeAppColors.primary,
+                          borderRadius: BorderRadius.circular(2),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      const Text(
+                        'الفئات',
+                        style: TextStyle(
+                          color: HomeAppColors.primary,
+                          fontSize: 18,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                    ],
                   ),
                   GestureDetector(
                     onTap: () => context.push('/CategoriesGrid'),
-                    child: const Text(
-                      'عرض الكل',
-                      style: TextStyle(
-                        color: HomeAppColors.primary,
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 5,
+                      ),
+                      decoration: BoxDecoration(
+                        color: HomeAppColors.primary.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: const Text(
+                        'عرض الكل',
+                        style: TextStyle(
+                          color: HomeAppColors.primary,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                        ),
                       ),
                     ),
                   ),
                 ],
               ),
-              const SizedBox(height: 20),
+              const SizedBox(height: 4),
+
+              // ── Grid
               if (vm.isLoading)
                 const SizedBox(
-                  height: 90,
+                  height: 120,
                   child: Center(
                     child: CircularProgressIndicator(
                       color: HomeAppColors.primary,
@@ -465,7 +496,7 @@ class _HomePageState extends State<HomePage>
                 )
               else if (displayCats.isEmpty)
                 const SizedBox(
-                  height: 90,
+                  height: 80,
                   child: Center(
                     child: Text(
                       'لا توجد فئات',
@@ -474,21 +505,26 @@ class _HomePageState extends State<HomePage>
                   ),
                 )
               else
-                SizedBox(
-                  height: 120,
-                  child: ListView.separated(
-                    scrollDirection: Axis.horizontal,
-                    physics: const BouncingScrollPhysics(),
-                    itemCount: displayCats.length,
-                    separatorBuilder: (_, __) => const SizedBox(width: 12),
-                    itemBuilder: (context, i) {
-                      final cat = displayCats[i];
-                      return _CategoryCard(
-                        category: cat,
-                        onTap: () => _selectCategory(cat.id),
-                      );
-                    },
-                  ),
+                GridView.builder(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  gridDelegate:
+                      const SliverGridDelegateWithFixedCrossAxisCount(
+                        crossAxisCount: 4,
+                        crossAxisSpacing: 10,
+                        mainAxisSpacing: 10,
+                        childAspectRatio: 0.70,
+                      ),
+                  itemCount: displayCats.length,
+                  itemBuilder: (context, i) {
+                    final cat = displayCats[i];
+                    final isSelected = _selectedCategoryId == cat.id;
+                    return _CategoryCard(
+                      category: cat,
+                      isSelected: isSelected,
+                      onTap: () => _selectCategory(cat.id),
+                    );
+                  },
                 ),
             ],
           ),
@@ -521,6 +557,62 @@ class _HomePageState extends State<HomePage>
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              // ── Header المتاجر
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 24, 16, 16),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Row(
+                      children: [
+                        Container(
+                          width: 4,
+                          height: 22,
+                          decoration: BoxDecoration(
+                            color: HomeAppColors.primary,
+                            borderRadius: BorderRadius.circular(2),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        const Text(
+                          'المتاجر',
+                          style: TextStyle(
+                            color: HomeAppColors.primary,
+                            fontSize: 18,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                      ],
+                    ),
+                    GestureDetector(
+                      onTap: () {
+                        if (_selectedCategoryId != null) {
+                          context.push('/CategoryMarketPage?categoryId=$_selectedCategoryId');
+                        }
+                      },
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 5,
+                        ),
+                        decoration: BoxDecoration(
+                          color: HomeAppColors.primary.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: const Text(
+                          'عرض الكل',
+                          style: TextStyle(
+                            color: HomeAppColors.primary,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
               if (_selectedCategoryId != null &&
                   filterVm.selectedCategoryId == _selectedCategoryId) ...[
                 CategoryStoresFilterBar(primaryColor: HomeAppColors.primary),
@@ -552,16 +644,18 @@ class _HomePageState extends State<HomePage>
                   ),
                 )
               else
-                SizedBox(
-                  height: 210,
-                  child: ListView.separated(
-                    scrollDirection: Axis.horizontal,
-                    physics: const BouncingScrollPhysics(),
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    itemCount: stores.length,
-                    separatorBuilder: (_, __) => const SizedBox(width: 14),
-                    itemBuilder: (ctx, i) => _HomeStoreCard(store: stores[i]),
+                GridView.builder(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: 2,
+                    crossAxisSpacing: 14,
+                    mainAxisSpacing: 14,
+                    childAspectRatio: 0.72,
                   ),
+                  itemCount: stores.length,
+                  itemBuilder: (ctx, i) => _HomeStoreCard(store: stores[i]),
                 ),
             ],
           ),
@@ -668,29 +762,58 @@ class _BannerCard extends StatelessWidget {
 class _CategoryCard extends StatelessWidget {
   final CategoryModel category;
   final VoidCallback? onTap;
-  const _CategoryCard({required this.category, this.onTap});
+  final bool isSelected;
+
+  const _CategoryCard({
+    required this.category,
+    required this.isSelected,
+    this.onTap,
+  });
 
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
       onTap: onTap,
-      child: SizedBox(
-        width: 72,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        decoration: BoxDecoration(
+          color: isSelected
+              ? HomeAppColors.primary
+              : const Color(0xFFEEF7FB),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(
+            color: isSelected
+                ? HomeAppColors.primary
+                : Colors.transparent,
+            width: 1.5,
+          ),
+        ),
+        padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 6),
         child: Column(
-          mainAxisSize: MainAxisSize.min,
+          mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            SizedBox(
-              width: 70,
-              height: 70,
-              child: ClipOval(child: _buildCategoryImage(category.icon)),
+            Container(
+              width: 46,
+              height: 46,
+              decoration: BoxDecoration(
+                color: isSelected
+                    ? Colors.white.withOpacity(0.2)
+                    : HomeAppColors.primary.withOpacity(0.12),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(12),
+                child: _buildCategoryImage(category.icon, isSelected),
+              ),
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 7),
             Text(
               category.name,
-              style: const TextStyle(
-                color: HomeAppColors.textDark,
-                fontSize: 12,
-                fontWeight: FontWeight.w500,
+              style: TextStyle(
+                color: isSelected ? Colors.white : HomeAppColors.textDark,
+                fontSize: 11,
+                fontWeight: FontWeight.w700,
+                height: 1.2,
               ),
               textAlign: TextAlign.center,
               maxLines: 2,
@@ -702,47 +825,40 @@ class _CategoryCard extends StatelessWidget {
     );
   }
 
-  Widget _buildCategoryImage(String icon) {
-    if (icon.isEmpty) {
-      return const Icon(
-        Icons.category_outlined,
-        color: HomeAppColors.primary,
-        size: 32,
-      );
-    }
+  Widget _buildCategoryImage(String icon, bool isSelected) {
+    final fallback = Icon(
+      Icons.category_outlined,
+      color: isSelected ? Colors.white : HomeAppColors.primary,
+      size: 26,
+    );
+
+    if (icon.isEmpty) return fallback;
+
     if (icon.startsWith('http://') || icon.startsWith('https://')) {
       return CachedNetworkImage(
         imageUrl: icon,
         fit: BoxFit.cover,
-        width: 70,
-        height: 70,
+        width: 46,
+        height: 46,
         placeholder: (_, __) => const Center(
           child: CircularProgressIndicator(
             strokeWidth: 2,
             color: HomeAppColors.primary,
           ),
         ),
-        errorWidget: (_, __, ___) => const Icon(
-          Icons.category_outlined,
-          color: HomeAppColors.primary,
-          size: 32,
-        ),
+        errorWidget: (_, __, ___) => fallback,
       );
     }
-    // صورة محلية
+
     final path = icon.startsWith('assets/')
         ? icon
         : 'assets/images/categories/$icon';
     return Image.asset(
       path,
       fit: BoxFit.cover,
-      width: 70,
-      height: 70,
-      errorBuilder: (_, __, ___) => const Icon(
-        Icons.category_outlined,
-        color: HomeAppColors.primary,
-        size: 32,
-      ),
+      width: 46,
+      height: 46,
+      errorBuilder: (_, __, ___) => fallback,
     );
   }
 }
@@ -758,7 +874,7 @@ class _HomeStoreCard extends StatelessWidget {
       child: Directionality(
         textDirection: TextDirection.rtl,
         child: Container(
-          width: 260,
+          width: double.infinity,
           decoration: BoxDecoration(
             color: Colors.white,
             borderRadius: BorderRadius.circular(18),

@@ -77,6 +77,7 @@ class CategoryStoresFilterBar extends StatelessWidget {
 
     showModalBottomSheet(
       context: context,
+      isScrollControlled: true,
       backgroundColor: Colors.white,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
@@ -89,7 +90,12 @@ class CategoryStoresFilterBar extends StatelessWidget {
               child: SafeArea(
                 top: false,
                 child: Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 10, 16, 16),
+                  padding: EdgeInsets.fromLTRB(
+                    16,
+                    10,
+                    16,
+                    16 + MediaQuery.of(ctx).viewInsets.bottom,
+                  ),
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
