@@ -52,7 +52,7 @@ class _CategoryMarketPageState extends State<CategoryMarketPage> {
       setState(() {}); // تحديث القائمة عند تغيير نص البحث
     });
   }
-  
+
   Future<void> _loadDeliverySettings() async {
     try {
       final settings = await _deliveryFeeService.getSettings();
@@ -112,12 +112,18 @@ class _CategoryMarketPageState extends State<CategoryMarketPage> {
   // حساب رسوم التوصيل باستخدام النظام المتدرج
   double _calculateDeliveryFee(double distanceKm) {
     if (_deliverySettings == null) return 30.0; // قيمة افتراضية
-    return _deliveryFeeService.calculateDeliveryFee(distanceKm, _deliverySettings!);
+    return _deliveryFeeService.calculateDeliveryFee(
+      distanceKm,
+      _deliverySettings!,
+    );
   }
 
   // حساب المسافة بين نقطتين
   double _calculateDistance(GeoPoint userLocation, GeoPoint storeLocation) {
-    return DeliveryFeeService.calculateDistanceFromGeoPoints(userLocation, storeLocation);
+    return DeliveryFeeService.calculateDistanceFromGeoPoints(
+      userLocation,
+      storeLocation,
+    );
   }
 
   String _normalize(String input) {
@@ -153,7 +159,10 @@ class _CategoryMarketPageState extends State<CategoryMarketPage> {
     final cartVm = context.watch<CartViewModel>();
     final locationVm = context.watch<SavedLocationsViewModel>();
 
-    final filteredStores = _filterStores(vm.sortedStores, _searchController.text);
+    final filteredStores = _filterStores(
+      vm.sortedStores,
+      _searchController.text,
+    );
 
     return Directionality(
       textDirection: TextDirection.rtl,
@@ -169,11 +178,8 @@ class _CategoryMarketPageState extends State<CategoryMarketPage> {
               expandedHeight: 140.0,
               elevation: 0,
               leading: IconButton(
-                icon: const Icon(
-                  Icons.arrow_back,
-                  color: Colors.white,
-                ),
-                onPressed: () => context.pop(),
+                icon: const Icon(Icons.arrow_back, color: Colors.white),
+                onPressed: () => context.go('/HomePage'),
               ),
               centerTitle: true,
               title: GestureDetector(
@@ -212,10 +218,7 @@ class _CategoryMarketPageState extends State<CategoryMarketPage> {
                     if (locationVm.hasLocation) ...[
                       const SizedBox(height: 2),
                       Text(
-                        _truncateAddress(
-                          locationVm.displayAddress,
-                          15,
-                        ),
+                        _truncateAddress(locationVm.displayAddress, 15),
                         style: const TextStyle(
                           fontSize: 14,
                           color: Colors.white70,
@@ -405,7 +408,9 @@ class _CategoryMarketPageState extends State<CategoryMarketPage> {
 
                       const SizedBox(height: 10),
 
-                      CategoryStoresFilterBar(primaryColor: AppColors.mainColor),
+                      CategoryStoresFilterBar(
+                        primaryColor: AppColors.mainColor,
+                      ),
                       const SizedBox(height: 8),
 
                       // Category Name
@@ -426,8 +431,10 @@ class _CategoryMarketPageState extends State<CategoryMarketPage> {
                             padding: EdgeInsets.all(32.0),
                             child: Text(
                               'لا توجد متاجر متاحة',
-                              style:
-                                  TextStyle(fontSize: 16, color: Colors.grey),
+                              style: TextStyle(
+                                fontSize: 16,
+                                color: Colors.grey,
+                              ),
                             ),
                           ),
                         ),
@@ -441,30 +448,23 @@ class _CategoryMarketPageState extends State<CategoryMarketPage> {
                 SliverPadding(
                   padding: const EdgeInsets.symmetric(horizontal: 16),
                   sliver: SliverList(
-                    delegate: SliverChildBuilderDelegate(
-                      (context, index) {
-                        return Padding(
-                          padding: const EdgeInsets.only(bottom: 16),
-                          child: _buildStoreCard(filteredStores[index]),
-                        );
-                      },
-                      childCount: filteredStores.length,
-                    ),
+                    delegate: SliverChildBuilderDelegate((context, index) {
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: 16),
+                        child: _buildStoreCard(filteredStores[index]),
+                      );
+                    }, childCount: filteredStores.length),
                   ),
                 ),
 
               // Bottom padding
-              const SliverToBoxAdapter(
-                child: SizedBox(height: 20),
-              ),
+              const SliverToBoxAdapter(child: SizedBox(height: 20)),
             ],
           ],
         ),
       ),
     );
   }
-
-
 
   Widget _buildRecommendedStoreCard(FeaturedStoreResult result) {
     final store = result.store;
