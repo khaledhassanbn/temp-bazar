@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>CLIENT_ID</key>
+	<string>681758766010-8hguil2cbb7an3mr70q161f56vr6v4kn.apps.googleusercontent.com</string>
+	<key>REVERSED_CLIENT_ID</key>
+	<string>com.googleusercontent.apps.681758766010-8hguil2cbb7an3mr70q161f56vr6v4kn</string>
+	<key>ANDROID_CLIENT_ID</key>
+	<string>681758766010-7806phk8rqevggru1fha2vbc1baa67hn.apps.googleusercontent.com</string>
+	<key>API_KEY</key>
+	<string>AIzaSyCgM95OcGbR3lHbtRdOXo4nwazI_5zcuZk</string>
+	<key>GCM_SENDER_ID</key>
+	<string>681758766010</string>
+	<key>PLIST_VERSION</key>
+	<string>1</string>
+	<key>BUNDLE_ID</key>
+	<string>com.example.bazarSuezApp</string>
+	<key>PROJECT_ID</key>
+	<string>bazar-suez-app</string>
+	<key>STORAGE_BUCKET</key>
+	<string>bazar-suez-app.firebasestorage.app</string>
+	<key>IS_ADS_ENABLED</key>
+	<false></false>
+	<key>IS_ANALYTICS_ENABLED</key>
+	<false></false>
+	<key>IS_APPINVITE_ENABLED</key>
+	<true></true>
+	<key>IS_GCM_ENABLED</key>
+	<true></true>
+	<key>IS_SIGNIN_ENABLED</key>
+	<true></true>
+	<key>GOOGLE_APP_ID</key>
+	<string>1:681758766010:ios:3d7c7fbdacf0ef406e2383</string>
+	<key>DATABASE_URL</key>
+	<string>https://bazar-suez-app-default-rtdb.firebaseio.com</string>
+</dict>
+</plist>

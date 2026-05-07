@@ -5,6 +5,9 @@ import 'package:google_sign_in/google_sign_in.dart';
 import '../model/userModel.dart';
 
 class AuthService {
+  static const String _iosGoogleClientId =
+      '681758766010-8hguil2cbb7an3mr70q161f56vr6v4kn.apps.googleusercontent.com';
+
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
@@ -79,7 +82,11 @@ class AuthService {
         final GoogleAuthProvider provider = GoogleAuthProvider();
         userCredential = await _auth.signInWithPopup(provider);
       } else {
-        final googleSignIn = GoogleSignIn();
+        final googleSignIn = GoogleSignIn(
+          clientId: defaultTargetPlatform == TargetPlatform.iOS
+              ? _iosGoogleClientId
+              : null,
+        );
 
         // تأكد من فصل أي جلسة سابقة حتى يَطلب التطبيق اختيار البريد في كل مرة
         try {
