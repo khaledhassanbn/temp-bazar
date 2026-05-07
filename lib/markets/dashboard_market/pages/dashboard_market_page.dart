@@ -22,16 +22,28 @@ class DashboardMarketPage extends StatefulWidget {
   State<DashboardMarketPage> createState() => _DashboardMarketPageState();
 }
 
-class _DashboardMarketPageState extends State<DashboardMarketPage> {
+class _DashboardMarketPageState extends State<DashboardMarketPage>
+    with SingleTickerProviderStateMixin {
   late final DashboardMarketViewModel _viewModel;
   final LicenseService _licenseService = LicenseService();
   final FirebaseAuth _auth = FirebaseAuth.instance;
   String? _processingPackageId;
+  late AnimationController _animController;
 
   @override
   void initState() {
     super.initState();
+    _animController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 900),
+    )..forward();
     _viewModel = DashboardMarketViewModel()..load(marketId: widget.marketId);
+  }
+
+  @override
+  void dispose() {
+    _animController.dispose();
+    super.dispose();
   }
 
   @override
@@ -41,14 +53,12 @@ class _DashboardMarketPageState extends State<DashboardMarketPage> {
       child: Directionality(
         textDirection: ui.TextDirection.rtl,
         child: Scaffold(
-          appBar: AppBar(
-            title: const Text('لوحة تحكم المتجر'),
-            backgroundColor: AppColors.mainColor,
-          ),
+          backgroundColor: const Color(0xFFF4F6FB),
+          appBar: _buildAppBar(context),
           body: Consumer<DashboardMarketViewModel>(
             builder: (context, vm, _) {
               if (vm.isLoading) {
-                return const Center(child: CircularProgressIndicator());
+                return const _LoadingView();
               }
               if (vm.errorMessage != null) {
                 return _ErrorView(
@@ -61,89 +71,123 @@ class _DashboardMarketPageState extends State<DashboardMarketPage> {
                 return const Center(child: Text('لا توجد بيانات متاحة'));
               }
               return RefreshIndicator(
+                color: AppColors.mainColor,
                 onRefresh: () => vm.load(marketId: widget.marketId),
                 child: ListView(
-                  padding: const EdgeInsets.all(12),
+                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
                   children: [
-                    _PackageCard(data: data),
-                    const SizedBox(height: 12),
-                    _StatsGrid(data: data),
-                    const SizedBox(height: 12),
-                    _SectionCard(
-                      title: 'المنتجات والمبيعات',
-                      child: TopProductsChart(points: data.topProducts),
+                    _buildAnimated(delay: 0, child: _PackageCard(data: data)),
+                    const SizedBox(height: 16),
+                    _buildAnimated(delay: 100, child: _StatsGrid(data: data)),
+                    const SizedBox(height: 16),
+                    _buildAnimated(
+                      delay: 200,
+                      child: _SectionCard(
+                        title: 'أكثر المنتجات مبيعاً',
+                        icon: Icons.bar_chart_rounded,
+                        child: TopProductsChart(points: data.topProducts),
+                      ),
                     ),
-                    const SizedBox(height: 12),
-                    _SectionCard(
-                      title: 'الباقات المتاحة',
-                      child: Column(
-                        children: data.availablePackages.map((pkg) {
-                          final isProcessing = _processingPackageId == pkg.id;
-                          return Container(
-                            margin: const EdgeInsets.only(bottom: 10),
-                            padding: const EdgeInsets.all(12),
-                            decoration: BoxDecoration(
-                              color: Colors.grey.shade50,
-                              borderRadius: BorderRadius.circular(12),
-                              border: Border.all(color: Colors.grey.shade200),
-                            ),
-                            child: Row(
-                              children: [
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        pkg.name,
-                                        style: const TextStyle(
-                                          fontWeight: FontWeight.bold,
-                                          fontSize: 16,
-                                        ),
-                                      ),
-                                      Text('${pkg.days} يوم'),
-                                    ],
-                                  ),
-                                ),
-                                Text(
-                                  '${pkg.price.toStringAsFixed(0)} ج.م',
-                                  style: const TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                    color: AppColors.mainColor,
-                                  ),
-                                ),
-                                const SizedBox(width: 10),
-                                ElevatedButton(
-                                  onPressed: isProcessing
-                                      ? null
-                                      : () => _subscribeFromDashboard(
-                                          package: pkg,
-                                          marketId: data.marketId,
-                                        ),
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: AppColors.mainColor,
-                                  ),
-                                  child: isProcessing
-                                      ? const SizedBox(
-                                          height: 16,
-                                          width: 16,
-                                          child: CircularProgressIndicator(
-                                            strokeWidth: 2,
-                                            color: Colors.white,
-                                          ),
-                                        )
-                                      : const Text('اشترك'),
-                                ),
-                              ],
-                            ),
-                          );
-                        }).toList(),
+                    const SizedBox(height: 16),
+                    _buildAnimated(
+                      delay: 300,
+                      child: _SectionCard(
+                        title: 'الباقات المتاحة',
+                        icon: Icons.workspace_premium_rounded,
+                        child: Column(
+                          children: data.availablePackages.map((pkg) {
+                            final isProcessing = _processingPackageId == pkg.id;
+                            return _PackageItem(
+                              package: pkg,
+                              isProcessing: isProcessing,
+                              onSubscribe: () => _subscribeFromDashboard(
+                                package: pkg,
+                                marketId: data.marketId,
+                              ),
+                            );
+                          }).toList(),
+                        ),
                       ),
                     ),
                   ],
                 ),
               );
             },
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildAnimated({required int delay, required Widget child}) {
+    return TweenAnimationBuilder<double>(
+      tween: Tween(begin: 0.0, end: 1.0),
+      duration: Duration(milliseconds: 500 + delay),
+      curve: Curves.easeOutCubic,
+      builder: (context, value, _) => Opacity(
+        opacity: value,
+        child: Transform.translate(
+          offset: Offset(0, 24 * (1 - value)),
+          child: child,
+        ),
+      ),
+    );
+  }
+
+  PreferredSizeWidget _buildAppBar(BuildContext context) {
+    return PreferredSize(
+      preferredSize: const Size.fromHeight(120),
+      child: Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: [
+              AppColors.mainColor,
+              AppColors.mainColor.withOpacity(0.82),
+            ],
+            begin: Alignment.topRight,
+            end: Alignment.bottomLeft,
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: AppColors.mainColor.withOpacity(0.35),
+              blurRadius: 20,
+              offset: const Offset(0, 6),
+            ),
+          ],
+        ),
+        child: SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Row(
+              children: [
+                Container(
+                  width: 40,
+                  height: 40,
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.18),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: IconButton(
+                    icon: const Icon(
+                      Icons.arrow_back,
+                      color: Colors.white,
+                      size: 22,
+                    ),
+                    onPressed: () => context.go('/HomePage'),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                const Text(
+                  'لوحة تحكم المتجر',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 20,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 0.3,
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),
@@ -157,33 +201,14 @@ class _DashboardMarketPageState extends State<DashboardMarketPage> {
     final user = _auth.currentUser;
     if (user == null) {
       if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('يجب تسجيل الدخول أولاً')));
+      _showSnack('يجب تسجيل الدخول أولاً', isError: true);
       return;
     }
 
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('تأكيد الاشتراك'),
-        content: Text(
+    final confirmed = await _showConfirmDialog(
+      title: 'تأكيد الاشتراك',
+      content:
           'هل تريد الاشتراك في باقة "${package.name}" بقيمة ${package.price.toStringAsFixed(2)} ج.م؟',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('إلغاء'),
-          ),
-          ElevatedButton(
-            onPressed: () => Navigator.pop(context, true),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.mainColor,
-            ),
-            child: const Text('تأكيد'),
-          ),
-        ],
-      ),
     );
 
     if (confirmed != true) return;
@@ -196,51 +221,132 @@ class _DashboardMarketPageState extends State<DashboardMarketPage> {
         userId: user.uid,
       );
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('تم الاشتراك في باقة ${package.name} بنجاح')),
-      );
+      _showSnack('تم الاشتراك في باقة ${package.name} بنجاح');
       await _viewModel.load(marketId: widget.marketId);
     } catch (e) {
       if (!mounted) return;
       final message = e.toString();
       if (message.contains('رصيدك غير كافٍ')) {
-        final goToWallet = await showDialog<bool>(
-          context: context,
-          builder: (context) => AlertDialog(
-            title: const Text('رصيد غير كافٍ'),
-            content: const Text(
-              'رصيد المحفظة غير كافٍ. هل تريد الانتقال لشحن المحفظة؟',
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context, false),
-                child: const Text('لاحقاً'),
-              ),
-              ElevatedButton(
-                onPressed: () => Navigator.pop(context, true),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.mainColor,
-                ),
-                child: const Text('شحن المحفظة'),
-              ),
-            ],
-          ),
+        final goToWallet = await _showConfirmDialog(
+          title: 'رصيد غير كافٍ',
+          content: 'رصيد المحفظة غير كافٍ. هل تريد الانتقال لشحن المحفظة؟',
+          confirmLabel: 'شحن المحفظة',
+          cancelLabel: 'لاحقاً',
         );
         if (goToWallet == true && mounted) {
           context.go('/wallet');
         }
       } else {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('فشل الاشتراك: $message')));
+        _showSnack('فشل الاشتراك: $message', isError: true);
       }
     } finally {
-      if (mounted) {
-        setState(() => _processingPackageId = null);
-      }
+      if (mounted) setState(() => _processingPackageId = null);
     }
   }
+
+  void _showSnack(String message, {bool isError = false}) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: isError ? Colors.red.shade700 : Colors.green.shade700,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        margin: const EdgeInsets.all(12),
+      ),
+    );
+  }
+
+  Future<bool?> _showConfirmDialog({
+    required String title,
+    required String content,
+    String confirmLabel = 'تأكيد',
+    String cancelLabel = 'إلغاء',
+  }) {
+    return showDialog<bool>(
+      context: context,
+      builder: (context) => Dialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 56,
+                height: 56,
+                decoration: BoxDecoration(
+                  color: AppColors.mainColor.withOpacity(0.1),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  Icons.workspace_premium_rounded,
+                  color: AppColors.mainColor,
+                  size: 28,
+                ),
+              ),
+              const SizedBox(height: 16),
+              Text(
+                title,
+                style: const TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 10),
+              Text(
+                content,
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 14,
+                  color: Colors.grey.shade600,
+                  height: 1.5,
+                ),
+              ),
+              const SizedBox(height: 20),
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: () => Navigator.pop(context, false),
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 13),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        side: BorderSide(color: Colors.grey.shade300),
+                      ),
+                      child: Text(
+                        cancelLabel,
+                        style: TextStyle(color: Colors.grey.shade700),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: ElevatedButton(
+                      onPressed: () => Navigator.pop(context, true),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.mainColor,
+                        padding: const EdgeInsets.symmetric(vertical: 13),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        elevation: 0,
+                      ),
+                      child: Text(confirmLabel),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 }
+
+// ─── Package Hero Card ──────────────────────────────────────────────────────
 
 class _PackageCard extends StatelessWidget {
   final DashboardMarketModel data;
@@ -253,91 +359,219 @@ class _PackageCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final progress = data.packageProgress.clamp(0.0, 1.0);
+
     return Container(
-      padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: AppColors.mainColor,
-        borderRadius: BorderRadius.circular(16),
+        gradient: LinearGradient(
+          colors: [AppColors.mainColor, AppColors.mainColor.withOpacity(0.78)],
+          begin: Alignment.topRight,
+          end: Alignment.bottomLeft,
+        ),
+        borderRadius: BorderRadius.circular(24),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.mainColor.withOpacity(0.4),
+            blurRadius: 24,
+            offset: const Offset(0, 10),
+          ),
+        ],
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      child: Stack(
         children: [
-          const Text(
-            'معلومات الباقة الحالية',
-            style: TextStyle(
-              color: Colors.white,
-              fontWeight: FontWeight.bold,
-              fontSize: 16,
+          // Decorative circle
+          Positioned(
+            left: -30,
+            top: -30,
+            child: Container(
+              width: 140,
+              height: 140,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: Colors.white.withOpacity(0.07),
+              ),
             ),
           ),
-          const SizedBox(height: 8),
-          Text(
-            data.currentPackageName,
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 18,
-              fontWeight: FontWeight.w700,
+          Positioned(
+            right: -20,
+            bottom: -20,
+            child: Container(
+              width: 100,
+              height: 100,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: Colors.white.withOpacity(0.07),
+              ),
             ),
           ),
-          const SizedBox(height: 8),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                'تاريخ البدء: ${_formatDate(data.packageStartAt)}',
-                style: const TextStyle(color: Colors.white),
-              ),
-              Text(
-                'تاريخ الانتهاء: ${_formatDate(data.packageEndAt)}',
-                style: const TextStyle(color: Colors.white),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                'الأيام المتبقية: ${data.remainingDays}',
-                style: const TextStyle(color: Colors.white),
-              ),
-              Text(
-                data.isPackageActive ? 'الحالة: نشط' : 'الحالة: غير نشط',
-                style: const TextStyle(color: Colors.white),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          LinearProgressIndicator(
-            value: data.packageProgress,
-            minHeight: 8,
-            backgroundColor: Colors.white24,
-            valueColor: const AlwaysStoppedAnimation<Color>(Colors.white),
-          ),
-          const SizedBox(height: 6),
-          Text(
-            'النسبة: ${(data.packageProgress * 100).toStringAsFixed(0)}%',
-            style: const TextStyle(color: Colors.white),
-          ),
-          const Divider(color: Colors.white30),
-          Text(
-            'الرصيد الحالي للتطبيق: ${data.walletBalance.toStringAsFixed(2)} ج.م',
-            style: const TextStyle(
-              color: Colors.white,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-          const SizedBox(height: 10),
-          Align(
-            alignment: Alignment.centerLeft,
-            child: OutlinedButton.icon(
-              onPressed: () => context.go('/wallet'),
-              style: OutlinedButton.styleFrom(
-                foregroundColor: Colors.white,
-                side: const BorderSide(color: Colors.white),
-              ),
-              icon: const Icon(Icons.account_balance_wallet_outlined),
-              label: const Text('شحن المحفظة'),
+          Padding(
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 5,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.2),
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            data.isPackageActive
+                                ? Icons.check_circle_rounded
+                                : Icons.cancel_rounded,
+                            size: 14,
+                            color: data.isPackageActive
+                                ? Colors.greenAccent
+                                : Colors.redAccent,
+                          ),
+                          const SizedBox(width: 5),
+                          Text(
+                            data.isPackageActive ? 'نشط' : 'غير نشط',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const Spacer(),
+                    const Text(
+                      'الباقة الحالية',
+                      style: TextStyle(color: Colors.white70, fontSize: 13),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  data.currentPackageName,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 24,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 0.5,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Row(
+                  children: [
+                    _InfoChip(
+                      icon: Icons.calendar_today_rounded,
+                      label: 'البداية',
+                      value: _formatDate(data.packageStartAt),
+                    ),
+                    const SizedBox(width: 10),
+                    _InfoChip(
+                      icon: Icons.event_rounded,
+                      label: 'الانتهاء',
+                      value: _formatDate(data.packageEndAt),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 14),
+                Row(
+                  children: [
+                    const Icon(
+                      Icons.hourglass_bottom_rounded,
+                      color: Colors.white70,
+                      size: 16,
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      '${data.remainingDays} يوم متبق',
+                      style: const TextStyle(color: Colors.white, fontSize: 13),
+                    ),
+                    const Spacer(),
+                    Text(
+                      '${(progress * 100).toStringAsFixed(0)}%',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(8),
+                  child: LinearProgressIndicator(
+                    value: progress,
+                    minHeight: 8,
+                    backgroundColor: Colors.white24,
+                    valueColor: const AlwaysStoppedAnimation<Color>(
+                      Colors.white,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Container(
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.15),
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(
+                        Icons.account_balance_wallet_rounded,
+                        color: Colors.white,
+                        size: 20,
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              'رصيد المحفظة',
+                              style: TextStyle(
+                                color: Colors.white70,
+                                fontSize: 12,
+                              ),
+                            ),
+                            Text(
+                              '${data.walletBalance.toStringAsFixed(2)} ج.م',
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 16,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      TextButton.icon(
+                        onPressed: () => context.go('/wallet'),
+                        style: TextButton.styleFrom(
+                          backgroundColor: Colors.white,
+                          foregroundColor: AppColors.mainColor,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 14,
+                            vertical: 10,
+                          ),
+                        ),
+                        icon: const Icon(Icons.add_rounded, size: 16),
+                        label: const Text(
+                          'شحن',
+                          style: TextStyle(fontWeight: FontWeight.bold),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
             ),
           ),
         ],
@@ -345,6 +579,55 @@ class _PackageCard extends StatelessWidget {
     );
   }
 }
+
+class _InfoChip extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final String value;
+
+  const _InfoChip({
+    required this.icon,
+    required this.label,
+    required this.value,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Expanded(
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+        decoration: BoxDecoration(
+          color: Colors.white.withOpacity(0.15),
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Row(
+          children: [
+            Icon(icon, size: 14, color: Colors.white70),
+            const SizedBox(width: 6),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    label,
+                    style: const TextStyle(color: Colors.white60, fontSize: 10),
+                  ),
+                  Text(
+                    value,
+                    style: const TextStyle(color: Colors.white, fontSize: 11),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ─── Stats Grid ─────────────────────────────────────────────────────────────
 
 class _StatsGrid extends StatelessWidget {
   final DashboardMarketModel data;
@@ -352,49 +635,71 @@ class _StatsGrid extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GridView.count(
+    final stats = [
+      _StatData(
+        title: 'إجمالي المنتجات',
+        value: data.totalProducts.toString(),
+        icon: Icons.inventory_2_rounded,
+        color: const Color(0xFF6C63FF),
+        bgColor: const Color(0xFFEEEDFF),
+      ),
+      _StatData(
+        title: 'مبيعات الأسبوع',
+        value: data.weeklySalesCount.toString(),
+        icon: Icons.shopping_bag_rounded,
+        color: const Color(0xFF00B37E),
+        bgColor: const Color(0xFFE6F9F3),
+      ),
+      _StatData(
+        title: 'الإيرادات الشهرية',
+        value: '${data.monthlyRevenue.toStringAsFixed(0)} ج',
+        icon: Icons.trending_up_rounded,
+        color: const Color(0xFFFF6B35),
+        bgColor: const Color(0xFFFFF0EA),
+      ),
+      _StatData(
+        title: 'التقييم',
+        value: data.rating.toStringAsFixed(1),
+        icon: Icons.star_rounded,
+        color: const Color(0xFFF59E0B),
+        bgColor: const Color(0xFFFFF8E1),
+      ),
+    ];
+
+    return GridView.builder(
       physics: const NeverScrollableScrollPhysics(),
-      crossAxisCount: 2,
       shrinkWrap: true,
-      childAspectRatio: 1.5,
-      crossAxisSpacing: 10,
-      mainAxisSpacing: 10,
-      children: [
-        _StatCard(
-          title: 'إجمالي المنتجات',
-          value: data.totalProducts.toString(),
-          icon: Icons.inventory_2_outlined,
-        ),
-        _StatCard(
-          title: 'مبيعات الأسبوع',
-          value: data.weeklySalesCount.toString(),
-          icon: Icons.shopping_cart_checkout_outlined,
-        ),
-        _StatCard(
-          title: 'إجمالي الإيرادات الشهرية',
-          value: '${data.monthlyRevenue.toStringAsFixed(0)} ج.م',
-          icon: Icons.payments_outlined,
-        ),
-        _StatCard(
-          title: 'التقييم',
-          value: data.rating.toStringAsFixed(1),
-          icon: Icons.star_outline,
-        ),
-      ],
+      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: 2,
+        childAspectRatio: 1.35,
+        crossAxisSpacing: 12,
+        mainAxisSpacing: 12,
+      ),
+      itemCount: stats.length,
+      itemBuilder: (context, i) => _StatCard(stat: stats[i]),
     );
   }
 }
 
-class _StatCard extends StatelessWidget {
+class _StatData {
   final String title;
   final String value;
   final IconData icon;
+  final Color color;
+  final Color bgColor;
 
-  const _StatCard({
+  const _StatData({
     required this.title,
     required this.value,
     required this.icon,
+    required this.color,
+    required this.bgColor,
   });
+}
+
+class _StatCard extends StatelessWidget {
+  final _StatData stat;
+  const _StatCard({required this.stat});
 
   @override
   Widget build(BuildContext context) {
@@ -402,25 +707,48 @@ class _StatCard extends StatelessWidget {
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(14),
-        boxShadow: const [
-          BoxShadow(color: Colors.black12, blurRadius: 8, offset: Offset(0, 3)),
+        borderRadius: BorderRadius.circular(18),
+        boxShadow: [
+          BoxShadow(
+            color: stat.color.withOpacity(0.08),
+            blurRadius: 16,
+            offset: const Offset(0, 4),
+          ),
         ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(icon, color: AppColors.mainColor),
+          Container(
+            width: 36,
+            height: 36,
+            decoration: BoxDecoration(
+              color: stat.bgColor,
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Icon(stat.icon, color: stat.color, size: 20),
+          ),
           const SizedBox(height: 8),
           Text(
-            title,
-            style: const TextStyle(fontSize: 12, color: Colors.black54),
+            stat.value,
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.w800,
+              color: stat.color,
+              letterSpacing: 0.3,
+            ),
           ),
-          const SizedBox(height: 4),
+          const SizedBox(height: 2),
           Text(
-            value,
-            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            stat.title,
+            style: TextStyle(
+              fontSize: 11,
+              color: Colors.grey.shade500,
+              fontWeight: FontWeight.w500,
+            ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
           ),
         ],
       ),
@@ -428,37 +756,206 @@ class _StatCard extends StatelessWidget {
   }
 }
 
+// ─── Section Card ────────────────────────────────────────────────────────────
+
 class _SectionCard extends StatelessWidget {
   final String title;
+  final IconData icon;
   final Widget child;
 
-  const _SectionCard({required this.title, required this.child});
+  const _SectionCard({
+    required this.title,
+    required this.icon,
+    required this.child,
+  });
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(12),
+      padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(20),
         boxShadow: const [
-          BoxShadow(color: Colors.black12, blurRadius: 8, offset: Offset(0, 3)),
+          BoxShadow(
+            color: Color(0x0D000000),
+            blurRadius: 20,
+            offset: Offset(0, 4),
+          ),
         ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            title,
-            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+          Row(
+            children: [
+              Container(
+                width: 36,
+                height: 36,
+                decoration: BoxDecoration(
+                  color: AppColors.mainColor.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Icon(icon, color: AppColors.mainColor, size: 20),
+              ),
+              const SizedBox(width: 10),
+              Text(
+                title,
+                style: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 0.2,
+                ),
+              ),
+            ],
           ),
-          const SizedBox(height: 10),
+          const SizedBox(height: 6),
+          Divider(color: Colors.grey.shade100, thickness: 1.5),
+          const SizedBox(height: 6),
           child,
         ],
       ),
     );
   }
 }
+
+// ─── Package Item ────────────────────────────────────────────────────────────
+
+class _PackageItem extends StatelessWidget {
+  final Package package;
+  final bool isProcessing;
+  final VoidCallback onSubscribe;
+
+  const _PackageItem({
+    required this.package,
+    required this.isProcessing,
+    required this.onSubscribe,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [AppColors.mainColor.withOpacity(0.04), Colors.white],
+          begin: Alignment.centerRight,
+          end: Alignment.centerLeft,
+        ),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.mainColor.withOpacity(0.15)),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 44,
+            height: 44,
+            decoration: BoxDecoration(
+              color: AppColors.mainColor.withOpacity(0.12),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Icon(
+              Icons.workspace_premium_rounded,
+              color: AppColors.mainColor,
+              size: 22,
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  package.name,
+                  style: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 15,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  '${package.days} يوم',
+                  style: TextStyle(fontSize: 12, color: Colors.grey.shade500),
+                ),
+              ],
+            ),
+          ),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Text(
+                '${package.price.toStringAsFixed(0)} ج.م',
+                style: TextStyle(
+                  fontWeight: FontWeight.w800,
+                  fontSize: 15,
+                  color: AppColors.mainColor,
+                ),
+              ),
+              const SizedBox(height: 6),
+              SizedBox(
+                height: 34,
+                child: ElevatedButton(
+                  onPressed: isProcessing ? null : onSubscribe,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.mainColor,
+                    foregroundColor: Colors.white,
+                    elevation: 0,
+                    padding: const EdgeInsets.symmetric(horizontal: 18),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    textStyle: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 13,
+                    ),
+                  ),
+                  child: isProcessing
+                      ? const SizedBox(
+                          height: 16,
+                          width: 16,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Colors.white,
+                          ),
+                        )
+                      : const Text('اشترك'),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ─── Loading View ────────────────────────────────────────────────────────────
+
+class _LoadingView extends StatelessWidget {
+  const _LoadingView();
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          CircularProgressIndicator(
+            valueColor: AlwaysStoppedAnimation<Color>(AppColors.mainColor),
+          ),
+          const SizedBox(height: 16),
+          Text(
+            'جارٍ تحميل البيانات...',
+            style: TextStyle(color: Colors.grey.shade500, fontSize: 14),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ─── Error View ──────────────────────────────────────────────────────────────
 
 class _ErrorView extends StatelessWidget {
   final String message;
@@ -470,17 +967,53 @@ class _ErrorView extends StatelessWidget {
   Widget build(BuildContext context) {
     return Center(
       child: Padding(
-        padding: const EdgeInsets.all(20),
+        padding: const EdgeInsets.all(24),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(Icons.error_outline, color: Colors.red, size: 40),
-            const SizedBox(height: 10),
-            Text(message, textAlign: TextAlign.center),
-            const SizedBox(height: 10),
-            ElevatedButton(
+            Container(
+              width: 72,
+              height: 72,
+              decoration: BoxDecoration(
+                color: Colors.red.shade50,
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                Icons.wifi_off_rounded,
+                color: Colors.red.shade400,
+                size: 36,
+              ),
+            ),
+            const SizedBox(height: 16),
+            const Text(
+              'تعذّر تحميل البيانات',
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              message,
+              textAlign: TextAlign.center,
+              style: TextStyle(color: Colors.grey.shade500, height: 1.5),
+            ),
+            const SizedBox(height: 20),
+            ElevatedButton.icon(
               onPressed: onRetry,
-              child: const Text('إعادة المحاولة'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.mainColor,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 24,
+                  vertical: 13,
+                ),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                elevation: 0,
+              ),
+              icon: const Icon(Icons.refresh_rounded),
+              label: const Text(
+                'إعادة المحاولة',
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
             ),
           ],
         ),
