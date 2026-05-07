@@ -35,7 +35,8 @@ class MarketLayout extends StatelessWidget {
     if (route.startsWith('/addproduct') ||
         route.startsWith('/ManageProducts') ||
         route.startsWith('/edit-store') ||
-        route.startsWith('/pricingpage')) {
+        route.startsWith('/pricingpage') ||
+        route.startsWith('/market-dashboard')) {
       return 2;
     }
     if (route.startsWith('/MyStorePage')) return 3;

@@ -3,6 +3,7 @@ import 'package:bazar_suez/markets/account/pages/manage_managers_page.dart';
 import 'package:bazar_suez/markets/create_market/pages/create_store_page.dart';
 import 'package:bazar_suez/markets/edit_market/pages/edit_store_page.dart';
 import 'package:bazar_suez/markets/home_market/pages/home_market_page.dart';
+import 'package:bazar_suez/markets/dashboard_market/pages/dashboard_market_page.dart';
 import 'package:bazar_suez/markets/mangement_market/pages/manage_products_page.dart';
 import 'package:bazar_suez/markets/order_of_markets/pages/MarketOrdersPage.dart';
 import 'package:bazar_suez/markets/order_of_markets/pages/PastOrdersPage.dart';
@@ -47,6 +48,13 @@ final marketRoutes = [
     builder: (_, __) => const AddProductModernPage(),
   ),
   GoRoute(path: '/SalesStatsPage', builder: (_, __) => const SalesStatsPage()),
+  GoRoute(
+    path: '/market-dashboard',
+    builder: (context, state) {
+      final marketId = state.uri.queryParameters['marketId'];
+      return DashboardMarketPage(marketId: marketId);
+    },
+  ),
 
   GoRoute(
     path: '/myorder',

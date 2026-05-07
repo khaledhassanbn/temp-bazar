@@ -117,7 +117,7 @@ class _CustomBottomAppBarState extends State<CustomBottomAppBar> {
     _ManageAction(
       icon: Icons.verified_user_outlined,
       label: 'الترخيص',
-      onTap: () => _navigateTo('/pricingpage'),
+      onTap: () => _navigateTo('/market-dashboard'),
     ),
   ];
 
@@ -152,44 +152,44 @@ class _CustomBottomAppBarState extends State<CustomBottomAppBar> {
                 height: 70,
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceAround,
-            children: [
-              _buildNavItem(
-                context,
-                Icons.home_rounded,
-                'الرئيسية',
-                0,
-                onTapOverride: () => _handleNavigation(0),
+                  children: [
+                    _buildNavItem(
+                      context,
+                      Icons.home_rounded,
+                      'الرئيسية',
+                      0,
+                      onTapOverride: () => _handleNavigation(0),
+                    ),
+                    _buildOrdersItem(context),
+                    _buildNavItem(
+                      context,
+                      Icons.manage_accounts,
+                      'إدارة المتجر',
+                      2,
+                      onTapOverride: _toggleManageMenu,
+                      isActiveOverride: _manageMenuOpen,
+                    ),
+                    _buildNavItem(
+                      context,
+                      Icons.storefront_rounded,
+                      'متجري',
+                      3,
+                      onTapOverride: () => _handleNavigation(3),
+                    ),
+                    _buildNavItem(
+                      context,
+                      Icons.person_outline_rounded,
+                      'حسابي',
+                      4,
+                      onTapOverride: () => _handleNavigation(4),
+                    ),
+                  ],
+                ),
               ),
-              _buildOrdersItem(context),
-              _buildNavItem(
-                context,
-                Icons.manage_accounts,
-                'إدارة المتجر',
-                2,
-                onTapOverride: _toggleManageMenu,
-                isActiveOverride: _manageMenuOpen,
-              ),
-              _buildNavItem(
-                context,
-                Icons.storefront_rounded,
-                'متجري',
-                3,
-                onTapOverride: () => _handleNavigation(3),
-              ),
-              _buildNavItem(
-                context,
-                Icons.person_outline_rounded,
-                'حسابي',
-                4,
-                onTapOverride: () => _handleNavigation(4),
-              ),
-            ],
+            ),
           ),
         ),
       ),
-    ),
-  ),
-),
     );
   }
 

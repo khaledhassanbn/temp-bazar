@@ -8,7 +8,6 @@ import 'package:bazar_suez/markets/saved_locations/viewmodels/saved_locations_vi
 import 'package:bazar_suez/markets/create_market/models/store_model.dart';
 import 'package:bazar_suez/markets/create_market/services/categories_service.dart'
     as cms;
-import 'package:bazar_suez/markets/home_page/services/featured_stores_service.dart';
 import 'package:bazar_suez/markets/saved_locations/widgets/saved_locations_sheet.dart';
 import 'package:bazar_suez/markets/Markets_after_category/widget/search_bar_widget.dart';
 import 'package:bazar_suez/markets/Markets_after_category/widget/category_stores_filter_bar.dart';
@@ -28,10 +27,7 @@ class _CategoryMarketPageState extends State<CategoryMarketPage> {
   final ScrollController _scrollController = ScrollController();
   final TextEditingController _searchController = TextEditingController();
   String? _categoryName;
-  final FeaturedStoresService _featuredStoresService = FeaturedStoresService();
   final DeliveryFeeService _deliveryFeeService = DeliveryFeeService();
-  List<FeaturedStoreResult> _featuredStores = [];
-  bool _isLoadingFeatured = false;
   DeliveryFeeSettings? _deliverySettings;
 
   @override
@@ -45,7 +41,6 @@ class _CategoryMarketPageState extends State<CategoryMarketPage> {
         _loadCategoryName(widget.categoryId!);
       }
       _loadDeliverySettings();
-      _loadFeaturedStores();
     });
     // إضافة listener للبحث
     _searchController.addListener(() {
@@ -63,23 +58,6 @@ class _CategoryMarketPageState extends State<CategoryMarketPage> {
       // استخدام القيم الافتراضية
       if (mounted) {
         setState(() => _deliverySettings = DeliveryFeeSettings.defaults());
-      }
-    }
-  }
-
-  Future<void> _loadFeaturedStores() async {
-    setState(() => _isLoadingFeatured = true);
-    try {
-      final stores = await _featuredStoresService.getFeaturedStores(limit: 10);
-      if (mounted) {
-        setState(() {
-          _featuredStores = stores;
-          _isLoadingFeatured = false;
-        });
-      }
-    } catch (e) {
-      if (mounted) {
-        setState(() => _isLoadingFeatured = false);
       }
     }
   }
@@ -383,28 +361,31 @@ class _CategoryMarketPageState extends State<CategoryMarketPage> {
                       ),
                       const SizedBox(height: 16),
 
-                      // Featured Stores list
-                      if (_isLoadingFeatured)
-                        const SizedBox(
-                          height: 220,
-                          child: Center(child: CircularProgressIndicator()),
-                        )
-                      else if (_featuredStores.isEmpty)
-                        const SizedBox.shrink()
-                      else
-                        SizedBox(
-                          height: 220,
-                          child: ListView.separated(
-                            scrollDirection: Axis.horizontal,
-                            itemCount: _featuredStores.length,
-                            separatorBuilder: (_, __) =>
-                                const SizedBox(width: 16),
-                            itemBuilder: (context, index) {
-                              final result = _featuredStores[index];
-                              return _buildRecommendedStoreCard(result);
-                            },
-                          ),
-                        ),
+                      // Top 4 best-selling stores in this category
+                      Builder(
+                        builder: (context) {
+                          final bestSelling = vm.stores.toList()
+                            ..sort(
+                              (a, b) => b.completedOrderCount.compareTo(
+                                a.completedOrderCount,
+                              ),
+                            );
+                          final top4 = bestSelling.take(4).toList();
+                          if (top4.isEmpty) return const SizedBox.shrink();
+                          return SizedBox(
+                            height: 245,
+                            child: ListView.separated(
+                              scrollDirection: Axis.horizontal,
+                              itemCount: top4.length,
+                              separatorBuilder: (_, __) =>
+                                  const SizedBox(width: 16),
+                              itemBuilder: (context, index) {
+                                return _buildRecommendedStoreCard(top4[index]);
+                              },
+                            ),
+                          );
+                        },
+                      ),
 
                       const SizedBox(height: 10),
 
@@ -466,13 +447,12 @@ class _CategoryMarketPageState extends State<CategoryMarketPage> {
     );
   }
 
-  Widget _buildRecommendedStoreCard(FeaturedStoreResult result) {
-    final store = result.store;
+  Widget _buildRecommendedStoreCard(StoreModel store) {
     final locationVm = context.watch<SavedLocationsViewModel>();
 
     // حساب المسافة والوقت والرسوم محلياً
     double? distanceKm;
-    int? deliveryTime = result.deliveryTimeMinutes;
+    int? deliveryTime;
     double? deliveryFee;
 
     if (locationVm.activeLocation != null && store.location != null) {
@@ -497,14 +477,17 @@ class _CategoryMarketPageState extends State<CategoryMarketPage> {
           ),
         ],
       ),
+      clipBehavior: Clip.antiAlias,
       child: GestureDetector(
         onTap: () {
           context.push('/HomeMarketPage?marketLink=${store.link}');
         },
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
           children: [
             Stack(
+              clipBehavior: Clip.none,
               children: [
                 Container(
                   height: 120,
@@ -534,16 +517,47 @@ class _CategoryMarketPageState extends State<CategoryMarketPage> {
                   top: 12,
                   right: 12,
                   child: Container(
-                    padding: const EdgeInsets.all(8),
+                    padding: const EdgeInsets.all(6),
                     decoration: const BoxDecoration(
                       color: Colors.white,
                       shape: BoxShape.circle,
                     ),
                     child: const Icon(
                       Icons.favorite_border,
-                      size: 20,
+                      size: 18,
                       color: Colors.black,
                     ),
+                  ),
+                ),
+                // شعار المتجر متداخل على اليسار بين الكفر والنص (مربع)
+                Positioned(
+                  bottom: -18,
+                  left: 12,
+                  child: Container(
+                    width: 44,
+                    height: 44,
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: Colors.white, width: 2),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.1),
+                          blurRadius: 6,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
+                      image: store.logoUrl != null && store.logoUrl!.isNotEmpty
+                          ? DecorationImage(
+                              image: NetworkImage(store.logoUrl!),
+                              fit: BoxFit.cover,
+                            )
+                          : null,
+                    ),
+                    clipBehavior: Clip.antiAlias,
+                    child: store.logoUrl == null || store.logoUrl!.isEmpty
+                        ? const Icon(Icons.store, size: 22, color: Colors.grey)
+                        : null,
                   ),
                 ),
                 if (deliveryTime != null && deliveryTime > 0)
@@ -552,15 +566,15 @@ class _CategoryMarketPageState extends State<CategoryMarketPage> {
                     right: 12,
                     child: Container(
                       padding: const EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 6,
+                        horizontal: 10,
+                        vertical: 4,
                       ),
                       decoration: BoxDecoration(
                         color: Colors.white,
                         borderRadius: BorderRadius.circular(20),
                       ),
                       child: Text(
-                        '$deliveryTime\nدقيقة',
+                        '$deliveryTime دقيقة',
                         textAlign: TextAlign.center,
                         style: const TextStyle(
                           fontSize: 11,
@@ -573,61 +587,53 @@ class _CategoryMarketPageState extends State<CategoryMarketPage> {
               ],
             ),
             Padding(
-              padding: const EdgeInsets.all(12),
+              padding: const EdgeInsets.fromLTRB(12, 28, 12, 10),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
                 children: [
                   Text(
                     store.name,
                     style: const TextStyle(
-                      fontSize: 18,
+                      fontSize: 15,
                       fontWeight: FontWeight.bold,
                     ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
-                  const SizedBox(height: 6),
+                  const SizedBox(height: 4),
                   Row(
                     children: [
-                      const Icon(Icons.star, color: Colors.green, size: 16),
+                      const Icon(Icons.star, color: Colors.green, size: 14),
                       const SizedBox(width: 4),
                       Text(
                         store.averageRating.toStringAsFixed(1),
                         style: const TextStyle(
-                          fontSize: 14,
+                          fontSize: 12,
                           fontWeight: FontWeight.w600,
                         ),
                       ),
-                      const SizedBox(width: 8),
+                      const SizedBox(width: 6),
                       Text(
                         '(${store.totalReviews})',
-                        style: TextStyle(fontSize: 13, color: Colors.grey[600]),
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          store.description,
-                          style: TextStyle(
-                            fontSize: 13,
-                            color: Colors.grey[600],
-                          ),
-                          overflow: TextOverflow.ellipsis,
-                        ),
+                        style: TextStyle(fontSize: 12, color: Colors.grey[600]),
                       ),
                     ],
                   ),
                   if (deliveryFee != null && deliveryFee > 0) ...[
-                    const SizedBox(height: 6),
+                    const SizedBox(height: 4),
                     Row(
                       children: [
                         const Icon(
                           Icons.motorcycle,
                           color: Colors.orange,
-                          size: 16,
+                          size: 14,
                         ),
                         const SizedBox(width: 4),
                         Text(
                           '${deliveryFee.toStringAsFixed(0)} ج.م',
                           style: const TextStyle(
-                            fontSize: 13,
+                            fontSize: 12,
                             color: Colors.orange,
                             fontWeight: FontWeight.w600,
                           ),
@@ -679,6 +685,7 @@ class _CategoryMarketPageState extends State<CategoryMarketPage> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Stack(
+              clipBehavior: Clip.none,
               children: [
                 Container(
                   height: 180,
@@ -720,6 +727,37 @@ class _CategoryMarketPageState extends State<CategoryMarketPage> {
                     ),
                   ),
                 ),
+                // شعار المتجر متداخل على اليسار بين الكفر والنص (مربع)
+                Positioned(
+                  bottom: -20,
+                  left: 12,
+                  child: Container(
+                    width: 48,
+                    height: 48,
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: Colors.white, width: 2),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.1),
+                          blurRadius: 6,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
+                      image: store.logoUrl != null && store.logoUrl!.isNotEmpty
+                          ? DecorationImage(
+                              image: NetworkImage(store.logoUrl!),
+                              fit: BoxFit.cover,
+                            )
+                          : null,
+                    ),
+                    clipBehavior: Clip.antiAlias,
+                    child: store.logoUrl == null || store.logoUrl!.isEmpty
+                        ? const Icon(Icons.store, size: 24, color: Colors.grey)
+                        : null,
+                  ),
+                ),
                 if (deliveryTime != null && deliveryTime > 0)
                   Positioned(
                     bottom: 12,
@@ -747,7 +785,7 @@ class _CategoryMarketPageState extends State<CategoryMarketPage> {
               ],
             ),
             Padding(
-              padding: const EdgeInsets.all(16),
+              padding: const EdgeInsets.fromLTRB(16, 28, 16, 16),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
