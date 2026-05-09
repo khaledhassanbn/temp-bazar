@@ -44,19 +44,15 @@ class _CustomBottomAppBarState extends State<CustomBottomAppBar> {
   void _handleNavigation(int index) {
     if (!mounted) return;
     _closeManageMenu();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) return;
-      widget.onTap(index);
-    });
+    Feedback.forTap(context);
+    widget.onTap(index);
   }
 
   void _navigateTo(String route) {
     if (!mounted) return;
     _closeManageMenu();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) return;
-      GoRouter.of(context).go(route);
-    });
+    Feedback.forTap(context);
+    GoRouter.of(context).go(route);
   }
 
   void _openManageMenu() {

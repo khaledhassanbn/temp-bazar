@@ -4,8 +4,9 @@ import 'package:flutter/material.dart';
 
 class HeaderWidget extends StatelessWidget {
   final String title;
+  final VoidCallback? onBackPressed;
 
-  const HeaderWidget({super.key, required this.title});
+  const HeaderWidget({super.key, required this.title, this.onBackPressed});
 
   @override
   Widget build(BuildContext context) {
@@ -22,7 +23,7 @@ class HeaderWidget extends StatelessWidget {
       child: Row(
         children: [
           IconButton(
-            onPressed: () => Navigator.pop(context),
+            onPressed: onBackPressed ?? () => Navigator.pop(context),
             icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white, size: 20),
           ),
           const SizedBox(width: 8),

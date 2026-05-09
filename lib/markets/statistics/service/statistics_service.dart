@@ -65,6 +65,42 @@ class StatisticsService {
     return {};
   }
 
+  Stream<Map<String, double>> streamMonthlyTotals({
+    required String marketId,
+    required int year,
+  }) {
+    return _firestore
+        .collection('markets')
+        .doc(marketId)
+        .collection('statistics')
+        .doc(year.toString())
+        .snapshots()
+        .map((doc) {
+          if (!doc.exists) return <String, double>{};
+          final data = doc.data() ?? {};
+          final dynamic monthly = data['monthly'];
+          if (monthly != null) {
+            return _normalizeNumericMap(monthly, keyPad: 2);
+          }
+          final dynamic months = data['months'];
+          if (months is Map) {
+            final Map<String, double> result = {};
+            months.forEach((k, v) {
+              final String key = _stringKey(k, keyPad: 2);
+              double? value;
+              if (v is Map) {
+                value = _asDouble(v['totalSales'] ?? v['sales'] ?? v['value']);
+              } else {
+                value = _asDouble(v);
+              }
+              if (value != null) result[key] = value;
+            });
+            return result;
+          }
+          return <String, double>{};
+        });
+  }
+
   Future<Map<String, double>> fetchDailyTotals({
     required String marketId,
     required int year,
@@ -106,6 +142,51 @@ class StatisticsService {
       return result;
     }
     return {};
+  }
+
+  Stream<Map<String, double>> streamDailyTotals({
+    required String marketId,
+    required int year,
+    required int month,
+  }) {
+    return _firestore
+        .collection('markets')
+        .doc(marketId)
+        .collection('statistics')
+        .doc(year.toString())
+        .snapshots()
+        .map((doc) {
+          if (!doc.exists) return <String, double>{};
+          final data = doc.data() ?? {};
+
+          final dynamic daily = data['daily'];
+          if (daily is Map) {
+            final Object? monthNode =
+                daily[_monthKey(month)] ?? daily[month] ?? daily[month.toString()];
+            return _normalizeNumericMap(monthNode, keyPad: 2);
+          }
+
+          final dynamic days = data['days'];
+          if (days is Map) {
+            final String monthPrefix = '${year.toString()}-${_monthKey(month)}-';
+            final Map<String, double> result = {};
+            days.forEach((k, v) {
+              if (k is String && k.startsWith(monthPrefix)) {
+                final String day = k.substring(k.length - 2);
+                double? value;
+                if (v is Map) {
+                  value = _asDouble(v['totalSales'] ?? v['sales'] ?? v['value']);
+                } else {
+                  value = _asDouble(v);
+                }
+                if (value != null) result[day] = value;
+              }
+            });
+            return result;
+          }
+
+          return <String, double>{};
+        });
   }
 
   Map<String, double> _normalizeNumericMap(dynamic node, {int? keyPad}) {

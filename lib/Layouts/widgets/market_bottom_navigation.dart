@@ -4,30 +4,44 @@ import 'package:go_router/go_router.dart';
 import '../viewmodels/bottom_bar_view_model.dart';
 import 'custom_bottom_app_bar.dart';
 
-class MarketBottomNavigation extends StatelessWidget {
+class MarketBottomNavigation extends StatefulWidget {
   final int currentIndex;
   const MarketBottomNavigation({super.key, required this.currentIndex});
 
   @override
+  State<MarketBottomNavigation> createState() => _MarketBottomNavigationState();
+}
+
+class _MarketBottomNavigationState extends State<MarketBottomNavigation> {
+  late final BottomBarViewModel _vm;
+  late final Future<String?> _marketIdFuture;
+
+  @override
+  void initState() {
+    super.initState();
+    _vm = BottomBarViewModel();
+    _marketIdFuture = _vm.resolveMarketId();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final vm = BottomBarViewModel();
     return FutureBuilder<String?>(
-      future: vm.resolveMarketId(),
+      future: _marketIdFuture,
       builder: (context, marketSnap) {
         final marketId = marketSnap.data;
         if (marketId == null || marketId.isEmpty) {
           return CustomBottomAppBar(
-            currentIndex: currentIndex,
+            currentIndex: widget.currentIndex,
             ordersCount: 0,
             onTap: (index) => _handleTap(context, index),
           );
         }
         return StreamBuilder<int>(
-          stream: vm.streamOrdersCount(marketId),
+          stream: _vm.streamOrdersCount(marketId),
           builder: (context, countSnap) {
             final count = countSnap.data ?? 0;
             return CustomBottomAppBar(
-              currentIndex: currentIndex,
+              currentIndex: widget.currentIndex,
               ordersCount: count,
               onTap: (index) => _handleTap(context, index, marketId: marketId),
             );

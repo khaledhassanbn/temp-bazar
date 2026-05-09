@@ -2,6 +2,7 @@ import 'package:bazar_suez/markets/statistics/viewModel/sales_stats_view_model.d
 import 'package:bazar_suez/markets/statistics/model/sales_data_model.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import 'package:bazar_suez/markets/order_of_markets/pages/PastOrdersPage.dart';
 
@@ -34,7 +35,15 @@ class _SalesStatsView extends StatelessWidget {
       body: SafeArea(
         child: Column(
           children: [
-            const HeaderWidget(title: "إحصائيات المتجر"),
+            HeaderWidget(
+              title: "إحصائيات المتجر",
+              onBackPressed: () async {
+                final didPop = await Navigator.of(context).maybePop();
+                if (!didPop && context.mounted) {
+                  context.go('/AccountPage');
+                }
+              },
+            ),
             const SizedBox(height: 12),
 
             // ✅ Tabs
