@@ -46,6 +46,11 @@ class OrderCard extends StatelessWidget {
   String _formatOrderDate(DateTime time) =>
       '${time.day.toString().padLeft(2, '0')}/${time.month.toString().padLeft(2, '0')}/${time.year}';
 
+  String _formatPrice(dynamic value) {
+    final num numericValue = value is num ? value : num.tryParse('$value') ?? 0;
+    return numericValue.toStringAsFixed(1);
+  }
+
   @override
   Widget build(BuildContext context) {
     final requiredOptions = List<Map<String, dynamic>>.from(
@@ -495,7 +500,7 @@ class OrderCard extends StatelessWidget {
                   style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
                 ),
                 Text(
-                  '${order['totalPrice']} جنيه',
+                  '${_formatPrice(order['totalPrice'])} جنيه',
                   style: const TextStyle(
                     fontWeight: FontWeight.bold,
                     fontSize: 16,
@@ -601,6 +606,18 @@ class OrderDetailsTable extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 4),
+          if (title == "الخيارات الأساسية")
+            const Padding(
+              padding: EdgeInsets.only(bottom: 6),
+              child: Text(
+                'عرض تفاصيل المنتجات المطلوبة:',
+                style: TextStyle(
+                  fontSize: 13,
+                  color: Colors.black54,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
           _buildOptionsTable(options, iconColor),
         ],
       ),
@@ -667,6 +684,7 @@ class OrderDetailsTable extends StatelessWidget {
                 ...List.generate((options[i]['details'] as List).length, (j) {
                   final detail =
                       (options[i]['details'] as List<Map<String, dynamic>>)[j];
+                  final isPriceDetail = detail['label'] == 'سعر المنتج';
                   return Padding(
                     padding: const EdgeInsets.only(bottom: 4),
                     child: Row(
@@ -688,6 +706,15 @@ class OrderDetailsTable extends StatelessWidget {
                             ),
                           ),
                         ),
+                        if (isPriceDetail)
+                          const Padding(
+                            padding: EdgeInsets.only(right: 4),
+                            child: Icon(
+                              Icons.monetization_on_outlined,
+                              size: 14,
+                              color: Colors.green,
+                            ),
+                          ),
                       ],
                     ),
                   );

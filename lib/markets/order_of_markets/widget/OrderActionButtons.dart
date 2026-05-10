@@ -126,6 +126,21 @@ class OrderActionButtons extends StatelessWidget {
               ),
             ),
 
+          // حالة انتظار موافقة المكتب: إتاحة تغيير المكتب
+          if (status == 'في انتظار قبول المكتب')
+            Expanded(
+              child: _buildActionButton(
+                'تغيير المكتب',
+                Icons.swap_horiz,
+                Colors.deepPurple,
+                () {
+                  if (onRequestDelivery != null) {
+                    onRequestDelivery!();
+                  }
+                },
+              ),
+            ),
+
           // الحالة الرابعة: تم التسليم للطيار
           if (status == 'تم التسليم للطيار')
             _statusChip(Icons.check_circle, 'تم التسليم', Colors.green),

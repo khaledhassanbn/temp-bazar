@@ -251,10 +251,15 @@ class MarketOrdersViewModel extends ChangeNotifier {
           final itemData = item as Map<String, dynamic>? ?? {};
           final productName = itemData['productName'] ?? 'منتج';
           final quantity = itemData['quantity'] ?? 1;
+          final itemPrice = _extractItemPrice(itemData);
 
           // تفاصيل المنتج (quantity + options)
           List<Map<String, dynamic>> details = [
             {'label': 'الكمية', 'value': quantity.toString()},
+            {
+              'label': 'سعر المنتج',
+              'value': '${itemPrice.toStringAsFixed(1)} جنيه',
+            },
           ];
 
           final selectedOptionsMap =
@@ -329,6 +334,27 @@ class MarketOrdersViewModel extends ChangeNotifier {
         'documentId': doc.id,
       };
     }
+  }
+
+  double _extractItemPrice(Map<String, dynamic> itemData) {
+    const candidateFields = [
+      'totalPrice',
+      'total',
+      'finalPrice',
+      'price',
+      'unitPrice',
+      'productPrice',
+      'subtotal',
+    ];
+    for (final field in candidateFields) {
+      final value = itemData[field];
+      if (value is num) return value.toDouble();
+      if (value != null) {
+        final parsed = double.tryParse(value.toString());
+        if (parsed != null) return parsed;
+      }
+    }
+    return 0.0;
   }
 
   // ======== Status Translation (Legacy store statuses) ========
@@ -422,6 +448,7 @@ class MarketOrdersViewModel extends ChangeNotifier {
     required String orderDocumentId,
     required Map<String, dynamic> office,
     Map<String, String>? distanceInfo,
+    bool replacePendingRequest = false,
   }) async {
     try {
       print('🚀 بدء إرسال طلب التوصيل...');
@@ -452,6 +479,28 @@ class MarketOrdersViewModel extends ChangeNotifier {
       if (office['id'] == null || office['id'].toString().isEmpty) {
         print('❌ معرف مكتب الشحن غير موجود');
         return 'معرف مكتب الشحن غير صحيح';
+      }
+
+      final existingRequest = deliveryRequestsByOrderId[orderDocumentId];
+      if (existingRequest != null) {
+        final existingRequestId = (existingRequest['id'] ?? '').toString();
+        final existingStatus = (existingRequest['status'] ?? '').toString();
+        final existingOfficeId = (existingRequest['officeId'] ?? '').toString();
+        final isPendingOfficeApproval =
+            existingStatus == 'pending' || existingStatus == 'في انتظار قبول المكتب';
+
+        if (replacePendingRequest) {
+          if (!isPendingOfficeApproval || existingRequestId.isEmpty) {
+            return 'لا يمكن تغيير المكتب بعد بدء تنفيذ الطلب';
+          }
+          if (existingOfficeId.isNotEmpty &&
+              existingOfficeId == (office['id'] ?? '').toString()) {
+            return 'تم اختيار نفس المكتب الحالي';
+          }
+          await _deliveryRequestService.deleteRequest(existingRequestId);
+        } else {
+          return 'تم إرسال طلب توصيل لهذا الطلب بالفعل';
+        }
       }
 
       final payload = <String, dynamic>{

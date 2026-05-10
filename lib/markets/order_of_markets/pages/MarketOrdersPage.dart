@@ -46,7 +46,9 @@ class _MarketOrdersPageState extends State<MarketOrdersPage>
       return;
     }
 
+    bool loadingShown = false;
     try {
+      final isChangingOffice = order['status'] == 'في انتظار قبول المكتب';
       final offices = await _viewModel.fetchActiveOffices();
       if (!mounted) return;
 
@@ -120,19 +122,23 @@ class _MarketOrdersPageState extends State<MarketOrdersPage>
 
       showDialog(
         context: context,
+        useRootNavigator: true,
         barrierDismissible: false,
         builder: (_) => const Center(child: CircularProgressIndicator()),
       );
+      loadingShown = true;
 
-      final error = await _viewModel.sendDeliveryRequest(
-        orderDocumentId: documentId,
-        office: selectedOffice,
-        distanceInfo: distanceInfo,
-      );
-
-      if (mounted && Navigator.of(context).canPop()) {
-        Navigator.of(context).pop(); // close loading
-      }
+      final error = await _viewModel
+          .sendDeliveryRequest(
+            orderDocumentId: documentId,
+            office: selectedOffice,
+            distanceInfo: distanceInfo,
+            replacePendingRequest: isChangingOffice,
+          )
+          .timeout(
+            const Duration(seconds: 30),
+            onTimeout: () => 'انتهت مهلة الطلب، حاول مرة أخرى',
+          );
 
       if (!mounted) return;
       if (error != null) {
@@ -146,24 +152,31 @@ class _MarketOrdersPageState extends State<MarketOrdersPage>
         print('❌ خطأ في إرسال الطلب: $error');
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('تم إرسال الطلب لمكتب الشحن بنجاح'),
+          SnackBar(
+            content: Text(
+              isChangingOffice
+                  ? 'تم سحب الطلب من المكتب السابق وإرساله للمكتب الجديد'
+                  : 'تم إرسال الطلب لمكتب الشحن بنجاح',
+            ),
             backgroundColor: Colors.green,
-            duration: Duration(seconds: 3),
+            duration: const Duration(seconds: 3),
           ),
         );
-        print('✅ تم إرسال الطلب بنجاح');
+        print(
+          isChangingOffice
+              ? '✅ تم تغيير المكتب وإعادة إرسال الطلب'
+              : '✅ تم إرسال الطلب بنجاح',
+        );
       }
     } catch (e) {
-      // إغلاق loading dialog في حالة الخطأ
-      if (mounted && Navigator.of(context).canPop()) {
-        Navigator.of(context).pop();
-      }
-
       if (mounted) {
         ScaffoldMessenger.of(
           context,
         ).showSnackBar(SnackBar(content: Text('حدث خطأ: $e')));
+      }
+    } finally {
+      if (mounted && loadingShown && Navigator.of(context, rootNavigator: true).canPop()) {
+        Navigator.of(context, rootNavigator: true).pop();
       }
     }
   }
