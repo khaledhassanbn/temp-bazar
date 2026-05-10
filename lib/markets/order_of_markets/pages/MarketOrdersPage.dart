@@ -8,6 +8,7 @@
 //          └── OrderCollapsibleHeader.dart  ✅ (العنوان مع البحث) [موجود لديك بالفعل]
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:go_router/go_router.dart';
 
 import 'package:bazar_suez/markets/order_of_markets/widget/OrderCollapsibleHeader.dart';
 import 'package:bazar_suez/markets/order_of_markets/widget/OrderCard.dart';
@@ -30,6 +31,7 @@ class MarketOrdersPage extends StatefulWidget {
 class _MarketOrdersPageState extends State<MarketOrdersPage>
     with SingleTickerProviderStateMixin {
   late final MarketOrdersViewModel _viewModel;
+  late final TextEditingController _searchController;
   AnimationController? _animController;
 
   Future<void> _handleRequestDelivery(
@@ -186,6 +188,7 @@ class _MarketOrdersPageState extends State<MarketOrdersPage>
     super.initState();
     _viewModel = MarketOrdersViewModel(marketId: widget.marketId)..init();
     final oid = widget.initialOrderId;
+    _searchController = TextEditingController(text: oid?.trim() ?? '');
     if (oid != null && oid.trim().isNotEmpty) {
       _viewModel.setSearchQuery(oid.trim());
     }
@@ -202,15 +205,26 @@ class _MarketOrdersPageState extends State<MarketOrdersPage>
   @override
   void dispose() {
     _animController?.dispose();
+    _searchController.dispose();
     _viewModel.disposeViewModel();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    return Directionality(
-      textDirection: TextDirection.rtl,
-      child: Scaffold(
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, result) {
+        if (didPop) return;
+        if (Navigator.of(context).canPop()) {
+          Navigator.of(context).pop();
+        } else {
+          context.go('/HomePage');
+        }
+      },
+      child: Directionality(
+        textDirection: TextDirection.rtl,
+        child: Scaffold(
         backgroundColor: Colors.grey[100],
         body: AnimatedBuilder(
           animation: _viewModel,
@@ -224,6 +238,7 @@ class _MarketOrdersPageState extends State<MarketOrdersPage>
                     showHeader: _viewModel.showHeader,
                     suggestions: const [],
                     searchHint: "ابحث برقم الأوردر أو اسم العميل",
+                    searchController: _searchController,
                     onSearchChanged: _viewModel.setSearchQuery,
                   ),
                 ),
@@ -351,37 +366,53 @@ class _MarketOrdersPageState extends State<MarketOrdersPage>
                           // رسالة عدم وجود نتائج للبحث
                           if (filteredOrders.isEmpty)
                             Container(
-                              margin: const EdgeInsets.all(12),
-                              padding: const EdgeInsets.all(24),
+                              margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
+                              padding: const EdgeInsets.all(32),
                               decoration: BoxDecoration(
                                 color: Colors.white,
-                                borderRadius: BorderRadius.circular(12),
-                                border: Border.all(color: Colors.grey[300]!),
+                                borderRadius: BorderRadius.circular(20),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.grey.withOpacity(0.08),
+                                    blurRadius: 24,
+                                    offset: const Offset(0, 8),
+                                  ),
+                                ],
                               ),
-                              child: const Center(
-                                child: Column(
-                                  children: [
-                                    Icon(
-                                      Icons.search_off,
-                                      size: 48,
+                              child: Column(
+                                children: [
+                                  Container(
+                                    padding: const EdgeInsets.all(20),
+                                    decoration: BoxDecoration(
+                                      color: Colors.orange.withOpacity(0.1),
+                                      shape: BoxShape.circle,
+                                    ),
+                                    child: const Icon(
+                                      Icons.search_off_rounded,
+                                      size: 56,
+                                      color: Colors.orange,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 24),
+                                  const Text(
+                                    "لا توجد طلبات مطابقة",
+                                    style: TextStyle(
+                                      fontSize: 20,
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.black87,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 8),
+                                  Text(
+                                    "لم نتمكن من العثور على طلب بهذا الرقم أو الاسم.\nيرجى التأكد من البيانات والمحاولة مرة أخرى.",
+                                    textAlign: TextAlign.center,
+                                    style: TextStyle(
+                                      fontSize: 14,
+                                      height: 1.5,
                                       color: Colors.grey,
                                     ),
-                                    SizedBox(height: 12),
-                                    Text(
-                                      "لا توجد طلبات مطابقة للبحث",
-                                      style: TextStyle(
-                                        fontSize: 16,
-                                        fontWeight: FontWeight.w500,
-                                        color: Colors.grey,
-                                      ),
-                                    ),
-                                    SizedBox(height: 4),
-                                    Text(
-                                      "جرب البحث برقم الطلب أو اسم العميل",
-                                      style: TextStyle(color: Colors.grey),
-                                    ),
-                                  ],
-                                ),
+                                  ),
+                                ],
                               ),
                             ),
 
@@ -415,7 +446,9 @@ class _MarketOrdersPageState extends State<MarketOrdersPage>
                                   distanceInfo,
                                 );
                               },
-                              rejectedMessage: _viewModel.getRejectedMessage(order['documentId'] ?? ''),
+                              rejectedMessage: _viewModel.getRejectedMessage(
+                                order['documentId'] ?? '',
+                              ),
                             );
                           }),
                         ]),
@@ -431,6 +464,7 @@ class _MarketOrdersPageState extends State<MarketOrdersPage>
           },
         ),
       ),
+    ),
     );
   }
 

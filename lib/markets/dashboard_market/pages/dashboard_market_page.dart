@@ -136,7 +136,7 @@ class _DashboardMarketPageState extends State<DashboardMarketPage>
 
   PreferredSizeWidget _buildAppBar(BuildContext context) {
     return PreferredSize(
-      preferredSize: const Size.fromHeight(120),
+      preferredSize: const Size.fromHeight(90),
       child: Container(
         decoration: BoxDecoration(
           gradient: LinearGradient(
@@ -156,34 +156,39 @@ class _DashboardMarketPageState extends State<DashboardMarketPage>
           ],
         ),
         child: SafeArea(
-          child: Padding(
+          child: Container(
+            height: 90,
+            alignment: Alignment.center,
             padding: const EdgeInsets.symmetric(horizontal: 16),
             child: Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
               children: [
                 Container(
-                  width: 40,
-                  height: 40,
+                  width: 44,
+                  height: 44,
                   decoration: BoxDecoration(
                     color: Colors.white.withOpacity(0.18),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: IconButton(
                     icon: const Icon(
-                      Icons.arrow_back,
+                      Icons.arrow_back_ios_new_rounded,
                       color: Colors.white,
-                      size: 22,
+                      size: 20,
                     ),
                     onPressed: () => context.go('/HomePage'),
                   ),
                 ),
-                const SizedBox(width: 12),
-                const Text(
-                  'لوحة تحكم المتجر',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 20,
-                    fontWeight: FontWeight.w700,
-                    letterSpacing: 0.3,
+                const SizedBox(width: 16),
+                const Expanded(
+                  child: Text(
+                    'لوحة تحكم المتجر',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 22,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: 0.3,
+                    ),
                   ),
                 ),
               ],
@@ -671,7 +676,7 @@ class _StatsGrid extends StatelessWidget {
       shrinkWrap: true,
       gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
         crossAxisCount: 2,
-        childAspectRatio: 1.35,
+        childAspectRatio: 1.0,
         crossAxisSpacing: 12,
         mainAxisSpacing: 12,
       ),

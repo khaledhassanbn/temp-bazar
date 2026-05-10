@@ -4,8 +4,7 @@ import 'package:flutter/material.dart';
 import '../services/OrderService.dart';
 import '../services/delivery_request_service.dart';
 import 'package:bazar_suez/markets/create_market/services/store_service.dart';
-import 'package:http/http.dart' as http;
-import 'dart:convert';
+import 'package:bazar_suez/services/delivery_fee/delivery_fee_service.dart';
 
 class MarketOrdersViewModel extends ChangeNotifier {
   final String marketId;
@@ -174,36 +173,26 @@ class MarketOrdersViewModel extends ChangeNotifier {
   ) async {
     if (marketLocation == null || clientLoc == null) return;
     if (distancesAndDurations.containsKey(orderId)) return; // موجودة مسبقاً
-    final String apiKey =
-        'AIzaSyA9bJxVt4G17WqaUeIHmpaHfmcOhsJddYA'; // ضع هنا مفتاحك بأمان
 
-    final url = Uri.parse(
-      'https://maps.googleapis.com/maps/api/distancematrix/json?key=$apiKey'
-      '&origins=${marketLocation!.latitude},${marketLocation!.longitude}'
-      '&destinations=${clientLoc.latitude},${clientLoc.longitude}'
-      '&mode=driving&language=ar',
-    );
     try {
-      final response = await http.get(url);
-      if (response.statusCode == 200) {
-        final data = json.decode(response.body);
-        final rows = data['rows'] as List?;
-        if (rows != null && rows.isNotEmpty) {
-          final elements = rows[0]['elements'] as List?;
-          if (elements != null && elements.isNotEmpty) {
-            final el = elements[0];
-            if (el['status'] == 'OK') {
-              String distanceText = el['distance']['text'] ?? '';
-              String durationText = el['duration']['text'] ?? '';
-              distancesAndDurations[orderId] = {
-                'distance': distanceText,
-                'duration': durationText,
-              };
-              notifyListeners();
-            }
-          }
-        }
-      }
+      // حساب المسافة باستخدام Haversine Formula (مسافة خطية)
+      final distanceKm = DeliveryFeeService.calculateDistanceFromGeoPoints(
+        marketLocation!,
+        clientLoc,
+      );
+
+      // حساب وقت التوصيل التقديري (بالدقائق)
+      final durationMinutes = DeliveryFeeService.calculateDeliveryTime(distanceKm);
+
+      // تنسيق البيانات لعرضها
+      final distanceText = '${distanceKm.toStringAsFixed(1)} كم';
+      final durationText = '$durationMinutes دقيقة';
+
+      distancesAndDurations[orderId] = {
+        'distance': distanceText,
+        'duration': durationText,
+      };
+      notifyListeners();
     } catch (_) {}
   }
 

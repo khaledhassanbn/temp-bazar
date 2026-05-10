@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:go_router/go_router.dart';
 
 import 'package:bazar_suez/markets/order_of_markets/widget/OrderCollapsibleHeader.dart';
 import 'package:bazar_suez/markets/order_of_markets/widget/OrderCardWithoutActions.dart';
@@ -74,11 +75,21 @@ class _PastOrdersPageState extends State<PastOrdersPage>
 
   @override
   Widget build(BuildContext context) {
-    return Directionality(
-      textDirection: TextDirection.rtl,
-      child: Scaffold(
-        backgroundColor: Colors.grey[100],
-        body: AnimatedBuilder(
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, result) {
+        if (didPop) return;
+        if (Navigator.of(context).canPop()) {
+          Navigator.of(context).pop();
+        } else {
+          context.go('/HomePage');
+        }
+      },
+      child: Directionality(
+        textDirection: TextDirection.rtl,
+        child: Scaffold(
+          backgroundColor: Colors.grey[100],
+          body: AnimatedBuilder(
           animation: _viewModel,
           builder: (context, _) {
             return CustomScrollView(
@@ -382,6 +393,7 @@ class _PastOrdersPageState extends State<PastOrdersPage>
           },
         ),
       ),
+    ),
     );
   }
 }
