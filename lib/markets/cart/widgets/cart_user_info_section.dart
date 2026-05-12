@@ -1,12 +1,21 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import '../../saved_locations/viewmodels/saved_locations_viewmodel.dart';
 import '../../saved_locations/widgets/saved_locations_sheet.dart';
 import '../pages/MapPickerPage.dart';
 
+/// يُستدعى عند جاهزية أو تغيّر إحداثيات التوصيل (لإعادة حساب رسوم التوصيل في السلة).
+typedef DeliveryLocationChangedCallback = void Function(GeoPoint? location);
+
 class CartUserInfoSection extends StatefulWidget {
-  const CartUserInfoSection({super.key});
+  const CartUserInfoSection({
+    super.key,
+    this.onDeliveryLocationChanged,
+  });
+
+  final DeliveryLocationChangedCallback? onDeliveryLocationChanged;
 
   @override
   State<CartUserInfoSection> createState() => CartUserInfoSectionState();
@@ -44,13 +53,36 @@ class CartUserInfoSectionState extends State<CartUserInfoSection>
     final viewModel = context.read<SavedLocationsViewModel>();
     await viewModel.loadDefaultLocation();
 
-    if (viewModel.selectedLocation != null && mounted) {
+    if (!mounted) return;
+
+    GeoPoint? loc;
+    if (viewModel.selectedLocation != null) {
+      loc = viewModel.selectedLocation!.location;
       setState(() {
-        selectedLocation = viewModel.selectedLocation!.location;
+        selectedLocation = loc;
         address = viewModel.selectedLocation!.address;
         locationName = viewModel.selectedLocation!.name;
+        _useCustomLocation = false;
+      });
+    } else if (viewModel.activeLocation != null) {
+      loc = viewModel.activeLocation;
+      setState(() {
+        selectedLocation = loc;
+        address = viewModel.activeAddress ?? 'موقعك الحالي';
+        locationName = 'موقعك الحالي';
+        _useCustomLocation = false;
       });
     }
+
+    widget.onDeliveryLocationChanged?.call(loc);
+  }
+
+  /// اسم مختصر للعرض في قائمة العناوين المحفوظة
+  String _deriveSavedLocationName(String rawAddress) {
+    final trimmed = rawAddress.trim();
+    if (trimmed.isEmpty) return 'عنوان من الخريطة';
+    if (trimmed.length <= 48) return trimmed;
+    return '${trimmed.substring(0, 45)}…';
   }
 
   @override
@@ -98,15 +130,29 @@ class CartUserInfoSectionState extends State<CartUserInfoSection>
       // التحقق من أن الـ widget لا يزال موجوداً
       if (!mounted) return;
 
-      // تحديث الموقع بعد إغلاق الـ sheet
+      GeoPoint? loc;
+
+      // عنوان محفوظ مختار
       if (viewModel.selectedLocation != null) {
+        loc = viewModel.selectedLocation!.location;
         setState(() {
-          selectedLocation = viewModel.selectedLocation!.location;
+          selectedLocation = loc;
           address = viewModel.selectedLocation!.address;
           locationName = viewModel.selectedLocation!.name;
           _useCustomLocation = false;
         });
+      } else if (viewModel.activeLocation != null) {
+        // «التوصيل لموقعك الحالي» يمسح المحفوظ ويستخدم GPS
+        loc = viewModel.activeLocation;
+        setState(() {
+          selectedLocation = loc;
+          address = viewModel.activeAddress ?? 'موقعك الحالي';
+          locationName = 'موقعك الحالي';
+          _useCustomLocation = false;
+        });
       }
+
+      widget.onDeliveryLocationChanged?.call(loc);
     });
   }
 
@@ -116,14 +162,49 @@ class CartUserInfoSectionState extends State<CartUserInfoSection>
       MaterialPageRoute(builder: (_) => const MapPickerPage()),
     );
 
-    if (result != null && result is Map) {
+    if (result == null || result is! Map || !mounted) return;
+
+    final geo = result['location'] as GeoPoint?;
+    final addr = result['address'] as String?;
+    if (geo == null) return;
+
+    final vm = context.read<SavedLocationsViewModel>();
+    final loggedIn = FirebaseAuth.instance.currentUser != null;
+
+    if (loggedIn && addr != null) {
+      final saved = await vm.addLocation(
+        name: _deriveSavedLocationName(addr),
+        address: addr,
+        location: geo,
+        setAsDefault: true,
+      );
+      if (!mounted) return;
+
+      if (saved && vm.selectedLocation != null) {
+        setState(() {
+          selectedLocation = vm.selectedLocation!.location;
+          address = vm.selectedLocation!.address;
+          locationName = vm.selectedLocation!.name;
+          _useCustomLocation = false;
+        });
+      } else {
+        setState(() {
+          selectedLocation = geo;
+          address = addr;
+          locationName = null;
+          _useCustomLocation = true;
+        });
+      }
+    } else {
       setState(() {
-        selectedLocation = result["location"] as GeoPoint?;
-        address = result["address"] as String?;
+        selectedLocation = geo;
+        address = addr;
         locationName = null;
         _useCustomLocation = true;
       });
     }
+
+    widget.onDeliveryLocationChanged?.call(geo);
   }
 
   @override

@@ -50,7 +50,8 @@ class _MarketOrdersPageState extends State<MarketOrdersPage>
 
     bool loadingShown = false;
     try {
-      final isChangingOffice = order['status'] == 'في انتظار قبول المكتب';
+      final isChangingOffice = order['status'] == 'في انتظار قبول المكتب' ||
+          order['status'] == 'المكتب رفض الطلب';
       final offices = await _viewModel.fetchActiveOffices();
       if (!mounted) return;
 

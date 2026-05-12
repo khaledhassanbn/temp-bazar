@@ -6,6 +6,11 @@ import '../services/delivery_request_service.dart';
 import 'package:bazar_suez/markets/create_market/services/store_service.dart';
 import 'package:bazar_suez/services/delivery_fee/delivery_fee_service.dart';
 
+bool _isReturnedToMerchantRaw(String? status) {
+  if (status == null || status.isEmpty) return false;
+  return status.trim().toLowerCase() == 'returned_to_merchant';
+}
+
 class MarketOrdersViewModel extends ChangeNotifier {
   final String marketId;
   final OrderService _service;
@@ -306,6 +311,13 @@ class MarketOrdersViewModel extends ChangeNotifier {
         'requiredOptions': requiredOptions,
         'extraOptions': [],
         'documentId': doc.id,
+        // ✅ إضافة البيانات المفقودة
+        'items': items, // المنتجات بالصيغة الجديدة
+        'notes': data['notes'] ?? '', // الملحوظات العامة
+        'subtotal': (data['subtotal'] ?? 0.0).toDouble(),
+        'deliveryFee': (data['deliveryFee'] ?? 0.0).toDouble(),
+        'serviceFee': (data['serviceFee'] ?? 0.0).toDouble(),
+        'totalAmount': (data['totalAmount'] ?? 0.0).toDouble(),
       };
     } catch (e) {
       final now = DateTime.now();
@@ -321,6 +333,13 @@ class MarketOrdersViewModel extends ChangeNotifier {
         'requiredOptions': [],
         'extraOptions': [],
         'documentId': doc.id,
+        // ✅ إضافة البيانات المفقودة
+        'items': [],
+        'notes': '',
+        'subtotal': 0.0,
+        'deliveryFee': 0.0,
+        'serviceFee': 0.0,
+        'totalAmount': 0.0,
       };
     }
   }
@@ -362,7 +381,8 @@ class MarketOrdersViewModel extends ChangeNotifier {
         status == 'تم استلام الطلب من المتجر' ||
         status == 'الطلب مكتمل' ||
         status == 'المندوب رفض الطلب' ||
-        status == 'الزبون رفض الاستلام') {
+        status == 'الزبون رفض الاستلام' ||
+        status == 'المكتب رفض الطلب') {
       return status;
     }
 
@@ -377,6 +397,8 @@ class MarketOrdersViewModel extends ChangeNotifier {
         return 'تم التسليم للطيار';
       case 'rejected':
         return 'تم رفض الطلب';
+      case 'returned_to_merchant':
+        return 'المكتب رفض الطلب';
       default:
         return status;
     }
@@ -402,7 +424,8 @@ class MarketOrdersViewModel extends ChangeNotifier {
         status == 'تم استلام الطلب من المتجر' ||
         status == 'الطلب مكتمل' ||
         status == 'المندوب رفض الطلب' ||
-        status == 'الزبون رفض الاستلام') {
+        status == 'الزبون رفض الاستلام' ||
+        status == 'المكتب رفض الطلب') {
       return status;
     }
 
@@ -427,6 +450,8 @@ class MarketOrdersViewModel extends ChangeNotifier {
         return 'الزبون رفض الاستلام';
       case 'rejected': // رفض نهائى من المكتب
         return 'تم رفض الطلب من المكتب';
+      case 'returned_to_merchant':
+        return 'المكتب رفض الطلب';
       default:
         return status;
     }
@@ -477,9 +502,14 @@ class MarketOrdersViewModel extends ChangeNotifier {
         final existingOfficeId = (existingRequest['officeId'] ?? '').toString();
         final isPendingOfficeApproval =
             existingStatus == 'pending' || existingStatus == 'في انتظار قبول المكتب';
+        final isOfficeReturnedToMerchant =
+            _isReturnedToMerchantRaw(existingStatus);
 
         if (replacePendingRequest) {
-          if (!isPendingOfficeApproval || existingRequestId.isEmpty) {
+          final canReplace =
+              (isPendingOfficeApproval || isOfficeReturnedToMerchant) &&
+                  existingRequestId.isNotEmpty;
+          if (!canReplace) {
             return 'لا يمكن تغيير المكتب بعد بدء تنفيذ الطلب';
           }
           if (existingOfficeId.isNotEmpty &&
@@ -488,6 +518,9 @@ class MarketOrdersViewModel extends ChangeNotifier {
           }
           await _deliveryRequestService.deleteRequest(existingRequestId);
         } else {
+          if (isOfficeReturnedToMerchant) {
+            return 'استخدم «مكتب جديد» لإعادة الإرسال بعد رفض المكتب';
+          }
           return 'تم إرسال طلب توصيل لهذا الطلب بالفعل';
         }
       }
@@ -579,6 +612,22 @@ class MarketOrdersViewModel extends ChangeNotifier {
           orderData['customerInfo'] as Map<String, dynamic>? ?? {};
       final customerId =
           customerInfo['userId'] as String? ?? orderData['userId'] as String?;
+
+      if (newStatus == 'تم التسليم للطيار') {
+        final deliveryInfo = deliveryRequestsByOrderId[documentId];
+        final deliveryStatus = deliveryInfo?['status']?.toString();
+        final orderRawStatus = orderData['status']?.toString();
+        final officeReturned = _isReturnedToMerchantRaw(orderRawStatus) ||
+            _isReturnedToMerchantRaw(deliveryStatus);
+        if (officeReturned) {
+          final rid = deliveryInfo?['id']?.toString();
+          if (rid != null && rid.isNotEmpty) {
+            try {
+              await _deliveryRequestService.deleteRequest(rid);
+            } catch (_) {}
+          }
+        }
+      }
 
       final isFinalStatus =
           newStatus == 'تم التسليم للطيار' || newStatus == 'تم رفض الطلب';

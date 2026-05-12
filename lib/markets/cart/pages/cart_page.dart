@@ -8,6 +8,7 @@ import 'package:bazar_suez/markets/cart/viewmodels/cart_view_model.dart';
 import 'package:bazar_suez/markets/home_market/pages/ProductDetails.dart';
 import 'package:bazar_suez/markets/saved_locations/viewmodels/saved_locations_viewmodel.dart';
 import 'package:bazar_suez/services/delivery_fee/delivery_fee_service.dart';
+import 'package:bazar_suez/services/delivery_fee/delivery_fee_settings.dart';
 import 'package:bazar_suez/services/order_notifications/order_index_service.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -50,6 +51,8 @@ String generateOrderId(String marketId) {
 class _CartPageState extends State<CartPage> {
   String? _marketName;
   String? _marketLogo;
+  /// يُحدَّث بعد جلب المستند؛ يُستخدم لإعادة حساب الرسوم عند تغيير عنوان التوصيل.
+  Map<String, dynamic>? _cachedMarketDocData;
   final TextEditingController _notesController = TextEditingController();
   int _cartItemCount = 0;
   bool _isSubmittingOrder = false;
@@ -87,12 +90,16 @@ class _CartPageState extends State<CartPage> {
       if (doc.exists && mounted) {
         final data = doc.data();
         setState(() {
+          _cachedMarketDocData = data;
           _marketName = data?['name'] ?? 'المتجر';
           _marketLogo = data?['logoUrl'];
         });
 
         // حساب رسوم التوصيل بناءً على المسافة
-        await _calculateAndSetDeliveryFee(data);
+        await _calculateAndSetDeliveryFee(
+          data,
+          userLocationOverride: _deliveryGeoPointFromCartUi(),
+        );
       }
     } catch (e) {
       if (mounted) {
@@ -103,10 +110,28 @@ class _CartPageState extends State<CartPage> {
     }
   }
 
+  GeoPoint? _deliveryGeoPointFromCartUi() {
+    final uiLoc = _userInfoKey.currentState?.selectedLocationValue;
+    if (uiLoc != null) return uiLoc;
+    final locationVm =
+        Provider.of<SavedLocationsViewModel>(context, listen: false);
+    return locationVm.activeLocation;
+  }
+
+  /// إعادة حساب الرسوم بعد تغيير عنوان التوصيل في واجهة السلة.
+  Future<void> _onDeliveryLocationChanged(GeoPoint? location) async {
+    await _calculateAndSetDeliveryFee(
+      _cachedMarketDocData,
+      userLocationOverride: location ?? _deliveryGeoPointFromCartUi(),
+    );
+    if (mounted) setState(() {});
+  }
+
   /// حساب وتعيين رسوم التوصيل بناءً على المسافة
   Future<void> _calculateAndSetDeliveryFee(
-    Map<String, dynamic>? storeData,
-  ) async {
+    Map<String, dynamic>? storeData, {
+    GeoPoint? userLocationOverride,
+  }) async {
     if (!mounted) return;
 
     final cartViewModel = Provider.of<CartViewModel>(context, listen: false);
@@ -120,8 +145,9 @@ class _CartPageState extends State<CartPage> {
       // جلب إعدادات رسوم التوصيل
       final settings = await deliveryFeeService.getSettings();
 
-      // جلب موقع المستخدم
-      final userLocation = locationVm.activeLocation;
+      // موقع التوصيل: ما اختاره المستخدم في السلة أولاً، ثم نموذج المواقع.
+      final userLocation =
+          userLocationOverride ?? locationVm.activeLocation;
 
       // جلب موقع المتجر
       GeoPoint? storeLocation;
@@ -145,13 +171,12 @@ class _CartPageState extends State<CartPage> {
         // تعيين رسوم التوصيل في CartViewModel
         cartViewModel.setDeliveryFee(deliveryFee);
       } else {
-        // استخدام رسوم التوصيل الافتراضية
+        // لا يوجد بعد نقطة توصيل أو موقع المتجر: رسوم أساسية من الإعدادات (ليست ثابتة 30 برمجياً)
         cartViewModel.setDeliveryFee(settings.baseFee);
       }
     } catch (e) {
       debugPrint('خطأ في حساب رسوم التوصيل: $e');
-      // استخدام القيمة الافتراضية في حالة الخطأ
-      cartViewModel.setDeliveryFee(30.0);
+      cartViewModel.setDeliveryFee(DeliveryFeeSettings.defaults().baseFee);
     }
   }
 
@@ -293,7 +318,12 @@ class _CartPageState extends State<CartPage> {
                   const SizedBox(height: 16),
 
                   /// بيانات المستخدم
-                  CartUserInfoSection(key: _userInfoKey),
+                  CartUserInfoSection(
+                    key: _userInfoKey,
+                    onDeliveryLocationChanged: (loc) {
+                      _onDeliveryLocationChanged(loc);
+                    },
+                  ),
                   const SizedBox(height: 24),
 
                   /// الفاتورة
@@ -550,6 +580,16 @@ class _CartPageState extends State<CartPage> {
           .get();
       final marketData = marketDoc.data() ?? <String, dynamic>{};
 
+      if (_cachedMarketDocData == null && marketDoc.exists) {
+        _cachedMarketDocData = marketData;
+      }
+
+      // تأكيد رسوم التوصيل وفق الإحداثيات الفعلية قبل الحفظ
+      await _calculateAndSetDeliveryFee(
+        _cachedMarketDocData ?? marketData,
+        userLocationOverride: userInfo.selectedLocationValue,
+      );
+
       // إعداد بيانات الطلب
       final orderData = {
         'orderId': orderId,
@@ -582,6 +622,7 @@ class _CartPageState extends State<CartPage> {
                 'quantity': item.quantity,
                 'selectedOptions': item.selectedOptions,
                 'categoryId': item.categoryId,
+                'productNote': item.productNote, // ملحوظة المنتج
               },
             )
             .toList(),

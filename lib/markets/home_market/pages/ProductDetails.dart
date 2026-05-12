@@ -28,7 +28,6 @@ class ProductDetailsPage extends StatefulWidget {
 
 class _ProductDetailsPageState extends State<ProductDetailsPage> {
   final ScrollController _scrollController = ScrollController();
-  final TextEditingController _noteController = TextEditingController();
 
   int quantity = 1;
   double basePrice = 0.0;
@@ -203,7 +202,6 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
   @override
   void dispose() {
     _scrollController.dispose();
-    _noteController.dispose();
     _appBarOpacity.dispose();
     super.dispose();
   }
@@ -235,7 +233,6 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
                     (opt) => _buildOptionSection(opt, isRequired: false),
                   ),
                 ],
-                _buildNoteField(),
                 const SizedBox(height: 110),
               ],
             ),
@@ -614,80 +611,6 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
   }
 
   // ─────────────────────────────────────────────
-  // NOTE FIELD
-  // ─────────────────────────────────────────────
-  Widget _buildNoteField() {
-    return Container(
-      margin: const EdgeInsets.fromLTRB(12, 10, 12, 0),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.04),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.end,
-          children: [
-            const Text(
-              'ملاحظة خاصة',
-              style: TextStyle(
-                fontSize: 15,
-                fontWeight: FontWeight.w600,
-                color: Color(0xFF1A1A1A),
-              ),
-            ),
-            const SizedBox(height: 10),
-            TextField(
-              controller: _noteController,
-              textAlign: TextAlign.right,
-              textDirection: TextDirection.rtl,
-              maxLines: 2,
-              decoration: InputDecoration(
-                hintText: 'مثال: بدون بصل، صوص جانبي...',
-                hintStyle: const TextStyle(
-                  fontSize: 13,
-                  color: Color(0xFFBBBBBB),
-                ),
-                filled: true,
-                fillColor: const Color(0xFFF8F8F8),
-                contentPadding: const EdgeInsets.symmetric(
-                  horizontal: 14,
-                  vertical: 12,
-                ),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(10),
-                  borderSide: const BorderSide(
-                    color: Color(0xFFEEEEEE),
-                    width: 0.5,
-                  ),
-                ),
-                enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(10),
-                  borderSide: const BorderSide(
-                    color: Color(0xFFEEEEEE),
-                    width: 0.5,
-                  ),
-                ),
-                focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(10),
-                  borderSide: const BorderSide(color: _primaryGreen, width: 1),
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  // ─────────────────────────────────────────────
   // ANIMATED APP BAR
   // ─────────────────────────────────────────────
   Widget _buildAnimatedAppBar() {
@@ -1028,6 +951,7 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
         marketId: widget.marketId ?? 'kb',
         categoryId: widget.categoryId ?? '',
         additionalPrice: additionalPrice,
+        productNote: null,
       );
 
       final success = await cartViewModel.addItem(cartItem);

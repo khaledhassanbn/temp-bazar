@@ -5,9 +5,29 @@ import 'package:flutter/material.dart';
 
 import 'package:bazar_suez/router/app_navigation.dart';
 import 'package:bazar_suez/widgets/order_notifications/new_order_alert_dialog.dart';
+import 'package:bazar_suez/widgets/order_notifications/office_return_alert_dialog.dart';
 
 import 'order_alert_sound_service.dart';
 import 'order_notification_constants.dart';
+
+enum _QueuedAlertKind { newOrder, officeReturned }
+
+class _QueuedAlert {
+  const _QueuedAlert.newOrder(this.storeId, this.orderId)
+      : kind = _QueuedAlertKind.newOrder,
+        orderDocumentId = orderId;
+
+  const _QueuedAlert.officeReturned(this.storeId, this.orderDocumentId)
+      : kind = _QueuedAlertKind.officeReturned,
+        orderId = orderDocumentId;
+
+  final _QueuedAlertKind kind;
+  final String storeId;
+  /// معرّف مستند طلب جديد فى مجموعة [orders] (مسار الإشعارات القديم).
+  final String orderId;
+  /// معرّف مستند الطلب فى [present_order] — يُستخدم لإرجاع المكتب للتاجر.
+  final String orderDocumentId;
+}
 
 /// يمنع التكرار بين FCM والاستماع المباشر، ويعرض نوافذ متتابعة عند وجود أكثر من طلب.
 class OrderNotificationCoordinator {
@@ -19,7 +39,8 @@ class OrderNotificationCoordinator {
 
   final OrderAlertSoundService _sound = OrderAlertSoundService();
   final Set<String> _queuedOrShown = {};
-  final Queue<String> _queue = Queue<String>();
+  final Set<String> _queuedOrShownOfficeReturn = {};
+  final Queue<_QueuedAlert> _queue = Queue<_QueuedAlert>();
 
   /// سلسلة معالجة متتابعة لتجنّب تعارض النوافذ والنداءات المتزامنة.
   Future<void> _chain = Future<void>.value();
@@ -32,7 +53,20 @@ class OrderNotificationCoordinator {
     final key = '$storeId::$orderId';
     if (_queuedOrShown.contains(key)) return;
     _queuedOrShown.add(key);
-    _queue.addLast(key);
+    _queue.addLast(_QueuedAlert.newOrder(storeId, orderId));
+    _chain = _chain.then((_) => _runQueue());
+  }
+
+  /// المكتب رجّع الطلب للتاجر (`returned_to_merchant`) — صوت وتنبيه مثل الطلب الجديد.
+  void notifyOfficeReturnedOrder({
+    required String orderDocumentId,
+    required String storeId,
+  }) {
+    if (orderDocumentId.isEmpty || storeId.isEmpty) return;
+    final key = '$storeId::$orderDocumentId';
+    if (_queuedOrShownOfficeReturn.contains(key)) return;
+    _queuedOrShownOfficeReturn.add(key);
+    _queue.addLast(_QueuedAlert.officeReturned(storeId, orderDocumentId));
     _chain = _chain.then((_) => _runQueue());
   }
 
@@ -47,11 +81,11 @@ class OrderNotificationCoordinator {
       }
       if (navigatorCtx == null) break;
 
-      final composite = _queue.first;
-      final parts = composite.split('::');
-      final storeId = parts.length >= 2 ? parts[0] : '';
-      final orderId = parts.length >= 2 ? parts[1] : composite;
-      if (storeId.isEmpty || orderId.isEmpty) {
+      final item = _queue.first;
+      if (item.storeId.isEmpty ||
+          (item.kind == _QueuedAlertKind.newOrder && item.orderId.isEmpty) ||
+          (item.kind == _QueuedAlertKind.officeReturned &&
+              item.orderDocumentId.isEmpty)) {
         _queue.removeFirst();
         continue;
       }
@@ -63,22 +97,33 @@ class OrderNotificationCoordinator {
       if (!navigatorCtx.mounted) break;
 
       try {
-        await showDialog<void>(
-          context: navigatorCtx,
-          barrierDismissible: false,
-          builder: (dialogCtx) => NewOrderAlertDialog(
-            orderId: orderId,
-            storeId: storeId,
-            onAccept: () async {
-              await _persistResponse(orderId, accepted: true);
-              if (dialogCtx.mounted) Navigator.of(dialogCtx).pop();
-            },
-            onReject: () async {
-              await _persistResponse(orderId, accepted: false);
-              if (dialogCtx.mounted) Navigator.of(dialogCtx).pop();
-            },
-          ),
-        );
+        if (item.kind == _QueuedAlertKind.newOrder) {
+          await showDialog<void>(
+            context: navigatorCtx,
+            barrierDismissible: false,
+            builder: (dialogCtx) => NewOrderAlertDialog(
+              orderId: item.orderId,
+              storeId: item.storeId,
+              onAccept: () async {
+                await _persistResponse(item.orderId, accepted: true);
+                if (dialogCtx.mounted) Navigator.of(dialogCtx).pop();
+              },
+              onReject: () async {
+                await _persistResponse(item.orderId, accepted: false);
+                if (dialogCtx.mounted) Navigator.of(dialogCtx).pop();
+              },
+            ),
+          );
+        } else {
+          await showDialog<void>(
+            context: navigatorCtx,
+            barrierDismissible: false,
+            builder: (dialogCtx) => OfficeReturnAlertDialog(
+              orderDocumentId: item.orderDocumentId,
+              storeId: item.storeId,
+            ),
+          );
+        }
       } finally {
         await _sound.stop();
         if (_queue.isNotEmpty) {

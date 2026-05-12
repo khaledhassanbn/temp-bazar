@@ -35,6 +35,9 @@ class CartItemModel extends HiveObject {
 
   @HiveField(9)
   DateTime addedAt; // Timestamp when item was added
+
+  @HiveField(10)
+  String? productNote; // ملحوظة خاصة بالمنتج
   
 
   CartItemModel({
@@ -48,6 +51,7 @@ class CartItemModel extends HiveObject {
     required this.categoryId,
     this.additionalPrice = 0.0,
     DateTime? addedAt,
+    this.productNote,
   }) : addedAt = addedAt ?? DateTime.now();
 
   /// Calculate the total price for this item (base price + options) * quantity
@@ -68,6 +72,7 @@ class CartItemModel extends HiveObject {
     String? categoryId,
     double? additionalPrice,
     DateTime? addedAt,
+    String? productNote,
   }) {
     return CartItemModel(
       productId: productId ?? this.productId,
@@ -80,6 +85,7 @@ class CartItemModel extends HiveObject {
       categoryId: categoryId ?? this.categoryId,
       additionalPrice: additionalPrice ?? this.additionalPrice,
       addedAt: addedAt ?? this.addedAt,
+      productNote: productNote ?? this.productNote,
     );
   }
 
@@ -96,6 +102,7 @@ class CartItemModel extends HiveObject {
       'categoryId': categoryId,
       'additionalPrice': additionalPrice,
       'addedAt': addedAt.millisecondsSinceEpoch,
+      'productNote': productNote,
     };
   }
 
@@ -114,6 +121,7 @@ class CartItemModel extends HiveObject {
       addedAt: map['addedAt'] != null
           ? DateTime.fromMillisecondsSinceEpoch(map['addedAt'])
           : DateTime.now(),
+      productNote: map['productNote'],
     );
   }
 

@@ -141,6 +141,35 @@ class OrderActionButtons extends StatelessWidget {
               ),
             ),
 
+          // المكتب رجّع الطلب للتاجر — مكتب جديد أو تسليم ذاتى
+          if (status == 'المكتب رفض الطلب') ...[
+            Expanded(
+              child: _buildActionButton(
+                'مكتب جديد',
+                Icons.local_shipping,
+                Colors.deepPurple,
+                () {
+                  if (onRequestDelivery != null) {
+                    onRequestDelivery!();
+                  }
+                },
+              ),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: _buildActionButton(
+                'هسلمه بنفسى',
+                Icons.person,
+                Colors.green,
+                () => _confirmAction(
+                  context,
+                  'هل أنت متأكد أنك هتسلم الطلب للعميل بنفسك؟',
+                  'تم التسليم للطيار',
+                ),
+              ),
+            ),
+          ],
+
           // الحالة الرابعة: تم التسليم للطيار
           if (status == 'تم التسليم للطيار')
             _statusChip(Icons.check_circle, 'تم التسليم', Colors.green),

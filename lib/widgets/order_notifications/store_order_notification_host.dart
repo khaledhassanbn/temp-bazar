@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 import 'package:bazar_suez/authentication/guards/AuthGuard.dart';
 import 'package:bazar_suez/services/fcm_service.dart';
 import 'package:bazar_suez/services/order_notifications/store_new_order_listener.dart';
+import 'package:bazar_suez/services/order_notifications/store_office_return_listener.dart';
 
 /// يربط الاستماع المباشر لطلبات `new` مع FCM بعد تحميل معرّف المتجر.
 /// يوضع داخل شجرة واجهة التاجر فقط (مثلاً داخل [MarketLayout]).
@@ -19,6 +20,7 @@ class StoreOrderNotificationHost extends StatefulWidget {
 class _StoreOrderNotificationHostState extends State<StoreOrderNotificationHost> {
   late final AuthGuard _auth;
   StoreNewOrderListener? _listener;
+  StoreOfficeReturnListener? _officeReturnListener;
   String? _attachedStoreId;
   String? _attachedUid;
   String? _lastLocation;
@@ -56,6 +58,7 @@ class _StoreOrderNotificationHostState extends State<StoreOrderNotificationHost>
   void dispose() {
     _auth.removeListener(_onAuthChanged);
     _listener?.dispose();
+    _officeReturnListener?.dispose();
     super.dispose();
   }
 
@@ -66,7 +69,9 @@ class _StoreOrderNotificationHostState extends State<StoreOrderNotificationHost>
     if (!_isEligibleLocation(location)) {
       // لا نحتاج listener هنا، فنتأكد أنه متوقف
       await _listener?.dispose();
+      await _officeReturnListener?.dispose();
       _listener = null;
+      _officeReturnListener = null;
       _attachedStoreId = null;
       _attachedUid = null;
       return;
@@ -74,7 +79,9 @@ class _StoreOrderNotificationHostState extends State<StoreOrderNotificationHost>
 
     if (!_auth.isMarketOwner || _auth.currentUser == null) {
       await _listener?.dispose();
+      await _officeReturnListener?.dispose();
       _listener = null;
+      _officeReturnListener = null;
       _attachedStoreId = null;
       _attachedUid = null;
       return;
@@ -90,15 +97,20 @@ class _StoreOrderNotificationHostState extends State<StoreOrderNotificationHost>
       final mid = _auth.marketId;
       if (mid == null || mid.isEmpty) {
         await _listener?.dispose();
+        await _officeReturnListener?.dispose();
         _listener = null;
+        _officeReturnListener = null;
         _attachedStoreId = null;
         _attachedUid = uid;
         return;
       }
 
-      if (_attachedStoreId == mid && _listener != null) return;
+      if (_attachedStoreId == mid && _listener != null && _officeReturnListener != null) {
+        return;
+      }
 
       await _listener?.dispose();
+      await _officeReturnListener?.dispose();
       _attachedStoreId = mid;
       _attachedUid = uid;
 
@@ -108,6 +120,7 @@ class _StoreOrderNotificationHostState extends State<StoreOrderNotificationHost>
       FcmService.instance.saveTokenForStore(mid);
 
       _listener = StoreNewOrderListener(mid)..start();
+      _officeReturnListener = StoreOfficeReturnListener(mid)..start();
     } finally {
       _busy = false;
     }

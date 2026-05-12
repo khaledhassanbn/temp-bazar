@@ -358,10 +358,13 @@ class DeliveryAddressesPage extends StatelessWidget {
                   title: const Text('حذف العنوان', 
                       style: TextStyle(color: Colors.red)),
                   onTap: () async {
+                    // احفظ الـ viewModel قبل إغلاق الـ BottomSheet
+                    final viewModel = context.read<SavedLocationsViewModel>();
+                    final rootContext = context;
                     Navigator.pop(context);
                     final confirm = await showDialog<bool>(
-                      context: context,
-                      builder: (context) => Directionality(
+                      context: rootContext,
+                      builder: (ctx) => Directionality(
                         textDirection: TextDirection.rtl,
                         child: AlertDialog(
                           title: const Text('حذف العنوان'),
@@ -370,11 +373,11 @@ class DeliveryAddressesPage extends StatelessWidget {
                           ),
                           actions: [
                             TextButton(
-                              onPressed: () => Navigator.pop(context, false),
+                              onPressed: () => Navigator.pop(ctx, false),
                               child: const Text('إلغاء'),
                             ),
                             TextButton(
-                              onPressed: () => Navigator.pop(context, true),
+                              onPressed: () => Navigator.pop(ctx, true),
                               style: TextButton.styleFrom(
                                 foregroundColor: Colors.red,
                               ),
@@ -384,9 +387,8 @@ class DeliveryAddressesPage extends StatelessWidget {
                         ),
                       ),
                     );
-                    if (confirm == true && context.mounted) {
-                      context.read<SavedLocationsViewModel>()
-                          .deleteLocation(location.id);
+                    if (confirm == true) {
+                      viewModel.deleteLocation(location.id);
                     }
                   },
                 ),
