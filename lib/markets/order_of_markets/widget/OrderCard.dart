@@ -130,6 +130,7 @@ class OrderCard extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
+                      // رقم الطلب كامل
                       Text(
                         'طلب رقم: ${order['id']}',
                         style: const TextStyle(
@@ -137,9 +138,35 @@ class OrderCard extends StatelessWidget {
                           fontWeight: FontWeight.bold,
                           fontSize: 17,
                         ),
-                        overflow: TextOverflow.ellipsis,
                       ),
-                      const SizedBox(height: 4),
+                      const SizedBox(height: 8),
+                      // حالة الطلب تحت الرقم
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 6,
+                        ),
+                        decoration: BoxDecoration(
+                          color: _getStatusColor(order['status']),
+                          borderRadius: BorderRadius.circular(10),
+                          boxShadow: [
+                            BoxShadow(
+                              color: _getStatusColor(order['status']).withOpacity(0.3),
+                              blurRadius: 6,
+                              offset: const Offset(0, 2),
+                            ),
+                          ],
+                        ),
+                        child: Text(
+                          order['status'],
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 8),
                       Wrap(
                         spacing: 8,
                         runSpacing: 4,
@@ -187,32 +214,6 @@ class OrderCard extends StatelessWidget {
                         ],
                       ),
                     ],
-                  ),
-                ),
-                // حالة الطلب
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 14,
-                    vertical: 8,
-                  ),
-                  decoration: BoxDecoration(
-                    color: _getStatusColor(order['status']),
-                    borderRadius: BorderRadius.circular(12),
-                    boxShadow: [
-                      BoxShadow(
-                        color: _getStatusColor(order['status']).withOpacity(0.3),
-                        blurRadius: 6,
-                        offset: const Offset(0, 2),
-                      ),
-                    ],
-                  ),
-                  child: Text(
-                    order['status'],
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 13,
-                      fontWeight: FontWeight.bold,
-                    ),
                   ),
                 ),
               ],
@@ -278,22 +279,40 @@ class OrderCard extends StatelessWidget {
                         icon: Icons.phone_outlined,
                         label: 'الهاتف',
                         value: order['customerPhone'] ?? '',
-                        trailing: IconButton(
-                          icon: const Icon(Icons.copy, size: 18),
-                          color: Colors.blue,
-                          onPressed: () {
-                            Clipboard.setData(
-                              ClipboardData(
-                                text: order['customerPhone'].toString(),
-                              ),
-                            );
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text('تم نسخ رقم الهاتف'),
-                                duration: Duration(seconds: 2),
-                              ),
-                            );
-                          },
+                        trailing: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            IconButton(
+                              icon: const Icon(Icons.phone, size: 18),
+                              color: Colors.green,
+                              onPressed: () async {
+                                final phone = order['customerPhone']?.toString() ?? '';
+                                if (phone.isNotEmpty) {
+                                  final url = Uri.parse('tel:$phone');
+                                  if (await canLaunchUrl(url)) {
+                                    await launchUrl(url);
+                                  }
+                                }
+                              },
+                            ),
+                            IconButton(
+                              icon: const Icon(Icons.copy, size: 18),
+                              color: Colors.blue,
+                              onPressed: () {
+                                Clipboard.setData(
+                                  ClipboardData(
+                                    text: order['customerPhone'].toString(),
+                                  ),
+                                );
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                    content: Text('تم نسخ رقم الهاتف'),
+                                    duration: Duration(seconds: 2),
+                                  ),
+                                );
+                              },
+                            ),
+                          ],
                         ),
                       ),
                       const Divider(height: 20),
@@ -356,20 +375,35 @@ class OrderCard extends StatelessWidget {
                             icon: Icons.phone_outlined,
                             label: 'هاتف المندوب',
                             value: assignedDriverPhone,
-                            trailing: IconButton(
-                              icon: const Icon(Icons.copy, size: 18),
-                              color: Colors.blue,
-                              onPressed: () {
-                                Clipboard.setData(
-                                  ClipboardData(text: assignedDriverPhone),
-                                );
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(
-                                    content: Text('تم نسخ رقم هاتف المندوب'),
-                                    duration: Duration(seconds: 2),
-                                  ),
-                                );
-                              },
+                            trailing: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                IconButton(
+                                  icon: const Icon(Icons.phone, size: 18),
+                                  color: Colors.green,
+                                  onPressed: () async {
+                                    final url = Uri.parse('tel:$assignedDriverPhone');
+                                    if (await canLaunchUrl(url)) {
+                                      await launchUrl(url);
+                                    }
+                                  },
+                                ),
+                                IconButton(
+                                  icon: const Icon(Icons.copy, size: 18),
+                                  color: Colors.blue,
+                                  onPressed: () {
+                                    Clipboard.setData(
+                                      ClipboardData(text: assignedDriverPhone),
+                                    );
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(
+                                        content: Text('تم نسخ رقم هاتف المندوب'),
+                                        duration: Duration(seconds: 2),
+                                      ),
+                                    );
+                                  },
+                                ),
+                              ],
                             ),
                           ),
                       ],

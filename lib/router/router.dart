@@ -14,6 +14,35 @@ import 'routes_config/market_routes.dart';
 import 'routes_config/shared_routes.dart';
 import 'routes_config/user_routes.dart';
 
+/// المسارات التي تتطلب تسجيل دخول
+bool _requiresAuth(String path) {
+  const protectedPaths = [
+    '/CartPage',
+    '/user-orders',
+    '/AccountPage',
+    '/delivery-addresses',
+    '/favourite-markets',
+    '/create-store',
+    '/pricingpage',
+    '/request-ads',
+    '/wallet',
+    '/deposit-request',
+    '/myorder',
+    '/PastOrders',
+    '/addproduct',
+    '/SalesStatsPage',
+    '/ManageProducts',
+    '/edit-store',
+    '/manage-managers',
+    '/market-dashboard',
+    '/MyStorePage',
+    '/license-status',
+    '/admin/wallet-requests',
+    '/store-reviews',
+  ];
+  return protectedPaths.any((p) => path.startsWith(p));
+}
+
 bool _isPublicPath(String path) {
   if (path.isEmpty || path == '/') return true;
   if (path == '/CategoryMarketPage') return true;
@@ -44,7 +73,10 @@ Future<GoRouter> createRouter(AuthGuard authGuard) async {
           if (!isAdmin) return '/CategoriesGrid';
         }
 
-        if (!loggedIn && !location.contains('/login')) return '/login';
+        // المسارات المحمية: إذا المستخدم غير مسجل دخول → تحويل لصفحة تسجيل الدخول
+        if (!loggedIn && _requiresAuth(path)) return '/login';
+
+        // إذا كان مسجل دخول وحاول يفتح صفحة تسجيل الدخول → تحويل للصفحة الرئيسية
         if (loggedIn && location.contains('/login')) {
           if (isAdmin) return '/admin/dashboard';
           return '/HomePage';

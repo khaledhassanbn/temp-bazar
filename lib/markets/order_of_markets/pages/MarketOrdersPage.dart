@@ -64,48 +64,209 @@ class _MarketOrdersPageState extends State<MarketOrdersPage>
 
       final selectedOffice = await showModalBottomSheet<Map<String, dynamic>>(
         context: context,
-        shape: const RoundedRectangleBorder(
-          borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-        ),
-        builder: (ctx) => Padding(
-          padding: const EdgeInsets.all(12),
+        isScrollControlled: true,
+        backgroundColor: Colors.transparent,
+        builder: (ctx) => Container(
+          height: MediaQuery.of(ctx).size.height * 0.75,
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+          ),
           child: Column(
-            mainAxisSize: MainAxisSize.min,
             children: [
+              // Handle bar
               Container(
                 width: 40,
-                height: 4,
-                margin: const EdgeInsets.only(bottom: 12),
+                height: 5,
+                margin: const EdgeInsets.only(top: 12, bottom: 8),
                 decoration: BoxDecoration(
                   color: Colors.grey[300],
                   borderRadius: BorderRadius.circular(12),
                 ),
               ),
-              const Text(
-                'اختار مكتب الشحن',
-                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+              
+              // Header
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                decoration: BoxDecoration(
+                  color: Colors.blue.shade50,
+                  border: Border(
+                    bottom: BorderSide(color: Colors.grey.shade200, width: 1),
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: Colors.blue.shade100,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Icon(
+                        Icons.local_shipping_rounded,
+                        color: Colors.blue.shade700,
+                        size: 28,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'اختر مكتب الشحن',
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 20,
+                              color: Colors.black87,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            '${offices.length} مكتب متاح',
+                            style: TextStyle(
+                              fontSize: 13,
+                              color: Colors.grey.shade600,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.close, color: Colors.grey),
+                      onPressed: () => Navigator.of(ctx).pop(),
+                    ),
+                  ],
+                ),
               ),
-              const SizedBox(height: 12),
-              SizedBox(
-                height: 340,
+              
+              // Offices List
+              Expanded(
                 child: ListView.builder(
+                  padding: const EdgeInsets.all(16),
                   itemCount: offices.length,
                   itemBuilder: (context, index) {
                     final office = offices[index];
-                    return Card(
-                      child: ListTile(
-                        leading: const Icon(Icons.local_shipping),
-                        title: Text(office['name'] ?? ''),
-                        subtitle: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            if (office['address'] != null)
-                              Text(office['address']),
-                            if (office['phone'] != null)
-                              Text('هاتف: ${office['phone']}'),
-                          ],
+                    final hasPhone = office['phone'] != null && office['phone'].toString().isNotEmpty;
+                    final hasAddress = office['address'] != null && office['address'].toString().isNotEmpty;
+                    
+                    return Container(
+                      margin: const EdgeInsets.only(bottom: 12),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: Colors.grey.shade200, width: 1.5),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.grey.withOpacity(0.08),
+                            blurRadius: 8,
+                            offset: const Offset(0, 2),
+                          ),
+                        ],
+                      ),
+                      child: Material(
+                        color: Colors.transparent,
+                        child: InkWell(
+                          borderRadius: BorderRadius.circular(16),
+                          onTap: () => Navigator.of(ctx).pop(office),
+                          child: Padding(
+                            padding: const EdgeInsets.all(16),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                // Office Name & Icon
+                                Row(
+                                  children: [
+                                    Container(
+                                      padding: const EdgeInsets.all(10),
+                                      decoration: BoxDecoration(
+                                        color: Colors.orange.shade50,
+                                        borderRadius: BorderRadius.circular(10),
+                                      ),
+                                      child: Icon(
+                                        Icons.store_rounded,
+                                        color: Colors.orange.shade700,
+                                        size: 24,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 12),
+                                    Expanded(
+                                      child: Text(
+                                        office['name'] ?? 'مكتب غير معروف',
+                                        style: const TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: 17,
+                                          color: Colors.black87,
+                                        ),
+                                      ),
+                                    ),
+                                    Icon(
+                                      Icons.arrow_back_ios_rounded,
+                                      size: 16,
+                                      color: Colors.grey.shade400,
+                                    ),
+                                  ],
+                                ),
+                                
+                                if (hasAddress || hasPhone) ...[
+                                  const SizedBox(height: 12),
+                                  const Divider(height: 1),
+                                  const SizedBox(height: 12),
+                                ],
+                                
+                                // Address
+                                if (hasAddress)
+                                  Padding(
+                                    padding: const EdgeInsets.only(bottom: 8),
+                                    child: Row(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Icon(
+                                          Icons.location_on_rounded,
+                                          size: 18,
+                                          color: Colors.red.shade400,
+                                        ),
+                                        const SizedBox(width: 8),
+                                        Expanded(
+                                          child: Text(
+                                            office['address'],
+                                            style: TextStyle(
+                                              fontSize: 14,
+                                              color: Colors.grey.shade700,
+                                              height: 1.4,
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                
+                                // Phone
+                                if (hasPhone)
+                                  Row(
+                                    children: [
+                                      Icon(
+                                        Icons.phone_rounded,
+                                        size: 18,
+                                        color: Colors.green.shade600,
+                                      ),
+                                      const SizedBox(width: 8),
+                                      Expanded(
+                                        child: Text(
+                                          office['phone'],
+                                          style: TextStyle(
+                                            fontSize: 14,
+                                            color: Colors.grey.shade700,
+                                            fontWeight: FontWeight.w500,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                              ],
+                            ),
+                          ),
                         ),
-                        onTap: () => Navigator.of(ctx).pop(office),
                       ),
                     );
                   },

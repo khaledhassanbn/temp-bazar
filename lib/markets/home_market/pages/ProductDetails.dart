@@ -7,6 +7,7 @@ import 'package:bazar_suez/markets/cart/viewmodels/cart_view_model.dart';
 import 'package:bazar_suez/markets/cart/models/cart_item_model.dart';
 import 'package:bazar_suez/markets/create_market/models/working_hours.dart';
 import 'package:bazar_suez/theme/app_color.dart';
+import 'package:bazar_suez/widgets/auth_gate.dart';
 
 class ProductDetailsPage extends StatefulWidget {
   final String? marketId;
@@ -924,6 +925,9 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
   // CART LOGIC
   // ─────────────────────────────────────────────
   Future<void> _addToCart() async {
+    // التحقق من تسجيل الدخول قبل الإضافة للسلة
+    if (!requireAuth(context, message: 'سجّل دخولك لإضافة المنتجات للسلة وإتمام الطلب')) return;
+
     if (!_storeAvailable || _storeClosedByWorkingHours) {
       _showErrorSnackBar(
         _storeClosedByWorkingHours

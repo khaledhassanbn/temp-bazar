@@ -300,10 +300,11 @@ class MarketOrdersViewModel extends ChangeNotifier {
         'customerLocation': clientLoc, // جديد
         'status': status,
         // بيانات المندوب من وثيقة request delivery (إن وُجدت)
-        'assignedDriverName':
-            deliveryInfo != null ? deliveryInfo['assignedDriverName'] ?? '' : '',
+        'assignedDriverName': deliveryInfo != null 
+            ? (deliveryInfo['assignedDriverName'] ?? deliveryInfo['driverName'] ?? deliveryInfo['driver_name'] ?? '') 
+            : '',
         'assignedDriverPhone': deliveryInfo != null
-            ? deliveryInfo['assignedDriverPhone'] ?? ''
+            ? (deliveryInfo['assignedDriverPhone'] ?? deliveryInfo['driverPhone'] ?? deliveryInfo['driver_phone'] ?? '')
             : '',
         'orderTime': orderTime,
         'createdAt': createdAtTimestamp, // إضافة createdAt لعرض التاريخ
@@ -501,7 +502,10 @@ class MarketOrdersViewModel extends ChangeNotifier {
         final existingStatus = (existingRequest['status'] ?? '').toString();
         final existingOfficeId = (existingRequest['officeId'] ?? '').toString();
         final isPendingOfficeApproval =
-            existingStatus == 'pending' || existingStatus == 'في انتظار قبول المكتب';
+            existingStatus == 'pending' || 
+            existingStatus == 'في انتظار قبول المكتب' ||
+            existingStatus == 'accepted' ||
+            existingStatus == 'تم قبوله من المكتب';
         final isOfficeReturnedToMerchant =
             _isReturnedToMerchantRaw(existingStatus);
 
@@ -516,7 +520,7 @@ class MarketOrdersViewModel extends ChangeNotifier {
               existingOfficeId == (office['id'] ?? '').toString()) {
             return 'تم اختيار نفس المكتب الحالي';
           }
-          await _deliveryRequestService.deleteRequest(existingRequestId);
+          await _deliveryRequestService.updateRequestStatus(existingRequestId, 'cancelled_by_merchant');
         } else {
           if (isOfficeReturnedToMerchant) {
             return 'استخدم «مكتب جديد» لإعادة الإرسال بعد رفض المكتب';
@@ -613,19 +617,13 @@ class MarketOrdersViewModel extends ChangeNotifier {
       final customerId =
           customerInfo['userId'] as String? ?? orderData['userId'] as String?;
 
-      if (newStatus == 'تم التسليم للطيار') {
+      if (newStatus == 'تم التسليم للطيار' || newStatus == 'تم رفض الطلب') {
         final deliveryInfo = deliveryRequestsByOrderId[documentId];
-        final deliveryStatus = deliveryInfo?['status']?.toString();
-        final orderRawStatus = orderData['status']?.toString();
-        final officeReturned = _isReturnedToMerchantRaw(orderRawStatus) ||
-            _isReturnedToMerchantRaw(deliveryStatus);
-        if (officeReturned) {
-          final rid = deliveryInfo?['id']?.toString();
-          if (rid != null && rid.isNotEmpty) {
-            try {
-              await _deliveryRequestService.deleteRequest(rid);
-            } catch (_) {}
-          }
+        final rid = deliveryInfo?['id']?.toString();
+        if (rid != null && rid.isNotEmpty) {
+          try {
+            await _deliveryRequestService.updateRequestStatus(rid, 'cancelled_by_merchant');
+          } catch (_) {}
         }
       }
 

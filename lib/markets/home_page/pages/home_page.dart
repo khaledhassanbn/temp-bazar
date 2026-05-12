@@ -9,6 +9,7 @@ import 'package:bazar_suez/markets/grid_of_categories/Model/model.dart';
 import 'package:bazar_suez/markets/Markets_after_category/viewmodel/category_filter_viewmodel.dart';
 import 'package:bazar_suez/markets/Markets_after_category/widget/category_stores_filter_bar.dart';
 import 'package:bazar_suez/markets/create_market/models/store_model.dart';
+import 'package:bazar_suez/widgets/auth_gate.dart';
 
 import '../../cart/viewmodels/cart_view_model.dart';
 import '../../saved_locations/viewmodels/saved_locations_viewmodel.dart';
@@ -115,6 +116,7 @@ class _HomePageState extends State<HomePage>
   }
 
   void _openLocationSheet() {
+    if (!requireAuth(context, message: 'سجّل دخولك لحفظ عناوين التوصيل وتحديد موقعك')) return;
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -249,7 +251,10 @@ class _HomePageState extends State<HomePage>
                       Consumer<CartViewModel>(
                         builder: (context, cartVm, _) {
                           return GestureDetector(
-                            onTap: () => context.push('/CartPage'),
+                            onTap: () {
+                              if (!requireAuth(context, message: 'سجّل دخولك لعرض سلة المشتريات')) return;
+                              context.push('/CartPage');
+                            },
                             child: Container(
                               width: 44,
                               height: 44,

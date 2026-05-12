@@ -126,9 +126,10 @@ class OrderActionButtons extends StatelessWidget {
               ),
             ),
 
-          // حالة انتظار موافقة المكتب: إتاحة تغيير المكتب
-          if (status == 'في انتظار قبول المكتب')
+          // حالة انتظار موافقة المكتب أو تم قبوله دون مندوب: إتاحة تغيير المكتب، التسليم الذاتي، أو إلغاء الطلب
+          if (status == 'في انتظار قبول المكتب' || status == 'تم قبوله من المكتب') ...[
             Expanded(
+              flex: 3,
               child: _buildActionButton(
                 'تغيير المكتب',
                 Icons.swap_horiz,
@@ -140,6 +141,35 @@ class OrderActionButtons extends StatelessWidget {
                 },
               ),
             ),
+            const SizedBox(width: 4),
+            Expanded(
+              flex: 2,
+              child: _buildActionButton(
+                'بنفسى',
+                Icons.person,
+                Colors.green,
+                () => _confirmAction(
+                  context,
+                  'هل أنت متأكد أنك هتسلم الطلب للعميل بنفسك؟',
+                  'تم التسليم للطيار',
+                ),
+              ),
+            ),
+            const SizedBox(width: 4),
+            Expanded(
+              flex: 2,
+              child: _buildActionButton(
+                'إلغاء',
+                Icons.cancel,
+                Colors.redAccent,
+                () => _confirmAction(
+                  context,
+                  'هل أنت متأكد من إلغاء الطلب؟',
+                  'تم رفض الطلب',
+                ),
+              ),
+            ),
+          ],
 
           // المكتب رجّع الطلب للتاجر — مكتب جديد أو تسليم ذاتى
           if (status == 'المكتب رفض الطلب') ...[
@@ -218,15 +248,18 @@ class OrderActionButtons extends StatelessWidget {
       style: ElevatedButton.styleFrom(
         backgroundColor: color,
         foregroundColor: Colors.white,
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 10),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         elevation: 2,
       ),
       icon: Icon(icon, size: 16),
-      label: Text(
-        text,
-        style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
-        textAlign: TextAlign.center,
+      label: FittedBox(
+        fit: BoxFit.scaleDown,
+        child: Text(
+          text,
+          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+          textAlign: TextAlign.center,
+        ),
       ),
       onPressed: onPressed,
     );
