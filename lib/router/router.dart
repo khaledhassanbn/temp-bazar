@@ -4,8 +4,8 @@ import 'package:bazar_suez/Layouts/user_layout.dart';
 import 'package:bazar_suez/router/app_navigation.dart';
 import 'package:bazar_suez/authentication/guards/AuthGuard.dart';
 import 'package:bazar_suez/authentication/pages/signin_with_social.dart';
-import 'package:bazar_suez/markets/Markets_after_category/pages/category_market_page.dart';
 import 'package:bazar_suez/markets/home_market/pages/home_market_page.dart';
+import 'package:bazar_suez/router/site_path_rules.dart';
 import 'package:go_router/go_router.dart';
 
 import 'routes_config/admin_routes.dart';
@@ -47,6 +47,12 @@ bool _isPublicPath(String path) {
   if (path.isEmpty || path == '/') return true;
   if (path == '/CategoryMarketPage') return true;
   if (path.startsWith('/market/')) return true;
+  if (path.startsWith('/productdetails')) return true;
+  final segs = path.split('/').where((s) => s.isNotEmpty).toList();
+  if (segs.length == 1 && isStoreShareSlugSegment(segs.first)) return true;
+  if (segs.length == 2 && isPublicProductSharePath(segs[0], segs[1])) {
+    return true;
+  }
   return false;
 }
 
@@ -57,7 +63,7 @@ Future<GoRouter> createRouter(AuthGuard authGuard) async {
 
     final router = GoRouter(
       navigatorKey: rootNavigatorKey,
-      initialLocation: '/HomePage',
+      initialLocation: '/',
       refreshListenable: authGuard,
       redirect: (context, state) {
         final loggedIn = authGuard.isAuthenticated;
@@ -79,7 +85,7 @@ Future<GoRouter> createRouter(AuthGuard authGuard) async {
         // إذا كان مسجل دخول وحاول يفتح صفحة تسجيل الدخول → تحويل للصفحة الرئيسية
         if (loggedIn && location.contains('/login')) {
           if (isAdmin) return '/admin/dashboard';
-          return '/HomePage';
+          return '/';
         }
 
         // منع الـ admin من الوصول إلى صفحات المستخدمين (ماعدا /AccountPage والصفحات العامة)
@@ -95,13 +101,6 @@ Future<GoRouter> createRouter(AuthGuard authGuard) async {
       },
       routes: [
         ...authRoutes,
-        GoRoute(
-          path: '/',
-          builder: (context, state) {
-            final categoryId = state.uri.queryParameters['categoryId'];
-            return CategoryMarketPage(categoryId: categoryId);
-          },
-        ),
         GoRoute(
           path: '/market/:marketId',
           builder: (context, state) {
@@ -126,6 +125,19 @@ Future<GoRouter> createRouter(AuthGuard authGuard) async {
             }
           },
           routes: [...sharedRoutes, ...userRoutes, ...marketRoutes],
+        ),
+        GoRoute(
+          path: r'/:storeId([a-z0-9-]+)',
+          redirect: (context, state) {
+            final id = state.pathParameters['storeId']!;
+            if (!isStoreShareSlugSegment(id)) return '/';
+            return null;
+          },
+          builder: (context, state) {
+            return MarketAnimatedPage(
+              marketLink: state.pathParameters['storeId'],
+            );
+          },
         ),
       ],
     );

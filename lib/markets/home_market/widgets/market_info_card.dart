@@ -5,6 +5,7 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:go_router/go_router.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:bazar_suez/config/site_links.dart';
 
 class MarketInfoCard extends StatelessWidget {
   final String marketName;
@@ -72,8 +73,8 @@ class MarketInfoCard extends StatelessWidget {
   bool get _hasInstagram => instagram != null && instagram!.isNotEmpty;
   bool get _canShowLocation => showAddress && location != null;
   String get _shareLink => marketLink != null && marketLink!.isNotEmpty
-      ? 'com.example.bazar_suez/market/$marketLink'
-      : 'com.example.bazar_suez/market/unknown';
+      ? publicStoreShareUrl(marketLink!)
+      : '$kPublicSiteOrigin/unknown-store';
 
   @override
   Widget build(BuildContext context) {

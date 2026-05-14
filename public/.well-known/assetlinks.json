@@ -1,0 +1,12 @@
+[
+    {
+      "relation": ["delegate_permission/common.handle_all_urls"],
+      "target": {
+        "namespace": "android_app",
+        "package_name": "com.example.bazar_suez",
+        "sha256_cert_fingerprints": [
+          "54:3E:82:79:5B:44:B4:E6:5C:8F:C0:F3:93:67:E6:08:10:59:E5:88:4D:3A:74:F5:DA:AE:DE:A5:E2:1A:28:DD"
+        ]
+      }
+    }
+  ]

@@ -3,6 +3,8 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:provider/provider.dart';
+import 'package:share_plus/share_plus.dart';
+import 'package:bazar_suez/config/site_links.dart';
 import 'package:bazar_suez/markets/cart/viewmodels/cart_view_model.dart';
 import 'package:bazar_suez/markets/cart/models/cart_item_model.dart';
 import 'package:bazar_suez/markets/create_market/models/working_hours.dart';
@@ -76,17 +78,46 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
     _selectedOptions = Map<String, String?>.from(e.selectedOptions);
   }
 
+  Future<String?> _resolveCategoryForProduct(String marketId, String itemId) async {
+    try {
+      final productsSnap = await FirebaseFirestore.instance
+          .collection('markets')
+          .doc(marketId)
+          .collection('products')
+          .get();
+      for (final cat in productsSnap.docs) {
+        final item =
+            await cat.reference.collection('items').doc(itemId).get();
+        if (item.exists) return cat.id;
+      }
+    } catch (_) {}
+    return null;
+  }
+
   Future<void> _loadProduct() async {
     final String marketId = widget.marketId ?? 'kb';
-    final String? categoryId = widget.categoryId;
+    String? categoryId = widget.categoryId;
     final String? itemId = widget.itemId;
 
-    if (categoryId == null || itemId == null) {
+    if (itemId == null || itemId.isEmpty) {
       setState(() {
         _error = 'مسار المنتج غير مكتمل';
         _loading = false;
       });
       return;
+    }
+
+    if (categoryId == null || categoryId.isEmpty) {
+      final resolved = await _resolveCategoryForProduct(marketId, itemId);
+      if (!mounted) return;
+      if (resolved == null) {
+        setState(() {
+          _error = 'لم يتم العثور على المنتج';
+          _loading = false;
+        });
+        return;
+      }
+      categoryId = resolved;
     }
 
     final marketsRef =
@@ -668,7 +699,26 @@ class _ProductDetailsPageState extends State<ProductDetailsPage> {
                         ),
                       ),
                     ),
-                    const SizedBox(width: 48),
+                    if (widget.marketId != null &&
+                        widget.marketId!.isNotEmpty &&
+                        widget.itemId != null &&
+                        widget.itemId!.isNotEmpty)
+                      IconButton(
+                        onPressed: () {
+                          final url = publicProductShareUrl(
+                            widget.marketId!,
+                            widget.itemId!,
+                          );
+                          Share.share(
+                            'شوف المنتج "$_name" في بازار السويس 👇\n$url',
+                            subject: _name,
+                          );
+                        },
+                        icon: const Icon(Icons.share_outlined),
+                        color: const Color(0xFF1A1A1A),
+                      )
+                    else
+                      const SizedBox(width: 48),
                   ],
                 ),
               ),

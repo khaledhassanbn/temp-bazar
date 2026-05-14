@@ -13,7 +13,7 @@ class UserLayout extends StatelessWidget {
   Widget build(BuildContext context) {
     final currentIndex = _getIndexFromRoute(context);
     return AppBackGuard(
-      homePath: '/HomePage',
+      homePath: '/',
       child: Scaffold(
         body: child,
         bottomNavigationBar: UserBottomNavigation(currentIndex: currentIndex),

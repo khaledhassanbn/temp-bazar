@@ -12,9 +12,11 @@ import 'package:bazar_suez/markets/wallet/pages/admin_wallet_requests_page.dart'
 import 'package:bazar_suez/markets/saved_locations/pages/delivery_addresses_page.dart';
 import 'package:bazar_suez/markets/license/pages/license_status_page.dart';
 import 'package:bazar_suez/markets/favourite_markets/pages/favourite_markets_page.dart';
+import 'package:bazar_suez/router/site_path_rules.dart';
 import 'package:go_router/go_router.dart';
 
 final sharedRoutes = [
+  GoRoute(path: '/', builder: (_, __) => const HomePage()),
   GoRoute(path: '/delivery-addresses', builder: (_, __) => const DeliveryAddressesPage()),
   GoRoute(path: '/HomePage', builder: (_, __) => const HomePage()),
   GoRoute(path: '/Search', builder: (_, __) => const SearchPage()),
@@ -55,6 +57,24 @@ final sharedRoutes = [
       return ProductDetailsPage(
         marketId: marketId,
         categoryId: categoryId,
+        itemId: itemId,
+      );
+    },
+  ),
+  GoRoute(
+    path: r'/:marketLink([a-z0-9-]+)/:itemId([a-zA-Z0-9_-]+)',
+    redirect: (context, state) {
+      final m = state.pathParameters['marketLink'] ?? '';
+      final p = state.pathParameters['itemId'] ?? '';
+      if (!isPublicProductSharePath(m, p)) return '/';
+      return null;
+    },
+    builder: (context, state) {
+      final marketLink = state.pathParameters['marketLink']!;
+      final itemId = state.pathParameters['itemId']!;
+      return ProductDetailsPage(
+        marketId: marketLink,
+        categoryId: null,
         itemId: itemId,
       );
     },

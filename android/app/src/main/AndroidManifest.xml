@@ -1,20 +1,18 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     package="com.example.bazar_suez">
 
-    <!-- 🔹 صلاحيات الموقع -->
+    <!-- صلاحيات الموقع -->
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
-    <!-- للعمل في الخلفية (Android 10+) -->
     <uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
-
 
     <application
         android:label="temp_bazar"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
 
-        <!-- ⭐ Google Maps API Key -->
+        <!-- Google Maps API Key -->
         <meta-data
             android:name="com.google.android.geo.API_KEY"
             android:value="AIzaSyA9bJxVt4G17WqaUeIHmpaHfmcOhsJddYA"/>
@@ -34,10 +32,28 @@
                 android:name="io.flutter.embedding.android.NormalTheme"
                 android:resource="@style/NormalTheme" />
 
+            <!-- Launcher -->
             <intent-filter>
                 <action android:name="android.intent.action.MAIN"/>
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
+
+            <!-- App Links -->
+            <intent-filter android:autoVerify="true">
+                <action android:name="android.intent.action.VIEW" />
+
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+
+                <data
+                    android:scheme="https"
+                    android:host="bazaarsuez.com" />
+
+                <data
+                    android:scheme="https"
+                    android:host="www.bazaarsuez.com" />
+            </intent-filter>
+
         </activity>
 
         <!-- Flutter embedding -->
@@ -46,7 +62,7 @@
             android:value="2" />
     </application>
 
-    <!-- Queries (مطلوب لبعض الـ plugins) -->
+    <!-- Queries -->
     <queries>
         <intent>
             <action android:name="android.intent.action.PROCESS_TEXT"/>

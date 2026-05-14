@@ -1,4 +1,3 @@
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:bazar_suez/widgets/auth_gate.dart';
@@ -18,7 +17,7 @@ class UserBottomNavigation extends StatelessWidget {
         Feedback.forTap(context);
         switch (index) {
           case 0:
-            context.go('/HomePage');
+            context.go('/');
             break;
           case 1:
             // طلباتي - تتطلب تسجيل دخول
