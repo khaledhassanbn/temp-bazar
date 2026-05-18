@@ -1,12 +1,13 @@
+import 'package:bazar_suez/core/errors/not_found_page.dart';
 import 'package:bazar_suez/Layouts/admin_layout.dart';
 import 'package:bazar_suez/Layouts/market_layout.dart';
 import 'package:bazar_suez/Layouts/user_layout.dart';
 import 'package:bazar_suez/router/app_navigation.dart';
 import 'package:bazar_suez/authentication/guards/AuthGuard.dart';
-import 'package:bazar_suez/authentication/pages/signin_with_social.dart';
 import 'package:bazar_suez/markets/home_market/pages/home_market_page.dart';
 import 'package:bazar_suez/router/site_path_rules.dart';
 import 'package:go_router/go_router.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'routes_config/admin_routes.dart';
 import 'routes_config/auth_routes.dart';
@@ -45,6 +46,7 @@ bool _requiresAuth(String path) {
 
 bool _isPublicPath(String path) {
   if (path.isEmpty || path == '/') return true;
+  if (path == '/not-found') return true;
   if (path == '/CategoryMarketPage') return true;
   if (path.startsWith('/market/')) return true;
   if (path.startsWith('/productdetails')) return true;
@@ -61,29 +63,43 @@ Future<GoRouter> createRouter(AuthGuard authGuard) async {
     await authGuard.loadUserStatus();
     authGuard.startStatusListener();
 
+    // التحقق من حالة الأونبوردينج
+    final prefs = await SharedPreferences.getInstance();
+    final onboardingCompleted = prefs.getBool('onboarding_completed') ?? false;
+
     final router = GoRouter(
       navigatorKey: rootNavigatorKey,
       initialLocation: '/',
       refreshListenable: authGuard,
+      errorBuilder: (context, state) => const NotFoundPage(),
       redirect: (context, state) {
         final loggedIn = authGuard.isAuthenticated;
         final isAdmin = authGuard.userStatus == 'admin';
         final location = state.matchedLocation;
         final path = state.uri.path;
 
+        // التحقق من الأونبوردينج أولاً
+        final onboardingDone = prefs.getBool('onboarding_completed') ?? false;
+        if (!onboardingDone && path != '/onboarding') {
+          return '/onboarding';
+        }
+
         if (_isPublicPath(path)) return null;
+
+        // السماح بصفحة الأونبوردينج
+        if (path == '/onboarding') return null;
 
         // حماية صفحات الأدمن
         if (path.startsWith('/admin')) {
-          if (!loggedIn) return '/login';
+          if (!loggedIn) return '/';
           if (!isAdmin) return '/CategoriesGrid';
         }
 
-        // المسارات المحمية: إذا المستخدم غير مسجل دخول → تحويل لصفحة تسجيل الدخول
-        if (!loggedIn && _requiresAuth(path)) return '/login';
+        // المسارات المحمية: إعادة التوجيه للرئيسية (تسجيل الدخول عبر الورقة المنبثقة)
+        if (!loggedIn && _requiresAuth(path)) return '/';
 
-        // إذا كان مسجل دخول وحاول يفتح صفحة تسجيل الدخول → تحويل للصفحة الرئيسية
-        if (loggedIn && location.contains('/login')) {
+        if (loggedIn &&
+            (location.contains('/login') || location.contains('/register'))) {
           if (isAdmin) return '/admin/dashboard';
           return '/';
         }
@@ -101,6 +117,10 @@ Future<GoRouter> createRouter(AuthGuard authGuard) async {
       },
       routes: [
         ...authRoutes,
+        GoRoute(
+          path: '/not-found',
+          builder: (_, __) => const NotFoundPage(),
+        ),
         GoRoute(
           path: '/market/:marketId',
           builder: (context, state) {
@@ -130,7 +150,7 @@ Future<GoRouter> createRouter(AuthGuard authGuard) async {
           path: r'/:storeId([a-z0-9-]+)',
           redirect: (context, state) {
             final id = state.pathParameters['storeId']!;
-            if (!isStoreShareSlugSegment(id)) return '/';
+            if (!isStoreShareSlugSegment(id)) return '/not-found';
             return null;
           },
           builder: (context, state) {
@@ -145,8 +165,9 @@ Future<GoRouter> createRouter(AuthGuard authGuard) async {
     return router;
   } catch (e) {
     return GoRouter(
-      initialLocation: '/login',
-      routes: [GoRoute(path: '/login', builder: (_, __) => const LoginPage())],
+      initialLocation: '/',
+      routes: authRoutes,
     );
   }
 }
+

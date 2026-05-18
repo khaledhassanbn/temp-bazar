@@ -4,6 +4,7 @@ import 'package:bazar_suez/theme/app_color.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:bazar_suez/widgets/auth_gate.dart';
 
 class AccountPage extends StatefulWidget {
   const AccountPage({super.key});
@@ -34,9 +35,10 @@ class _AccountPageState extends State<AccountPage> {
   Future<void> _handleCreateMarketTap(BuildContext context) async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) {
-      ScaffoldMessenger.of(
+      showAuthBottomSheet(
         context,
-      ).showSnackBar(const SnackBar(content: Text('يجب تسجيل الدخول')));
+        message: 'سجّل دخولك لإنشاء متجرك والاشتراك في باقة',
+      );
       return;
     }
 
@@ -411,7 +413,7 @@ class _AccountPageState extends State<AccountPage> {
       if (navigator.canPop()) {
         navigator.pop(); // close bottom sheet
       }
-      router.go('/login');
+      router.go('/');
     } catch (e) {
       _showSnack('فشل تسجيل الخروج، حاول مرة أخرى');
     } finally {

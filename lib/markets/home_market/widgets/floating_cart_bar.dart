@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
 import 'package:bazar_suez/markets/cart/viewmodels/cart_view_model.dart';
 import 'package:bazar_suez/theme/app_color.dart';
+import 'package:bazar_suez/widgets/auth_gate.dart';
 
 class FloatingCartBar extends StatelessWidget {
   const FloatingCartBar({super.key});
@@ -93,6 +94,10 @@ class FloatingCartBar extends StatelessWidget {
   }
 
   void _navigateToCart(BuildContext context) {
-    context.push('/CartPage');
+    pushIfAuthed(
+      context,
+      '/CartPage',
+      message: 'سجّل دخولك لعرض سلة المشتريات وإتمام الطلب',
+    );
   }
 }

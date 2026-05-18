@@ -1,3 +1,5 @@
+import 'package:bazar_suez/core/network/connection_service.dart';
+import 'package:bazar_suez/core/network/connectivity_listener.dart';
 import 'package:bazar_suez/router/router.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
@@ -64,13 +66,22 @@ class MyApp extends StatefulWidget {
 
 class _MyAppState extends State<MyApp> {
   late final AuthGuard _authGuard;
+  late final ConnectionService _connectionService;
   late Future<GoRouter> _routerFuture;
 
   @override
   void initState() {
     super.initState();
     _authGuard = AuthGuard();
+    _connectionService = ConnectionService();
+    _connectionService.initialize();
     _routerFuture = createRouter(_authGuard);
+  }
+
+  @override
+  void dispose() {
+    _connectionService.dispose();
+    super.dispose();
   }
 
   @override
@@ -97,6 +108,9 @@ class _MyAppState extends State<MyApp> {
           },
         ),
         ChangeNotifierProvider(create: (_) => HomeDataProvider()),
+        ChangeNotifierProvider<ConnectionService>.value(
+          value: _connectionService,
+        ),
       ],
       child: FutureBuilder<GoRouter>(
         future: _routerFuture,
@@ -107,35 +121,37 @@ class _MyAppState extends State<MyApp> {
             );
           }
 
-          return MaterialApp.router(
-            debugShowCheckedModeBanner: false,
-            locale: const Locale("ar"),
-            localizationsDelegates: const [
-              GlobalMaterialLocalizations.delegate,
-              GlobalWidgetsLocalizations.delegate,
-              GlobalCupertinoLocalizations.delegate,
-            ],
-            supportedLocales: const [Locale("ar"), Locale("en")],
-            routerConfig: snapshot.data!,
-            theme: ThemeData(
-              fontFamily: "Tajawal",
-              textTheme: const TextTheme(
-                bodyMedium: TextStyle(fontSize: 16, fontFamily: "Tajawal"),
-                bodyLarge: TextStyle(fontSize: 18, fontFamily: "Tajawal"),
-                headlineSmall: TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
-                  fontFamily: "Tajawal",
-                ),
-                headlineMedium: TextStyle(
-                  fontSize: 24,
-                  fontWeight: FontWeight.bold,
-                  fontFamily: "Tajawal",
-                ),
-                titleLarge: TextStyle(
-                  fontSize: 22,
-                  fontWeight: FontWeight.bold,
-                  fontFamily: "Tajawal",
+          return ConnectivityListener(
+            child: MaterialApp.router(
+              debugShowCheckedModeBanner: false,
+              locale: const Locale("ar"),
+              localizationsDelegates: const [
+                GlobalMaterialLocalizations.delegate,
+                GlobalWidgetsLocalizations.delegate,
+                GlobalCupertinoLocalizations.delegate,
+              ],
+              supportedLocales: const [Locale("ar"), Locale("en")],
+              routerConfig: snapshot.data!,
+              theme: ThemeData(
+                fontFamily: "Tajawal",
+                textTheme: const TextTheme(
+                  bodyMedium: TextStyle(fontSize: 16, fontFamily: "Tajawal"),
+                  bodyLarge: TextStyle(fontSize: 18, fontFamily: "Tajawal"),
+                  headlineSmall: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                    fontFamily: "Tajawal",
+                  ),
+                  headlineMedium: TextStyle(
+                    fontSize: 24,
+                    fontWeight: FontWeight.bold,
+                    fontFamily: "Tajawal",
+                  ),
+                  titleLarge: TextStyle(
+                    fontSize: 22,
+                    fontWeight: FontWeight.bold,
+                    fontFamily: "Tajawal",
+                  ),
                 ),
               ),
             ),

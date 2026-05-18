@@ -8,6 +8,7 @@ import '../services/pending_payment_service.dart';
 import '../../wallet/services/wallet_service.dart';
 import '../../license/services/license_service.dart';
 import '../../../theme/app_color.dart';
+import 'package:bazar_suez/widgets/auth_gate.dart';
 
 class PricingPage extends StatefulWidget {
   final String? marketId;
@@ -213,9 +214,10 @@ class _PricingPageState extends State<PricingPage> {
   ) async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) {
-      ScaffoldMessenger.of(
+      showAuthBottomSheet(
         context,
-      ).showSnackBar(const SnackBar(content: Text('يجب تسجيل الدخول')));
+        message: 'سجّل دخولك لاختيار باقة والاشتراك',
+      );
       return;
     }
 

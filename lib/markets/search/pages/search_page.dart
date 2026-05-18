@@ -5,6 +5,7 @@ import 'package:bazar_suez/markets/grid_of_categories/ViewModel/ViewModel.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
+import 'package:bazar_suez/widgets/auth_gate.dart';
 
 class SearchPage extends StatefulWidget {
   const SearchPage({super.key});
@@ -197,7 +198,11 @@ class _SearchPageState extends State<SearchPage> {
           ),
           const SizedBox(width: 8),
           GestureDetector(
-            onTap: () => context.push('/CartPage'),
+            onTap: () => pushIfAuthed(
+                  context,
+                  '/CartPage',
+                  message: 'سجّل دخولك لعرض سلة المشتريات',
+                ),
             child: Stack(
               clipBehavior: Clip.none,
               children: [

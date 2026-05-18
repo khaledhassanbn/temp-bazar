@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 
 import '../../../theme/app_color.dart'; // ← تأكد إن ده مسار ملف AppColors
+import 'package:bazar_suez/widgets/auth_gate.dart';
 import '../ViewModel/ViewModel.dart';
 import '../Model/model.dart';
 
@@ -59,7 +60,11 @@ class _CategoriesGridPageState extends State<CategoriesGridPage> {
           leading: IconButton(
             icon: const Icon(Icons.shopping_cart_outlined, color: Colors.white),
             onPressed: () {
-              context.go('/CartPage');
+              goIfAuthed(
+                context,
+                '/CartPage',
+                message: 'سجّل دخولك لعرض سلة المشتريات',
+              );
             },
           ),
           title: Image.asset('assets/images/logo.png', height: 32),
@@ -68,7 +73,11 @@ class _CategoriesGridPageState extends State<CategoriesGridPage> {
             IconButton(
               icon: const Icon(Icons.menu, color: Colors.white),
               onPressed: () {
-                context.go('/AccountPage');
+                goIfAuthed(
+                  context,
+                  '/AccountPage',
+                  message: 'سجّل دخولك للوصول لحسابك',
+                );
               },
             ),
           ],

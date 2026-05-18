@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:bazar_suez/markets/grid_of_categories/ViewModel/ViewModel.dart';
 import 'package:bazar_suez/markets/grid_of_categories/Model/model.dart';
 import 'package:bazar_suez/markets/Markets_after_category/viewmodel/category_filter_viewmodel.dart';
@@ -116,7 +117,19 @@ class _HomePageState extends State<HomePage>
   }
 
   void _openLocationSheet() {
-    if (!requireAuth(context, message: 'سجّل دخولك لحفظ عناوين التوصيل وتحديد موقعك')) return;
+    if (FirebaseAuth.instance.currentUser != null) {
+      _showSavedLocationsSheet();
+      return;
+    }
+    showAuthBottomSheet(
+      context,
+      message: 'سجّل دخولك لحفظ عناوين التوصيل وتحديد موقعك',
+      onAuthenticated: _showSavedLocationsSheet,
+    );
+  }
+
+  void _showSavedLocationsSheet() {
+    if (!mounted) return;
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -252,8 +265,11 @@ class _HomePageState extends State<HomePage>
                         builder: (context, cartVm, _) {
                           return GestureDetector(
                             onTap: () {
-                              if (!requireAuth(context, message: 'سجّل دخولك لعرض سلة المشتريات')) return;
-                              context.push('/CartPage');
+                              pushIfAuthed(
+                                context,
+                                '/CartPage',
+                                message: 'سجّل دخولك لعرض سلة المشتريات',
+                              );
                             },
                             child: Container(
                               width: 44,
@@ -372,8 +388,18 @@ class _HomePageState extends State<HomePage>
                           ? 'assets/images/adsmarket.jpg'
                           : 'assets/images/create_market.png';
                       final onTap = isMarketOwner
-                          ? () => context.push('/request-ads')
-                          : () => context.push('/pricingpage');
+                          ? () => pushIfAuthed(
+                                context,
+                                '/request-ads',
+                                message:
+                                    'سجّل دخولك لطلب إعلانات لمتجرك',
+                              )
+                          : () => pushIfAuthed(
+                                context,
+                                '/pricingpage',
+                                message:
+                                    'سجّل دخولك لإنشاء متجرك والاشتراك في باقة',
+                              );
                       return _BannerCard(
                         image: AssetImage(assetPath),
                         onTap: onTap,

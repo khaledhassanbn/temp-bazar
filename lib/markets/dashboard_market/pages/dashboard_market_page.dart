@@ -5,6 +5,7 @@ import 'package:bazar_suez/markets/planes/models/package.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:bazar_suez/widgets/auth_gate.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
@@ -206,7 +207,10 @@ class _DashboardMarketPageState extends State<DashboardMarketPage>
     final user = _auth.currentUser;
     if (user == null) {
       if (!mounted) return;
-      _showSnack('يجب تسجيل الدخول أولاً', isError: true);
+      showAuthBottomSheet(
+        context,
+        message: 'سجّل دخولك للاشتراك في الباقات',
+      );
       return;
     }
 

@@ -20,14 +20,18 @@ class UserBottomNavigation extends StatelessWidget {
             context.go('/');
             break;
           case 1:
-            // طلباتي - تتطلب تسجيل دخول
-            if (!requireAuth(context, message: 'سجّل دخولك لعرض طلباتك السابقة ومتابعة حالتها')) return;
-            context.go('/user-orders');
+            goIfAuthed(
+              context,
+              '/user-orders',
+              message: 'سجّل دخولك لعرض طلباتك السابقة ومتابعة حالتها',
+            );
             break;
           case 2:
-            // حسابي - تتطلب تسجيل دخول
-            if (!requireAuth(context, message: 'سجّل دخولك للوصول لحسابك وإدارة إعداداتك')) return;
-            context.go('/AccountPage');
+            goIfAuthed(
+              context,
+              '/AccountPage',
+              message: 'سجّل دخولك للوصول لحسابك وإدارة إعداداتك',
+            );
             break;
         }
       },

@@ -66,6 +66,7 @@ dependencies:
   webview_flutter: ^4.9.0
   cached_network_image: ^3.4.1
   shared_preferences: ^2.5.5
+  connectivity_plus: ^6.1.4
 
 dev_dependencies:
   flutter_test:
@@ -82,12 +83,17 @@ flutter:
     - assets/images/food_placeholder.png
     - assets/images/logo.png
     - assets/images/categories/
+    - assets/images/Onboarding Screens/one.png
+    - assets/images/Onboarding Screens/two.png
+    - assets/images/Onboarding Screens/three.png
     - assets/images/create_market.png
     - assets/images/adsmarket.jpg
     - assets/images/busy.png
     - assets/images/closed.png
     - assets/images/appbar.png
     - assets/sounds/notification.mp3
+    - assets/images/404.png
+    - assets/images/no_internet.png
 
   fonts:
     - family: Tajawal

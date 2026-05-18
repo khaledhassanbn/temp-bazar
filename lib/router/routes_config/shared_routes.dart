@@ -66,7 +66,7 @@ final sharedRoutes = [
     redirect: (context, state) {
       final m = state.pathParameters['marketLink'] ?? '';
       final p = state.pathParameters['itemId'] ?? '';
-      if (!isPublicProductSharePath(m, p)) return '/';
+      if (!isPublicProductSharePath(m, p)) return '/not-found';
       return null;
     },
     builder: (context, state) {

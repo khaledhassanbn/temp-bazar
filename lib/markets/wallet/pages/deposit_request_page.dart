@@ -6,6 +6,7 @@ import 'package:bazar_suez/theme/app_color.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:bazar_suez/widgets/auth_gate.dart';
 import 'package:image_picker/image_picker.dart';
 
 class DepositRequestPage extends StatefulWidget {
@@ -89,9 +90,10 @@ class _DepositRequestPageState extends State<DepositRequestPage> {
 
     final user = _auth.currentUser;
     if (user == null) {
-      ScaffoldMessenger.of(
+      showAuthBottomSheet(
         context,
-      ).showSnackBar(const SnackBar(content: Text('يجب تسجيل الدخول')));
+        message: 'سجّل دخولك لإرسال طلب إيداع',
+      );
       return;
     }
 

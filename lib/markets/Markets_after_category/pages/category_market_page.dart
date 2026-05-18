@@ -12,6 +12,7 @@ import 'package:bazar_suez/markets/saved_locations/widgets/saved_locations_sheet
 import 'package:bazar_suez/markets/Markets_after_category/widget/search_bar_widget.dart';
 import 'package:bazar_suez/markets/Markets_after_category/widget/category_stores_filter_bar.dart';
 import 'package:bazar_suez/theme/app_color.dart';
+import 'package:bazar_suez/widgets/auth_gate.dart';
 import 'package:bazar_suez/services/delivery_fee/delivery_fee_service.dart';
 import 'package:bazar_suez/services/delivery_fee/delivery_fee_settings.dart';
 
@@ -211,7 +212,11 @@ class _CategoryMarketPageState extends State<CategoryMarketPage> {
               ),
               actions: [
                 InkWell(
-                  onTap: () => context.go('/CartPage'),
+                  onTap: () => goIfAuthed(
+                        context,
+                        '/CartPage',
+                        message: 'سجّل دخولك لعرض سلة المشتريات',
+                      ),
                   borderRadius: BorderRadius.circular(12),
                   child: Container(
                     padding: const EdgeInsets.all(8),
