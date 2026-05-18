@@ -121,8 +121,7 @@ class _MyAppState extends State<MyApp> {
             );
           }
 
-          return ConnectivityListener(
-            child: MaterialApp.router(
+          return MaterialApp.router(
               debugShowCheckedModeBanner: false,
               locale: const Locale("ar"),
               localizationsDelegates: const [
@@ -132,6 +131,9 @@ class _MyAppState extends State<MyApp> {
               ],
               supportedLocales: const [Locale("ar"), Locale("en")],
               routerConfig: snapshot.data!,
+              builder: (context, child) => ConnectivityListener(
+                child: child ?? const SizedBox.shrink(),
+              ),
               theme: ThemeData(
                 fontFamily: "Tajawal",
                 textTheme: const TextTheme(
@@ -154,8 +156,7 @@ class _MyAppState extends State<MyApp> {
                   ),
                 ),
               ),
-            ),
-          );
+            );
         },
       ),
     );
