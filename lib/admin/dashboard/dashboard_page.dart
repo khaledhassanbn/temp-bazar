@@ -66,11 +66,13 @@ class _DashboardPageState extends State<DashboardPage>
 
   Future<void> _loadDashboardData() async {
     try {
+      if (!mounted) return;
       setState(() => _isLoading = true);
 
       // جلب جميع المتاجر
       final storesSnapshot = await _firestore.collection('markets').get();
 
+      if (!mounted) return;
       _totalStores = storesSnapshot.docs.length;
       _activeStores = 0;
       _inactiveStores = 0;
@@ -95,11 +97,13 @@ class _DashboardPageState extends State<DashboardPage>
       // حساب المنتجات المضافة اليوم
       await _calculateProductsAddedToday(storesSnapshot.docs);
 
+      if (!mounted) return;
       setState(() => _isLoading = false);
       _animationController.reset();
       _animationController.forward();
     } catch (e) {
       print('خطأ في تحميل بيانات لوحة التحكم: $e');
+      if (!mounted) return;
       setState(() => _isLoading = false);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -124,6 +128,7 @@ class _DashboardPageState extends State<DashboardPage>
 
       // فحص كل متجر
       for (var storeDoc in stores) {
+        if (!mounted) return;
         final marketId = storeDoc.id;
 
         try {
@@ -134,8 +139,11 @@ class _DashboardPageState extends State<DashboardPage>
               .collection('products')
               .get();
 
+          if (!mounted) return;
+
           // فحص كل فئة
           for (var categoryDoc in categoriesSnapshot.docs) {
+            if (!mounted) return;
             final categoryId = categoryDoc.id;
 
             try {
@@ -153,6 +161,7 @@ class _DashboardPageState extends State<DashboardPage>
                   .where('createdAt', isLessThan: Timestamp.fromDate(endOfDay))
                   .get();
 
+              if (!mounted) return;
               productsAddedToday += productsSnapshot.docs.length;
             } catch (e) {
               print('خطأ في جلب منتجات الفئة $categoryId: $e');
@@ -163,6 +172,7 @@ class _DashboardPageState extends State<DashboardPage>
         }
       }
 
+      if (!mounted) return;
       setState(() {
         _productsAddedToday = productsAddedToday;
       });
@@ -1050,6 +1060,68 @@ class _DashboardPageState extends State<DashboardPage>
                           SizedBox(height: 4),
                           Text(
                             'إضافة وتعديل وإدارة مكاتب الشحن',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Color(0xFF7F8C8D),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Icon(
+                      Icons.arrow_forward_ios_rounded,
+                      size: 16,
+                      color: AppColors.mainColor,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
+            InkWell(
+              onTap: () {
+                context.go('/admin/courier-requests');
+              },
+              borderRadius: BorderRadius.circular(12),
+              child: Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: AppColors.mainColor.withOpacity(0.05),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: AppColors.mainColor.withOpacity(0.2),
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: AppColors.mainColor,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: const Icon(
+                        Icons.motorcycle_rounded,
+                        color: Colors.white,
+                        size: 20,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    const Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'طلبات تسجيل المناديب',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                              color: Color(0xFF2C3E50),
+                            ),
+                          ),
+                          SizedBox(height: 4),
+                          Text(
+                            'مراجعة وقبول أو رفض طلبات المناديب الجدد',
                             style: TextStyle(
                               fontSize: 12,
                               color: Color(0xFF7F8C8D),

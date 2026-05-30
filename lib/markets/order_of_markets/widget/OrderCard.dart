@@ -4,6 +4,7 @@ import 'package:bazar_suez/markets/order_of_markets/widget/OrderActionButtons.da
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:flutter/services.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 
 class OrderCard extends StatelessWidget {
   final Map<String, dynamic> order;
@@ -17,6 +18,8 @@ class OrderCard extends StatelessWidget {
   )?
   onRequestDelivery;
   final String? rejectedMessage;
+  final VoidCallback? onChangeIndependentCourier;
+  final VoidCallback? onSendToOffice;
 
   const OrderCard({
     super.key,
@@ -27,6 +30,8 @@ class OrderCard extends StatelessWidget {
     this.distanceAndDuration,
     this.onRequestDelivery,
     this.rejectedMessage,
+    this.onChangeIndependentCourier,
+    this.onSendToOffice,
   });
 
   String _timeSinceOrder(DateTime orderTime) {
@@ -67,6 +72,21 @@ class OrderCard extends StatelessWidget {
     final String assignedDriverPhone =
         (order['assignedDriverPhone'] ?? '').toString();
     final String generalNotes = (order['notes'] ?? '').toString();
+    final Map<String, dynamic>? independentDispatch =
+        order['independentDispatch'] as Map<String, dynamic>?;
+    final Map<String, dynamic> independentCouriersDirectory =
+        (order['independentCouriersDirectory'] is Map)
+            ? Map<String, dynamic>.from(order['independentCouriersDirectory'])
+            : <String, dynamic>{};
+    final String cancelReason = (order['cancelReason'] ?? '').toString();
+    final dynamic cancelledAtRaw = order['cancelledAt'];
+    String? cancelledAtFormatted;
+    if (cancelledAtRaw is Timestamp) {
+      final dt = cancelledAtRaw.toDate();
+      cancelledAtFormatted =
+          '${dt.day.toString().padLeft(2, '0')}/${dt.month.toString().padLeft(2, '0')}/${dt.year} '
+          '${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
+    }
 
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
@@ -262,6 +282,76 @@ class OrderCard extends StatelessWidget {
                   const SizedBox(height: 16),
                 ],
 
+                // ================== سبب الإلغاء (إن وُجد) ==================
+                if (cancelReason.isNotEmpty) ...[
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                      color: Colors.red.shade50,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: Colors.red.shade300,
+                        width: 1.5,
+                      ),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Icon(
+                              Icons.cancel_rounded,
+                              color: Colors.red.shade700,
+                              size: 24,
+                            ),
+                            const SizedBox(width: 10),
+                            Text(
+                              'سبب الإلغاء',
+                              style: TextStyle(
+                                color: Colors.red.shade800,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 15,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          cancelReason,
+                          style: TextStyle(
+                            color: Colors.red.shade700,
+                            fontWeight: FontWeight.w600,
+                            fontSize: 14,
+                            height: 1.4,
+                          ),
+                        ),
+                        if (cancelledAtFormatted != null) ...[
+                          const SizedBox(height: 6),
+                          Row(
+                            children: [
+                              Icon(
+                                Icons.access_time_rounded,
+                                size: 14,
+                                color: Colors.red.shade400,
+                              ),
+                              const SizedBox(width: 4),
+                              Text(
+                                'وقت الإلغاء: $cancelledAtFormatted',
+                                style: TextStyle(
+                                  color: Colors.red.shade400,
+                                  fontSize: 12,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                ],
+
                 // ================== معلومات العميل ==================
                 _buildSectionCard(
                   title: 'معلومات العميل',
@@ -407,6 +497,20 @@ class OrderCard extends StatelessWidget {
                             ),
                           ),
                       ],
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                ],
+
+                // ================== ردود المناديب المستقلين (Realtime) ==================
+                if (independentDispatch != null) ...[
+                  _buildSectionCard(
+                    title: 'ردود المناديب (مستقل)',
+                    icon: Icons.how_to_reg_rounded,
+                    iconColor: Colors.orange,
+                    child: _IndependentCourierResponsesView(
+                      dispatch: independentDispatch,
+                      couriersDirectory: independentCouriersDirectory,
                     ),
                   ),
                   const SizedBox(height: 16),
@@ -642,6 +746,17 @@ class OrderCard extends StatelessWidget {
 
                 const SizedBox(height: 16),
 
+                // ================== Independent courier quick actions (2x2) ==================
+                if (independentDispatch != null) ...[
+                  _IndependentDispatchQuickActions(
+                    onChangeCourier: onChangeIndependentCourier,
+                    onSendToOffice: onSendToOffice,
+                    onDeliverSelf: () => onStatusChange('تم التسليم للطيار'),
+                    onCancel: () => onStatusChange('تم رفض الطلب'),
+                  ),
+                  const SizedBox(height: 12),
+                ],
+
                 // ================== Actions ==================
                 OrderActionButtons(
                   order: order,
@@ -649,6 +764,7 @@ class OrderCard extends StatelessWidget {
                   onRequestDelivery: onRequestDelivery != null
                       ? () => onRequestDelivery!(order, distanceAndDuration)
                       : null,
+                  independentDispatch: independentDispatch,
                 ),
               ],
             ),
@@ -1148,8 +1264,486 @@ class OrderCard extends StatelessWidget {
         return Colors.redAccent;
       case 'المكتب رفض الطلب':
         return Colors.deepOrange;
+      // حالات المندوب المستقل
+      case 'المندوب قبل الطلب':
+        return Colors.teal;
+      case 'تم استلام الطلب من المتجر':
+        return Colors.indigo;
+      case 'الطلب مكتمل':
+        return Colors.green;
+      case 'الزبون رفض الاستلام':
+        return Colors.red;
+      case 'تم إلغاء الطلب':
+        return Colors.red;
       default:
         return Colors.grey;
     }
+  }
+}
+
+class _IndependentDispatchQuickActions extends StatelessWidget {
+  final VoidCallback? onChangeCourier;
+  final VoidCallback? onSendToOffice;
+  final VoidCallback onDeliverSelf;
+  final VoidCallback onCancel;
+
+  const _IndependentDispatchQuickActions({
+    required this.onChangeCourier,
+    required this.onSendToOffice,
+    required this.onDeliverSelf,
+    required this.onCancel,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Row(
+          children: [
+            Expanded(
+              child: _ActionTile(
+                title: 'تغيير المندوب',
+                icon: Icons.swap_horiz_rounded,
+                color: AppColors.mainColor,
+                onTap: onChangeCourier,
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: _ActionTile(
+                title: 'إرسال لمكتب توصيل',
+                icon: Icons.local_shipping_rounded,
+                color: Colors.deepPurple,
+                onTap: onSendToOffice,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 10),
+        Row(
+          children: [
+            Expanded(
+              child: _ActionTile(
+                title: 'هسلمه بنفسى',
+                icon: Icons.person,
+                color: Colors.green,
+                onTap: onDeliverSelf,
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: _ActionTile(
+                title: 'إلغاء الطلب',
+                icon: Icons.cancel,
+                color: Colors.redAccent,
+                onTap: onCancel,
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+}
+
+class _ActionTile extends StatelessWidget {
+  final String title;
+  final IconData icon;
+  final Color color;
+  final VoidCallback? onTap;
+
+  const _ActionTile({
+    required this.title,
+    required this.icon,
+    required this.color,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final enabled = onTap != null;
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(14),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+        decoration: BoxDecoration(
+          color: enabled ? color.withOpacity(0.08) : Colors.grey.shade100,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(
+            color: enabled ? color.withOpacity(0.22) : Colors.grey.shade300,
+            width: 1.2,
+          ),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(icon, size: 18, color: enabled ? color : Colors.grey),
+            const SizedBox(width: 8),
+            Flexible(
+              child: Text(
+                title,
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.bold,
+                  color: enabled ? color : Colors.grey,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _IndependentCourierResponsesView extends StatelessWidget {
+  final Map<String, dynamic> dispatch;
+  final Map<String, dynamic> couriersDirectory;
+
+  const _IndependentCourierResponsesView({
+    required this.dispatch,
+    required this.couriersDirectory,
+  });
+
+  String _dispatchOrderStatusArabic(String value) {
+    final v = value.trim().toLowerCase();
+    switch (v) {
+      case 'pending':
+      case 'accepted':
+        return 'الطلب في انتظار التعيين';
+      case 'assigned':
+      case 'notified_multiple':
+        return 'تم إرساله للمناديب وبانتظار القبول';
+      case 'driver_accepted':
+        return 'قبل المندوب الطلب وهو في الطريق للمتجر';
+      case 'picked_up':
+        return 'استلم المندوب الشحنة وهو في الطريق للزبون';
+      case 'completed':
+        return 'تم التسليم بنجاح';
+      case 'customer_rejected':
+        return 'رفض الزبون استلام الشحنة';
+      case 'returned_to_merchant':
+        return 'تم إلغاء الطلب وإرجاعه للمتجر';
+      case 'cancelled':
+        return 'تم إلغاء الطلب';
+      case 'reassigned_by_merchant':
+        return 'تم سحب الطلب من المندوب بواسطة التاجر';
+      default:
+        return 'قيد المتابعة';
+    }
+  }
+
+  String _dispatchStatusArabic(String value) {
+    final v = value.trim().toLowerCase();
+    switch (v) {
+      case 'waiting_courier_response':
+        return 'بانتظار رد المناديب';
+      case 'courier_assigned':
+        return 'تم تعيين مندوب';
+      case 'fallback_to_office':
+        return 'تم التحويل لمكتب توصيل';
+      default:
+        return 'قيد المتابعة';
+    }
+  }
+
+  String _courierResponseArabic(String value) {
+    final v = value.trim().toLowerCase();
+    switch (v) {
+      case 'accepted':
+        return 'وافق';
+      case 'rejected':
+        return 'رفض';
+      case 'pending':
+      default:
+        return 'بانتظار الرد';
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final statusRaw = (dispatch['status'] ?? '').toString();
+    final statusText = _dispatchOrderStatusArabic(statusRaw);
+    final dispatchStatusRaw = (dispatch['dispatchStatus'] ?? '').toString();
+    final dispatchStatus = _dispatchStatusArabic(dispatchStatusRaw);
+    final assignedCourierId = (dispatch['assignedCourierId'] ?? '').toString();
+    final availableCouriers = (dispatch['availableCouriers'] is List)
+        ? List<String>.from(dispatch['availableCouriers'] as List)
+        : const <String>[];
+
+    final responsesRaw = dispatch['courierResponses'];
+    final Map<String, dynamic> responses = responsesRaw is Map
+        ? Map<String, dynamic>.from(responsesRaw)
+        : <String, dynamic>{};
+
+    int pending = 0;
+    int accepted = 0;
+    int rejected = 0;
+
+    // حساب العدادات مع مراعاة assignedCourierId
+    final assignedId = (dispatch['assignedCourierId'] ?? '').toString();
+
+    for (final uid in availableCouriers) {
+      // لو المندوب هو المعيّن → نعدّه accepted بغض النظر عن courierResponses
+      if (assignedId.isNotEmpty && uid == assignedId) {
+        accepted++;
+        continue;
+      }
+      final v = (responses[uid] ?? 'pending').toString().toLowerCase();
+      if (v == 'accepted') accepted++;
+      else if (v == 'rejected') rejected++;
+      else pending++;
+    }
+    // لو المندوب المعيّن مش في availableCouriers بس موجود → نعدّه برضو
+    if (assignedId.isNotEmpty && !availableCouriers.contains(assignedId)) {
+      accepted++;
+    }
+
+    final createdAtRaw = dispatch['createdAt'];
+    DateTime? createdAt;
+    if (createdAtRaw is Timestamp) {
+      createdAt = createdAtRaw.toDate();
+    }
+    final bool timedOut = createdAt != null &&
+        DateTime.now().difference(createdAt).inMinutes >= 3 &&
+        accepted == 0 &&
+        assignedCourierId.isEmpty &&
+        (statusRaw.toLowerCase() == 'searching' ||
+            statusRaw.toLowerCase() == 'assigned' ||
+            statusRaw.toLowerCase() == 'notified_multiple');
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            _miniChip(statusText, Colors.blueGrey),
+            _miniChip(dispatchStatus, Colors.blueGrey),
+            _miniChip('بانتظار الرد: $pending', Colors.orange),
+            _miniChip('رفض: $rejected', Colors.red),
+            _miniChip('موافقة: $accepted', Colors.green),
+          ],
+        ),
+        if (timedOut) ...[
+          const SizedBox(height: 10),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: Colors.orange.withOpacity(0.08),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: Colors.orange.withOpacity(0.25)),
+            ),
+            child: const Text(
+              'لم يتم قبول الطلب بعد. يمكنك إعادة الإرسال أو اختيار مناديب آخرين أو الإرسال عبر مكتب.',
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                color: Colors.black87,
+                height: 1.4,
+              ),
+              textAlign: TextAlign.right,
+            ),
+          ),
+        ],
+        if (assignedCourierId.isNotEmpty) ...[
+          const SizedBox(height: 10),
+          _AssignedIndependentCourierCard(
+            courierUid: assignedCourierId,
+            courierData: couriersDirectory[assignedCourierId] is Map
+                ? Map<String, dynamic>.from(couriersDirectory[assignedCourierId])
+                : null,
+          ),
+        ],
+        if (availableCouriers.isNotEmpty) ...[
+          const SizedBox(height: 10),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: availableCouriers.map((uid) {
+              final v = (responses[uid] ?? 'pending').toString().toLowerCase();
+              Color c;
+              String t;
+              if (v == 'accepted') {
+                c = Colors.green;
+                t = _courierResponseArabic(v);
+              } else if (v == 'rejected') {
+                c = Colors.red;
+                t = _courierResponseArabic(v);
+              } else {
+                c = Colors.orange;
+                t = _courierResponseArabic(v);
+              }
+              final courierDataRaw = couriersDirectory[uid];
+              final courierData =
+                  courierDataRaw is Map ? Map<String, dynamic>.from(courierDataRaw) : null;
+              final name = (courierData?['name'] ?? 'مندوب').toString();
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 6),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 10,
+                      height: 10,
+                      decoration:
+                          BoxDecoration(color: c, shape: BoxShape.circle),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        name,
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Colors.grey.shade700,
+                        ),
+                      ),
+                    ),
+                    Text(
+                      t,
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                        color: c,
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            }).toList(growable: false),
+          ),
+        ],
+      ],
+    );
+  }
+
+  Widget _miniChip(String text, Color color) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.08),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: color.withOpacity(0.2)),
+      ),
+      child: Text(
+        text,
+        style: TextStyle(
+          fontSize: 11,
+          fontWeight: FontWeight.bold,
+          color: color,
+        ),
+      ),
+    );
+  }
+
+}
+
+class _AssignedIndependentCourierCard extends StatelessWidget {
+  final String courierUid;
+  final Map<String, dynamic>? courierData;
+
+  const _AssignedIndependentCourierCard({
+    required this.courierUid,
+    required this.courierData,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final name = (courierData?['name'] ?? 'مندوب').toString();
+    final phone = (courierData?['phone'] ?? '').toString();
+    final photoUrl = (courierData?['photoUrl'] ?? '').toString();
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.orange.withOpacity(0.06),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: Colors.orange.withOpacity(0.2)),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 48,
+            height: 48,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: Colors.grey.shade200,
+            ),
+            child: ClipOval(
+              child: photoUrl.isNotEmpty
+                  ? CachedNetworkImage(
+                      key: ValueKey(photoUrl),
+                      cacheKey: photoUrl,
+                      imageUrl: photoUrl,
+                      fit: BoxFit.cover,
+                      placeholder: (c, _) => const Center(
+                        child: SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        ),
+                      ),
+                      errorWidget: (c, _, __) => const Icon(Icons.person),
+                    )
+                  : const Icon(Icons.person),
+            ),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'تم قبول الطلب بواسطة:',
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: Colors.grey.shade700,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  name,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.black87,
+                  ),
+                ),
+                if (phone.isNotEmpty) ...[
+                  const SizedBox(height: 2),
+                  Text(
+                    phone,
+                    textDirection: TextDirection.ltr,
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Colors.grey.shade700,
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+          if (phone.isNotEmpty)
+            IconButton(
+              onPressed: () async {
+                final url = Uri.parse('tel:$phone');
+                if (await canLaunchUrl(url)) {
+                  await launchUrl(url);
+                }
+              },
+              icon: const Icon(Icons.phone_rounded),
+              color: Colors.green,
+              tooltip: 'اتصال',
+            ),
+        ],
+      ),
+    );
   }
 }

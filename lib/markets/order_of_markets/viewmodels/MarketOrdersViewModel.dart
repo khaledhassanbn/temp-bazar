@@ -1,8 +1,10 @@
 import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_database/firebase_database.dart';
 import 'package:flutter/material.dart';
 import '../services/OrderService.dart';
 import '../services/delivery_request_service.dart';
+import '../independent_couriers/services/independent_dispatch_orders_service.dart';
 import 'package:bazar_suez/markets/create_market/services/store_service.dart';
 import 'package:bazar_suez/services/delivery_fee/delivery_fee_service.dart';
 
@@ -17,6 +19,8 @@ class MarketOrdersViewModel extends ChangeNotifier {
   final StoreService _storeService = StoreService();
   final DeliveryRequestService _deliveryRequestService =
       DeliveryRequestService();
+  final IndependentDispatchOrdersService _independentDispatchOrdersService =
+      IndependentDispatchOrdersService();
 
   GeoPoint? marketLocation;
   final Map<String, Map<String, String>> distancesAndDurations = {};
@@ -43,6 +47,8 @@ class MarketOrdersViewModel extends ChangeNotifier {
   Timer? _timer;
   StreamSubscription? _rejectedRequestsSubscription;
   StreamSubscription? _deliveryRequestsSubscription;
+  StreamSubscription? _independentDispatchOrdersSubscription;
+  StreamSubscription? _couriersDirectorySubscription;
   
   // تخزين رسائل الرفض لعرضها للتاجر
   final Map<String, String> rejectedMessages = {};
@@ -50,6 +56,13 @@ class MarketOrdersViewModel extends ChangeNotifier {
   // تخزين بيانات طلب التوصيل لكل طلب (من مجموعة request delivery)
   // key = orderDocumentId
   final Map<String, Map<String, dynamic>> deliveryRequestsByOrderId = {};
+
+  // تخزين بيانات إرسال الطلب للمناديب المستقلين من مجموعة orders (root)
+  // key = orderId (نستخدم documentId الخاص بـ present_order)
+  final Map<String, Map<String, dynamic>> independentDispatchByOrderId = {};
+
+  // دليل المناديب المستقلين (uid -> profile data) لعرض الاسم/الصورة بدل id
+  final Map<String, Map<String, dynamic>> independentCouriersByUid = {};
 
   // ======== Init ========
   void init() {
@@ -61,6 +74,8 @@ class MarketOrdersViewModel extends ChangeNotifier {
     _fetchMarketLocation();
     _listenToRejectedRequests();
     _listenToDeliveryRequests();
+    _listenToIndependentDispatchOrders();
+    _listenToIndependentCouriersDirectory();
   }
 
   // ======== Listen to rejected delivery requests ========
@@ -111,6 +126,89 @@ class MarketOrdersViewModel extends ChangeNotifier {
       }
 
       // تحديث الـ UI لعرض حالة الطلب / بيانات المندوب فوراً
+      notifyListeners();
+    });
+  }
+
+  void _listenToIndependentDispatchOrders() {
+    _independentDispatchOrdersSubscription = _independentDispatchOrdersService
+        .streamOrdersForStore(marketId)
+        .listen((orders) {
+      independentDispatchByOrderId.clear();
+      for (final o in orders) {
+        final dispatchType = (o['dispatchType'] ?? '').toString();
+        if (dispatchType != 'independent_courier') continue;
+        final orderId = (o['orderId'] ?? o['id'] ?? '').toString();
+        if (orderId.isEmpty) continue;
+        independentDispatchByOrderId[orderId] = o;
+      }
+      notifyListeners();
+    });
+  }
+
+  void _listenToIndependentCouriersDirectory() {
+    _couriersDirectorySubscription = FirebaseFirestore.instance
+        .collection('courier_requests')
+        .where('status', isEqualTo: 'approved')
+        .snapshots()
+        .listen((snapshot) {
+      independentCouriersByUid.clear();
+      for (final doc in snapshot.docs) {
+        final data = doc.data();
+        final uid = (data['courierUid'] ?? data['uid'] ?? data['userId'] ?? doc.id)
+            .toString();
+
+        final name = (data['name'] ??
+                data['fullName'] ??
+                data['full_name'] ??
+                data['userName'] ??
+                data['user_name'] ??
+                data['displayName'] ??
+                data['display_name'] ??
+                'مندوب')
+            .toString();
+
+        final phone = (data['phone'] ??
+                data['phoneNumber'] ??
+                data['phone_number'] ??
+                '')
+            .toString();
+
+        final vehicleType =
+            (data['vehicleType'] ?? data['vehicle_type'] ?? data['vehicle'] ?? '')
+                .toString();
+
+        final photoUrl = (data['profileImage'] ??
+                data['personalPhoto'] ??
+                data['personal_photo'] ??
+                data['photoUrl'] ??
+                data['photo_url'] ??
+                data['personalImage'] ??
+                data['personal_image'] ??
+                data['image'] ??
+                data['photo'] ??
+                data['avatar'] ??
+                data['avatarUrl'] ??
+                data['avatar_url'] ??
+                '')
+            .toString();
+
+        double? rating;
+        final ratingRaw = data['rating'] ?? data['rate'];
+        if (ratingRaw is num) rating = ratingRaw.toDouble();
+        if (rating == null && ratingRaw != null) {
+          rating = double.tryParse(ratingRaw.toString());
+        }
+
+        independentCouriersByUid[uid] = {
+          'uid': uid,
+          'name': name,
+          'phone': phone,
+          'vehicleType': vehicleType,
+          'photoUrl': photoUrl,
+          'rating': rating,
+        };
+      }
       notifyListeners();
     });
   }
@@ -210,17 +308,25 @@ class MarketOrdersViewModel extends ChangeNotifier {
 
       // جلب بيانات طلب التوصيل (إن وجد) لهذا الطلب
       final deliveryInfo = deliveryRequestsByOrderId[doc.id];
+      final independentDispatchInfo = independentDispatchByOrderId[doc.id];
 
       // أولوية عرض الحالة:
-      // 1) لو فيه طلب توصيل → نستخدم حالة تطبيق المكاتب (request delivery)
-      // 2) لو مفيش → نستخدم حالة الطلب الأصلية الخاصة بالتاجر
+      // 1) لو فيه طلب توصيل (مكتب) → نستخدم حالة تطبيق المكاتب (request delivery)
+      // 2) لو فيه مندوب مستقل → نستخدم حالة الـ dispatch المستقل
+      // 3) لو مفيش أي منهم → نستخدم حالة الطلب الأصلية
       final String status;
       final String? rawStatusFromDelivery =
           deliveryInfo != null ? deliveryInfo['status'] as String? : null;
+      final String? rawStatusFromIndependent =
+          independentDispatchInfo != null
+              ? (independentDispatchInfo['status'] as String?)
+              : null;
       final String? rawStatusFromOrder = data['status'] as String?;
 
       if (rawStatusFromDelivery != null) {
         status = _convertDeliveryStatusToArabic(rawStatusFromDelivery);
+      } else if (rawStatusFromIndependent != null) {
+        status = _convertIndependentStatusToArabic(rawStatusFromIndependent);
       } else {
         status = _convertLegacyStatusToArabic(
           rawStatusFromOrder ?? 'قيد المراجعة',
@@ -312,6 +418,10 @@ class MarketOrdersViewModel extends ChangeNotifier {
         'requiredOptions': requiredOptions,
         'extraOptions': [],
         'documentId': doc.id,
+        // بيانات نظام المناديب المستقلين (إن وجد)
+        'independentDispatch': independentDispatchInfo,
+        // دليل المناديب لعرض الأسماء بدلاً من uid
+        'independentCouriersDirectory': independentCouriersByUid,
         // ✅ إضافة البيانات المفقودة
         'items': items, // المنتجات بالصيغة الجديدة
         'notes': data['notes'] ?? '', // الملحوظات العامة
@@ -319,6 +429,9 @@ class MarketOrdersViewModel extends ChangeNotifier {
         'deliveryFee': (data['deliveryFee'] ?? 0.0).toDouble(),
         'serviceFee': (data['serviceFee'] ?? 0.0).toDouble(),
         'totalAmount': (data['totalAmount'] ?? 0.0).toDouble(),
+        // بيانات الإلغاء (إن وُجدت)
+        'cancelReason': data['cancelReason'] ?? independentDispatchInfo?['cancelReason'] ?? '',
+        'cancelledAt': data['cancelledAt'] ?? independentDispatchInfo?['cancelledAt'],
       };
     } catch (e) {
       final now = DateTime.now();
@@ -334,6 +447,8 @@ class MarketOrdersViewModel extends ChangeNotifier {
         'requiredOptions': [],
         'extraOptions': [],
         'documentId': doc.id,
+        'independentDispatch': independentDispatchByOrderId[doc.id],
+        'independentCouriersDirectory': independentCouriersByUid,
         // ✅ إضافة البيانات المفقودة
         'items': [],
         'notes': '',
@@ -458,6 +573,93 @@ class MarketOrdersViewModel extends ChangeNotifier {
     }
   }
 
+  String _convertIndependentStatusToArabic(String status) {
+    if (status == 'في انتظار قبول المندوب' ||
+        status == 'المندوب قبل الطلب' ||
+        status == 'تم استلام الطلب من المتجر' ||
+        status == 'الطلب مكتمل' ||
+        status == 'المندوب رفض الطلب' ||
+        status == 'الزبون رفض الاستلام' ||
+        status == 'تم إلغاء الطلب من التاجر' ||
+        status == 'تم إعادة التعيين من التاجر') {
+      return status;
+    }
+
+    switch (status.toLowerCase()) {
+      case 'pending':
+      case 'searching':
+        return 'تم استلام الطلب';
+      case 'assigned':
+      case 'notified_multiple':
+        return 'في انتظار قبول المندوب';
+      case 'driver_accepted':
+      case 'accepted':
+        return 'المندوب قبل الطلب';
+      case 'picked_up':
+        return 'تم استلام الطلب من المتجر';
+      case 'completed':
+        return 'الطلب مكتمل';
+      case 'driver_rejected':
+        return 'المندوب رفض الطلب';
+      case 'customer_rejected':
+        return 'الزبون رفض الاستلام';
+      case 'cancelled':
+      case 'cancelled_by_merchant':
+        return 'تم إلغاء الطلب من التاجر';
+      case 'reassigned_by_merchant':
+        return 'تم إعادة التعيين من التاجر';
+      default:
+        return status;
+    }
+  }
+
+  Future<void> cancelIndependentCourierDispatch(String orderId, String actionType) async {
+    final dispatch = independentDispatchByOrderId[orderId];
+    if (dispatch == null) return;
+
+    final String? assignedCourierId = dispatch['assignedCourierId'] as String?;
+    final updates = <String, dynamic>{
+      'assignedCourierId': null,
+      'updatedAt': FieldValue.serverTimestamp(),
+    };
+
+    if (assignedCourierId != null && assignedCourierId.isNotEmpty) {
+      updates['previousCourierId'] = assignedCourierId;
+      updates['courierResponses.$assignedCourierId'] = 'cancelled_by_merchant';
+
+      // Clear courier's busy status in Realtime Database
+      try {
+        await FirebaseDatabase.instance.ref('couriers_live/$assignedCourierId/currentOrderId').remove();
+        await FirebaseDatabase.instance.ref('couriers_live/$assignedCourierId/current_order_id').remove();
+      } catch (e) {
+        print('Error clearing courier currentOrderId in RTDB: $e');
+      }
+    }
+
+    if (actionType == 'send_to_office') {
+      updates['status'] = 'cancelled_by_merchant';
+      updates['dispatchStatus'] = 'sent_to_office';
+      updates['cancelledAt'] = FieldValue.serverTimestamp();
+      updates['cancelReason'] = 'merchant_sent_to_office';
+    } else if (actionType == 'deliver_self') {
+      updates['status'] = 'cancelled_by_merchant';
+      updates['dispatchStatus'] = 'delivered_by_merchant';
+      updates['cancelledAt'] = FieldValue.serverTimestamp();
+      updates['cancelReason'] = 'merchant_delivering_self';
+    } else if (actionType == 'cancel_order') {
+      updates['status'] = 'cancelled_by_merchant';
+      updates['dispatchStatus'] = 'cancelled_by_merchant';
+      updates['cancelledAt'] = FieldValue.serverTimestamp();
+      updates['cancelReason'] = 'merchant_cancelled_order';
+    }
+
+    try {
+      await FirebaseFirestore.instance.collection('orders').doc(orderId).update(updates);
+    } catch (e) {
+      print('Error updating independent dispatch: $e');
+    }
+  }
+
   // ======== Delivery request ========
   Future<String?> sendDeliveryRequest({
     required String orderDocumentId,
@@ -567,6 +769,13 @@ class MarketOrdersViewModel extends ChangeNotifier {
       await _deliveryRequestService.createRequest(payload);
       print('✅ تم إرسال البيانات بنجاح');
 
+      // Cancel/unassign independent dispatch if any exists
+      try {
+        await cancelIndependentCourierDispatch(orderDocumentId, 'send_to_office');
+      } catch (e) {
+        print('⚠️ Error cancelling independent dispatch during sendDeliveryRequest: $e');
+      }
+
       print('🔄 تحديث حالة الطلب...');
       await _service.updatePresentOrderStatus(
         marketId,
@@ -625,6 +834,12 @@ class MarketOrdersViewModel extends ChangeNotifier {
             await _deliveryRequestService.updateRequestStatus(rid, 'cancelled_by_merchant');
           } catch (_) {}
         }
+        try {
+          await cancelIndependentCourierDispatch(
+            documentId,
+            newStatus == 'تم التسليم للطيار' ? 'deliver_self' : 'cancel_order',
+          );
+        } catch (_) {}
       }
 
       final isFinalStatus =
@@ -675,6 +890,8 @@ class MarketOrdersViewModel extends ChangeNotifier {
     _timer?.cancel();
     _rejectedRequestsSubscription?.cancel();
     _deliveryRequestsSubscription?.cancel();
+    _independentDispatchOrdersSubscription?.cancel();
+    _couriersDirectorySubscription?.cancel();
     scrollController.dispose();
   }
 }

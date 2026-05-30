@@ -14,6 +14,7 @@ import 'package:bazar_suez/markets/order_of_markets/widget/OrderCollapsibleHeade
 import 'package:bazar_suez/markets/order_of_markets/widget/OrderCard.dart';
 import 'package:bazar_suez/markets/order_of_markets/widget/OrderStats.dart';
 import 'package:bazar_suez/markets/order_of_markets/viewmodels/MarketOrdersViewModel.dart';
+import 'package:bazar_suez/markets/order_of_markets/independent_couriers/widgets/independent_courier_picker_sheet.dart';
 
 class MarketOrdersPage extends StatefulWidget {
   final String marketId;
@@ -47,6 +48,106 @@ class _MarketOrdersPageState extends State<MarketOrdersPage>
       }
       return;
     }
+
+    final selected = await showModalBottomSheet<String>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (ctx) {
+        return Container(
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+          ),
+          child: SafeArea(
+            top: false,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 40,
+                  height: 5,
+                  margin: const EdgeInsets.only(bottom: 12),
+                  decoration: BoxDecoration(
+                    color: Colors.grey[300],
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+                const Align(
+                  alignment: Alignment.centerRight,
+                  child: Text(
+                    'اختر طريقة التوصيل',
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                _DeliveryChoiceTile(
+                  title: 'التوصيل عبر مكتب',
+                  subtitle: 'النظام الحالي (بدون أي تغيير)',
+                  icon: Icons.local_shipping_rounded,
+                  color: Colors.blue,
+                  onTap: () => Navigator.of(ctx).pop('office'),
+                ),
+                const SizedBox(height: 10),
+                _DeliveryChoiceTile(
+                  title: 'مندوب مستقل',
+                  subtitle: 'إرسال الطلب مباشرة للمناديب المتاحين',
+                  icon: Icons.delivery_dining_rounded,
+                  color: Colors.orange,
+                  onTap: () => Navigator.of(ctx).pop('independent'),
+                ),
+                const SizedBox(height: 8),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+
+    if (selected == null) return;
+
+    if (selected == 'independent') {
+      if (!mounted) return;
+      await showModalBottomSheet<void>(
+        context: context,
+        isScrollControlled: true,
+        backgroundColor: Colors.transparent,
+        builder: (ctx) => IndependentCourierPickerSheet(
+          marketId: widget.marketId,
+          presentOrderDocumentId: documentId,
+        ),
+      );
+      return;
+    }
+
+    // Office flow (legacy) — keep exactly same behavior
+    return _handleRequestDeliveryOffice(order, distanceInfo);
+  }
+
+  Future<void> _openIndependentCourierPicker({
+    required String orderDocumentId,
+    Set<String> excludedCourierUids = const <String>{},
+  }) async {
+    if (!mounted) return;
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => IndependentCourierPickerSheet(
+        marketId: widget.marketId,
+        presentOrderDocumentId: orderDocumentId,
+        excludedCourierUids: excludedCourierUids,
+      ),
+    );
+  }
+
+  Future<void> _handleRequestDeliveryOffice(
+    Map<String, dynamic> order,
+    Map<String, String>? distanceInfo,
+  ) async {
+    final documentId = order['documentId'] as String?;
+    if (documentId == null) return;
 
     bool loadingShown = false;
     try {
@@ -608,6 +709,30 @@ class _MarketOrdersPageState extends State<MarketOrdersPage>
                                   distanceInfo,
                                 );
                               },
+                              onChangeIndependentCourier: () {
+                                final independentDispatch =
+                                    order['independentDispatch']
+                                        as Map<String, dynamic>?;
+                                final excluded =
+                                    (independentDispatch?['availableCouriers']
+                                                is List)
+                                        ? Set<String>.from(
+                                            independentDispatch!['availableCouriers']
+                                                as List,
+                                          )
+                                        : <String>{};
+                                _openIndependentCourierPicker(
+                                  orderDocumentId:
+                                      (order['documentId'] ?? '').toString(),
+                                  excludedCourierUids: excluded,
+                                );
+                              },
+                              onSendToOffice: () {
+                                _handleRequestDeliveryOffice(
+                                  order,
+                                  _viewModel.distancesAndDurations[order['id']],
+                                );
+                              },
                               rejectedMessage: _viewModel.getRejectedMessage(
                                 order['documentId'] ?? '',
                               ),
@@ -631,4 +756,76 @@ class _MarketOrdersPageState extends State<MarketOrdersPage>
   }
 
   // stats moved to OrderStats widget
+}
+
+class _DeliveryChoiceTile extends StatelessWidget {
+  final String title;
+  final String subtitle;
+  final IconData icon;
+  final Color color;
+  final VoidCallback onTap;
+
+  const _DeliveryChoiceTile({
+    required this.title,
+    required this.subtitle,
+    required this.icon,
+    required this.color,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(16),
+        child: Container(
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: Colors.grey.shade200, width: 1.5),
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(
+                  color: color.withOpacity(0.12),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Icon(icon, color: color, size: 24),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 15,
+                      ),
+                    ),
+                    const SizedBox(height: 3),
+                    Text(
+                      subtitle,
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.grey.shade600,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Icon(Icons.arrow_forward_ios_rounded,
+                  size: 16, color: Colors.grey.shade400),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 }

@@ -313,6 +313,12 @@ class _AccountPageState extends State<AccountPage> {
             subtitle: 'إعدادات حساب رسوم التوصيل',
             onTap: () => context.push('/admin/delivery-fee-settings'),
           ),
+          _MenuTileData(
+            icon: Icons.motorcycle_rounded,
+            label: 'طلبات تسجيل المناديب',
+            subtitle: 'مراجعة وقبول أو رفض طلبات المناديب الجدد',
+            onTap: () => context.push('/admin/courier-requests'),
+          ),
         ],
       ),
     ];

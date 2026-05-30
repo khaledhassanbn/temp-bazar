@@ -10,13 +10,14 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+
   flutter_localizations:
     sdk: flutter
 
   # أيقونات iOS
   cupertino_icons: ^1.0.2
 
-  # 🔥 مكتبات Firebase (متوافقة مع بعض - بدون تعارض)
+  # 🔥 Firebase
   firebase_core: ^4.2.0
   cloud_firestore: ^6.0.3
   cloud_functions: ^6.0.4
@@ -25,19 +26,19 @@ dependencies:
   firebase_messaging: ^16.1.0
   firebase_database: ^12.0.3
 
-  # 🔔 إشعارات محلية وتشغيل صوت التنبيه
+  # 🔔 إشعارات
   flutter_local_notifications: ^18.0.1
   audioplayers: ^6.1.0
 
-  # 🌐 مكتبات التوجيه وإدارة الحالة
+  # 🌐 التوجيه وإدارة الحالة
   go_router: ^16.2.5
   provider: ^6.1.5
 
-  # 🔐 تسجيل الدخول الاجتماعي
+  # 🔐 تسجيل الدخول
   google_sign_in: ^6.1.5
   flutter_facebook_auth: ^7.1.2
 
-  # 🎨 واجهة المستخدم والتحسينات
+  # 🎨 UI
   font_awesome_flutter: ^10.2.0
   flutter_animate: ^4.5.2
   smooth_page_indicator: ^1.2.1
@@ -49,21 +50,22 @@ dependencies:
   share_plus: ^12.0.1
   url_launcher: ^6.3.0
 
-  # 🌍 الخرائط والموقع الجغرافي
+  # 🌍 الخرائط والموقع
   google_maps_flutter: ^2.9.0
   geolocator: ^14.0.2
   geocoding: ^4.0.0
 
-  # ⚙️ أدوات مساعدة
+  # ⚙️ أدوات
   uuid: ^4.5.1
   http: ^1.1.0
   hive_flutter: ^1.1.0
   google_places_flutter: ^2.1.1
   fl_chart: ^1.1.1
 
-  
-  # 💳 بوابة الدفع
+  # 💳 الدفع
   webview_flutter: ^4.9.0
+
+  # 🖼️ صور وتخزين
   cached_network_image: ^3.4.1
   shared_preferences: ^2.5.5
   connectivity_plus: ^6.1.4
@@ -71,9 +73,23 @@ dependencies:
 dev_dependencies:
   flutter_test:
     sdk: flutter
+
   flutter_lints: ^6.0.0
   hive_generator: ^2.0.1
   build_runner: ^2.4.7
+
+  # ✅ إضافة أيقونة التطبيق
+  flutter_launcher_icons: ^0.14.4
+
+# ✅ إعدادات الأيقونة
+flutter_launcher_icons:
+  android: true
+  ios: true
+
+  image_path: "assets/images/icon/app_icon.png"
+
+  adaptive_icon_background: "#4E99B4"
+  adaptive_icon_foreground: "assets/images/icon/app_icon.png"
 
 flutter:
   uses-material-design: true

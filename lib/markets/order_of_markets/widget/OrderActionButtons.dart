@@ -5,12 +5,14 @@ class OrderActionButtons extends StatelessWidget {
   final Map<String, dynamic> order;
   final Function(String) onStatusChange;
   final VoidCallback? onRequestDelivery;
+  final Map<String, dynamic>? independentDispatch;
 
   const OrderActionButtons({
     super.key,
     required this.order,
     required this.onStatusChange,
     this.onRequestDelivery,
+    this.independentDispatch,
   });
 
   void _confirmAction(BuildContext context, String message, String newStatus) {
@@ -42,6 +44,8 @@ class OrderActionButtons extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final status = order['status'];
+    final bool hasIndependentDispatch = independentDispatch != null;
+
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 8),
       child: Row(
@@ -76,8 +80,8 @@ class OrderActionButtons extends StatelessWidget {
             ),
           ],
 
-          // الحالة الثانية: تم استلام الطلب
-          if (status == 'تم استلام الطلب') ...[
+          // الحالة الثانية: تم استلام الطلب (فقط لو مفيش مندوب مستقل - لتجنب التكرار مع الأزرار الأربعة)
+          if (status == 'تم استلام الطلب' && !hasIndependentDispatch) ...[
             Expanded(
               child: _buildActionButton(
                 'طلب طيار',
