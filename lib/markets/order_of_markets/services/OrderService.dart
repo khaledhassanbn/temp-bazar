@@ -1,12 +1,12 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import '../utils/order_status_helper.dart';
 
 class OrderService {
   Stream<QuerySnapshot> streamPresentOrders(String marketId) {
     return FirebaseFirestore.instance
-        .collection('markets')
-        .doc(marketId)
-        .collection('present_order')
-        .orderBy('createdAt', descending: true)
+        .collection('orders')
+        .where('storeId', isEqualTo: marketId)
+        .where('isActive', isEqualTo: true)
         .snapshots();
   }
 
@@ -15,22 +15,13 @@ class OrderService {
     DateTime? startDate,
     DateTime? endDate,
   }) {
+    // orderBy removed to avoid composite index requirement — sorting is done client-side
     Query query = FirebaseFirestore.instance
-        .collection('markets')
-        .doc(marketId)
-        .collection('past_order');
+        .collection('orders')
+        .where('storeId', isEqualTo: marketId)
+        .where('isActive', isEqualTo: false);
 
-    if (startDate != null) {
-      query = query.where(
-        'createdAt',
-        isGreaterThanOrEqualTo: Timestamp.fromDate(startDate),
-      );
-    }
-    if (endDate != null) {
-      query = query.where('createdAt', isLessThan: Timestamp.fromDate(endDate));
-    }
-
-    return query.orderBy('createdAt', descending: true).snapshots();
+    return query.snapshots();
   }
 
   Future<DocumentSnapshot<Map<String, dynamic>>> getPresentOrder(
@@ -38,9 +29,7 @@ class OrderService {
     String documentId,
   ) {
     return FirebaseFirestore.instance
-        .collection('markets')
-        .doc(marketId)
-        .collection('present_order')
+        .collection('orders')
         .doc(documentId)
         .get();
   }
@@ -50,28 +39,97 @@ class OrderService {
     String documentId,
     String newStatus,
   ) async {
+    final now = DateTime.now();
     await FirebaseFirestore.instance
-        .collection('markets')
-        .doc(marketId)
-        .collection('present_order')
+        .collection('orders')
         .doc(documentId)
         .update({
           'status': newStatus,
+          'orderStatus': _mapToDbStatus(newStatus),
           'updatedAt': FieldValue.serverTimestamp(),
+          'statusHistory': FieldValue.arrayUnion([
+            {
+              'status': newStatus,
+              'time': Timestamp.fromDate(now),
+            }
+          ]),
         });
   }
 
+  // Keep updateUserOrder for backward compatibility, but target unified order doc
   Future<void> updateUserOrder(
     String userId,
     String documentId,
     Map<String, dynamic> data,
   ) async {
+    final now = DateTime.now();
+    final updatedData = Map<String, dynamic>.from(data);
+    if (data.containsKey('status')) {
+      updatedData['orderStatus'] = _mapToDbStatus(data['status']);
+      updatedData['statusHistory'] = FieldValue.arrayUnion([
+        {
+          'status': data['status'],
+          'time': Timestamp.fromDate(now),
+        }
+      ]);
+    }
     await FirebaseFirestore.instance
-        .collection('users')
-        .doc(userId)
         .collection('orders')
         .doc(documentId)
-        .update(data);
+        .update(updatedData);
+  }
+
+  /// ينقل الطلب إلى الطلبات السابقة إذا اكتمل التوصيل ولم يُنقل بعد
+  Future<bool> finalizeDeliveredOrder(
+    String marketId,
+    String documentId,
+  ) async {
+    final orderDoc = await getPresentOrder(marketId, documentId);
+    if (!orderDoc.exists) return false;
+
+    final data = orderDoc.data() ?? <String, dynamic>{};
+    if (data['isActive'] == false) return false;
+    if (!OrderStatusHelper.isDelivered(data)) return false;
+
+    await moveToPastOrder(
+      marketId,
+      documentId,
+      data,
+      'تم التسليم للطيار',
+    );
+
+    final customerInfo =
+        data['customerInfo'] as Map<String, dynamic>? ?? {};
+    final customerId =
+        customerInfo['userId'] as String? ?? data['userId'] as String?;
+    if (customerId != null && customerId.isNotEmpty) {
+      try {
+        await updateUserOrder(customerId, documentId, {
+          'status': 'تم التسليم للطيار',
+          'updatedAt': FieldValue.serverTimestamp(),
+          'completedAt': FieldValue.serverTimestamp(),
+        });
+      } catch (_) {}
+    }
+
+    return true;
+  }
+
+  /// مزامنة الطلبات المكتملة التى لم تُنقل بعد إلى الطلبات السابقة
+  Future<void> syncCompletedOrdersForMarket(String marketId) async {
+    final snapshot = await FirebaseFirestore.instance
+        .collection('orders')
+        .where('storeId', isEqualTo: marketId)
+        .where('isActive', isEqualTo: true)
+        .get();
+
+    for (final doc in snapshot.docs) {
+      if (OrderStatusHelper.isDelivered(doc.data())) {
+        try {
+          await finalizeDeliveredOrder(marketId, doc.id);
+        } catch (_) {}
+      }
+    }
   }
 
   Future<void> moveToPastOrder(
@@ -81,28 +139,25 @@ class OrderService {
     String newStatus,
   ) async {
     final completedAt = FieldValue.serverTimestamp();
-    final updatedOrderData = {
-      ...orderData,
-      'status': newStatus,
-      'updatedAt': completedAt,
-      'completedAt': completedAt,
-    };
+    final now = DateTime.now();
 
-    // 1) copy to past_order
+    // Instead of copying, we update isActive to false in the unified collection
     await FirebaseFirestore.instance
-        .collection('markets')
-        .doc(marketId)
-        .collection('past_order')
+        .collection('orders')
         .doc(documentId)
-        .set(updatedOrderData);
-
-    // 2) delete from present_order
-    await FirebaseFirestore.instance
-        .collection('markets')
-        .doc(marketId)
-        .collection('present_order')
-        .doc(documentId)
-        .delete();
+        .update({
+          'isActive': false,
+          'status': newStatus,
+          'orderStatus': _mapToDbStatus(newStatus),
+          'updatedAt': completedAt,
+          'completedAt': completedAt,
+          'statusHistory': FieldValue.arrayUnion([
+            {
+              'status': newStatus,
+              'time': Timestamp.fromDate(now),
+            }
+          ]),
+        });
 
     // 3) update store statistics if delivered to driver
     if (newStatus == 'تم التسليم للطيار') {
@@ -123,6 +178,25 @@ class OrderService {
         // ignore: avoid_print
         print('Failed to update statistics for $marketId: $e');
       }
+    }
+  }
+
+  String _mapToDbStatus(String arabicStatus) {
+    switch (arabicStatus) {
+      case 'قيد المراجعة':
+        return 'pending';
+      case 'تم استلام الطلب':
+        return 'accepted';
+      case 'جارى تسليم للدليفري':
+        return 'delivering';
+      case 'التسليم الذاتي':
+        return 'self_delivery';
+      case 'تم التسليم للطيار':
+        return 'completed';
+      case 'تم رفض الطلب':
+        return 'rejected';
+      default:
+        return arabicStatus;
     }
   }
 

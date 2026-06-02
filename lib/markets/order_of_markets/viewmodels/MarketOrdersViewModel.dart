@@ -4,7 +4,6 @@ import 'package:firebase_database/firebase_database.dart';
 import 'package:flutter/material.dart';
 import '../services/OrderService.dart';
 import '../services/delivery_request_service.dart';
-import '../independent_couriers/services/independent_dispatch_orders_service.dart';
 import 'package:bazar_suez/markets/create_market/services/store_service.dart';
 import 'package:bazar_suez/services/delivery_fee/delivery_fee_service.dart';
 
@@ -19,8 +18,6 @@ class MarketOrdersViewModel extends ChangeNotifier {
   final StoreService _storeService = StoreService();
   final DeliveryRequestService _deliveryRequestService =
       DeliveryRequestService();
-  final IndependentDispatchOrdersService _independentDispatchOrdersService =
-      IndependentDispatchOrdersService();
 
   GeoPoint? marketLocation;
   final Map<String, Map<String, String>> distancesAndDurations = {};
@@ -53,16 +50,10 @@ class MarketOrdersViewModel extends ChangeNotifier {
   // تخزين رسائل الرفض لعرضها للتاجر
   final Map<String, String> rejectedMessages = {};
 
-  // تخزين بيانات طلب التوصيل لكل طلب (من مجموعة request delivery)
-  // key = orderDocumentId
-  final Map<String, Map<String, dynamic>> deliveryRequestsByOrderId = {};
-
-  // تخزين بيانات إرسال الطلب للمناديب المستقلين من مجموعة orders (root)
-  // key = orderId (نستخدم documentId الخاص بـ present_order)
-  final Map<String, Map<String, dynamic>> independentDispatchByOrderId = {};
-
   // دليل المناديب المستقلين (uid -> profile data) لعرض الاسم/الصورة بدل id
   final Map<String, Map<String, dynamic>> independentCouriersByUid = {};
+  final Map<String, double> _customerReliabilityByUid = {};
+  final Set<String> _loadingReliabilityUids = {};
 
   // ======== Init ========
   void init() {
@@ -73,9 +64,40 @@ class MarketOrdersViewModel extends ChangeNotifier {
     _setupOrdersStream();
     _fetchMarketLocation();
     _listenToRejectedRequests();
-    _listenToDeliveryRequests();
-    _listenToIndependentDispatchOrders();
+    _listenToDeliveryCompletions();
+    _syncCompletedOrders();
     _listenToIndependentCouriersDirectory();
+  }
+
+  Future<void> _syncCompletedOrders() async {
+    try {
+      await _service.syncCompletedOrdersForMarket(marketId);
+    } catch (e) {
+      print('⚠️ خطأ في مزامنة الطلبات المكتملة: $e');
+    }
+  }
+
+  void _listenToDeliveryCompletions() {
+    _deliveryRequestsSubscription = _deliveryRequestService
+        .streamRequestsForMarket(marketId)
+        .listen((requests) async {
+      for (final request in requests) {
+        final status = (request['status'] ?? '').toString().toLowerCase();
+        if (status != 'completed') continue;
+
+        final orderDocumentId =
+            request['orderDocumentId'] as String? ??
+            request['id'] as String?;
+        if (orderDocumentId == null || orderDocumentId.isEmpty) continue;
+
+        try {
+          await _service.finalizeDeliveredOrder(marketId, orderDocumentId);
+          notifyListeners();
+        } catch (e) {
+          print('❌ خطأ في إنهاء الطلب $orderDocumentId: $e');
+        }
+      }
+    });
   }
 
   // ======== Listen to rejected delivery requests ========
@@ -112,39 +134,6 @@ class MarketOrdersViewModel extends ChangeNotifier {
     });
   }
 
-  // الاستماع لكل طلبات التوصيل الخاصة بهذا المتجر
-  void _listenToDeliveryRequests() {
-    _deliveryRequestsSubscription = _deliveryRequestService
-        .streamRequestsForMarket(marketId)
-        .listen((requests) {
-      deliveryRequestsByOrderId.clear();
-
-      for (final request in requests) {
-        final orderDocumentId = request['orderDocumentId'] as String?;
-        if (orderDocumentId == null || orderDocumentId.isEmpty) continue;
-        deliveryRequestsByOrderId[orderDocumentId] = request;
-      }
-
-      // تحديث الـ UI لعرض حالة الطلب / بيانات المندوب فوراً
-      notifyListeners();
-    });
-  }
-
-  void _listenToIndependentDispatchOrders() {
-    _independentDispatchOrdersSubscription = _independentDispatchOrdersService
-        .streamOrdersForStore(marketId)
-        .listen((orders) {
-      independentDispatchByOrderId.clear();
-      for (final o in orders) {
-        final dispatchType = (o['dispatchType'] ?? '').toString();
-        if (dispatchType != 'independent_courier') continue;
-        final orderId = (o['orderId'] ?? o['id'] ?? '').toString();
-        if (orderId.isEmpty) continue;
-        independentDispatchByOrderId[orderId] = o;
-      }
-      notifyListeners();
-    });
-  }
 
   void _listenToIndependentCouriersDirectory() {
     _couriersDirectorySubscription = FirebaseFirestore.instance
@@ -299,6 +288,27 @@ class MarketOrdersViewModel extends ChangeNotifier {
     } catch (_) {}
   }
 
+  /// يفصل حقل الإشعارات (`status: new`) عن الحالة التشغيلية (`orderStatus`).
+  String _resolveRawOrderStatus(Map<String, dynamic> data) {
+    final rawStatus = (data['status'] as String?)?.trim();
+    final rawOrderStatus = (data['orderStatus'] as String?)?.trim();
+
+    const notificationOnly = {'new', 'accepted', 'rejected'};
+    if (rawStatus != null &&
+        notificationOnly.contains(rawStatus.toLowerCase()) &&
+        rawOrderStatus != null &&
+        rawOrderStatus.isNotEmpty) {
+      return rawOrderStatus;
+    }
+    if (rawStatus != null && rawStatus.isNotEmpty) {
+      return rawStatus;
+    }
+    if (rawOrderStatus != null && rawOrderStatus.isNotEmpty) {
+      return rawOrderStatus;
+    }
+    return 'pending';
+  }
+
   // ======== Order conversion ========
   Map<String, dynamic> convertOrder(DocumentSnapshot doc) {
     try {
@@ -306,9 +316,9 @@ class MarketOrdersViewModel extends ChangeNotifier {
       final customerInfo = data['customerInfo'] as Map<String, dynamic>? ?? {};
       final items = data['items'] as List<dynamic>? ?? [];
 
-      // جلب بيانات طلب التوصيل (إن وجد) لهذا الطلب
-      final deliveryInfo = deliveryRequestsByOrderId[doc.id];
-      final independentDispatchInfo = independentDispatchByOrderId[doc.id];
+      // جلب بيانات طلب التوصيل والمناديب المستقلين من نفس المستند الموحد
+      final deliveryInfo = data['deliveryRequest'] as Map<String, dynamic>?;
+      final independentDispatchInfo = data['dispatchType'] == 'independent_courier' ? data : null;
 
       // أولوية عرض الحالة:
       // 1) لو فيه طلب توصيل (مكتب) → نستخدم حالة تطبيق المكاتب (request delivery)
@@ -321,16 +331,14 @@ class MarketOrdersViewModel extends ChangeNotifier {
           independentDispatchInfo != null
               ? (independentDispatchInfo['status'] as String?)
               : null;
-      final String? rawStatusFromOrder = data['status'] as String?;
+      final String rawStatusFromOrder = _resolveRawOrderStatus(data);
 
       if (rawStatusFromDelivery != null) {
         status = _convertDeliveryStatusToArabic(rawStatusFromDelivery);
       } else if (rawStatusFromIndependent != null) {
         status = _convertIndependentStatusToArabic(rawStatusFromIndependent);
       } else {
-        status = _convertLegacyStatusToArabic(
-          rawStatusFromOrder ?? 'قيد المراجعة',
-        );
+        status = _convertLegacyStatusToArabic(rawStatusFromOrder);
       }
 
       DateTime orderTime;
@@ -384,6 +392,9 @@ class MarketOrdersViewModel extends ChangeNotifier {
 
       // استخراج احداثيات العميل إن وجدت
       dynamic customerLocRaw = customerInfo['location'];
+      final customerId =
+          (customerInfo['userId'] ?? data['userId'] ?? '').toString();
+      _prefetchCustomerReliability(customerId);
       GeoPoint? clientLoc;
       if (customerLocRaw is GeoPoint) {
         clientLoc = customerLocRaw;
@@ -403,6 +414,10 @@ class MarketOrdersViewModel extends ChangeNotifier {
         'customerName': customerInfo['name'] ?? 'عميل',
         'customerPhone': customerInfo['phone'] ?? '',
         'customerAddress': customerInfo['address'] ?? '',
+        'customerId': customerId,
+        'customerReliability': customerId.isEmpty
+            ? null
+            : _customerReliabilityByUid[customerId],
         'customerLocation': clientLoc, // جديد
         'status': status,
         // بيانات المندوب من وثيقة request delivery (إن وُجدت)
@@ -429,6 +444,7 @@ class MarketOrdersViewModel extends ChangeNotifier {
         'deliveryFee': (data['deliveryFee'] ?? 0.0).toDouble(),
         'serviceFee': (data['serviceFee'] ?? 0.0).toDouble(),
         'totalAmount': (data['totalAmount'] ?? 0.0).toDouble(),
+        'deliveryRating': data['deliveryRating'],
         // بيانات الإلغاء (إن وُجدت)
         'cancelReason': data['cancelReason'] ?? independentDispatchInfo?['cancelReason'] ?? '',
         'cancelledAt': data['cancelledAt'] ?? independentDispatchInfo?['cancelledAt'],
@@ -447,7 +463,7 @@ class MarketOrdersViewModel extends ChangeNotifier {
         'requiredOptions': [],
         'extraOptions': [],
         'documentId': doc.id,
-        'independentDispatch': independentDispatchByOrderId[doc.id],
+        'independentDispatch': doc.data() is Map && (doc.data() as Map)['dispatchType'] == 'independent_courier' ? doc.data() : null,
         'independentCouriersDirectory': independentCouriersByUid,
         // ✅ إضافة البيانات المفقودة
         'items': [],
@@ -457,6 +473,35 @@ class MarketOrdersViewModel extends ChangeNotifier {
         'serviceFee': 0.0,
         'totalAmount': 0.0,
       };
+    }
+  }
+
+  Future<void> _prefetchCustomerReliability(String customerId) async {
+    if (customerId.isEmpty) return;
+    if (_customerReliabilityByUid.containsKey(customerId)) return;
+    if (_loadingReliabilityUids.contains(customerId)) return;
+    _loadingReliabilityUids.add(customerId);
+    try {
+      final userDoc =
+          await FirebaseFirestore.instance.collection('users').doc(customerId).get();
+      final data = userDoc.data();
+      if (data != null) {
+        final raw = data['customerReliability'];
+        if (raw is num) {
+          _customerReliabilityByUid[customerId] = raw.toDouble();
+          notifyListeners();
+        } else if (raw != null) {
+          final parsed = double.tryParse(raw.toString());
+          if (parsed != null) {
+            _customerReliabilityByUid[customerId] = parsed;
+            notifyListeners();
+          }
+        }
+      }
+    } catch (_) {
+      // ignore
+    } finally {
+      _loadingReliabilityUids.remove(customerId);
     }
   }
 
@@ -498,23 +543,31 @@ class MarketOrdersViewModel extends ChangeNotifier {
         status == 'الطلب مكتمل' ||
         status == 'المندوب رفض الطلب' ||
         status == 'الزبون رفض الاستلام' ||
-        status == 'المكتب رفض الطلب') {
+        status == 'المكتب رفض الطلب' ||
+        status == 'التسليم الذاتي') {
       return status;
     }
 
     switch (status.toLowerCase()) {
+      case 'new':
       case 'pending':
         return 'قيد المراجعة';
       case 'accepted':
         return 'تم استلام الطلب';
       case 'preparing':
+      case 'delivering':
         return 'جارى تسليم للدليفري';
       case 'delivered':
+      case 'completed':
         return 'تم التسليم للطيار';
       case 'rejected':
         return 'تم رفض الطلب';
+      case 'cancelled_by_customer':
+        return 'تم إلغاء الطلب';
       case 'returned_to_merchant':
         return 'المكتب رفض الطلب';
+      case 'self_delivery':
+        return 'التسليم الذاتي';
       default:
         return status;
     }
@@ -614,8 +667,10 @@ class MarketOrdersViewModel extends ChangeNotifier {
   }
 
   Future<void> cancelIndependentCourierDispatch(String orderId, String actionType) async {
-    final dispatch = independentDispatchByOrderId[orderId];
-    if (dispatch == null) return;
+    final orderDoc = await FirebaseFirestore.instance.collection('orders').doc(orderId).get();
+    if (!orderDoc.exists) return;
+    final dispatch = orderDoc.data() ?? {};
+    if (dispatch['dispatchType'] != 'independent_courier') return;
 
     final String? assignedCourierId = dispatch['assignedCourierId'] as String?;
     final updates = <String, dynamic>{
@@ -698,9 +753,9 @@ class MarketOrdersViewModel extends ChangeNotifier {
         return 'معرف مكتب الشحن غير صحيح';
       }
 
-      final existingRequest = deliveryRequestsByOrderId[orderDocumentId];
+      final existingRequest = orderData['deliveryRequest'] as Map<String, dynamic>?;
       if (existingRequest != null) {
-        final existingRequestId = (existingRequest['id'] ?? '').toString();
+        final existingRequestId = orderDocumentId;
         final existingStatus = (existingRequest['status'] ?? '').toString();
         final existingOfficeId = (existingRequest['officeId'] ?? '').toString();
         final isPendingOfficeApproval =
@@ -827,9 +882,9 @@ class MarketOrdersViewModel extends ChangeNotifier {
           customerInfo['userId'] as String? ?? orderData['userId'] as String?;
 
       if (newStatus == 'تم التسليم للطيار' || newStatus == 'تم رفض الطلب') {
-        final deliveryInfo = deliveryRequestsByOrderId[documentId];
-        final rid = deliveryInfo?['id']?.toString();
-        if (rid != null && rid.isNotEmpty) {
+        final deliveryInfo = orderData['deliveryRequest'] as Map<String, dynamic>?;
+        final rid = documentId;
+        if (deliveryInfo != null) {
           try {
             await _deliveryRequestService.updateRequestStatus(rid, 'cancelled_by_merchant');
           } catch (_) {}

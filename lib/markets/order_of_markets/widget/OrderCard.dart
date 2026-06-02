@@ -72,6 +72,10 @@ class OrderCard extends StatelessWidget {
     final String assignedDriverPhone =
         (order['assignedDriverPhone'] ?? '').toString();
     final String generalNotes = (order['notes'] ?? '').toString();
+    final Map<String, dynamic>? deliveryRating =
+        order['deliveryRating'] is Map
+            ? Map<String, dynamic>.from(order['deliveryRating'] as Map)
+            : null;
     final Map<String, dynamic>? independentDispatch =
         order['independentDispatch'] as Map<String, dynamic>?;
     final Map<String, dynamic> independentCouriersDirectory =
@@ -364,6 +368,15 @@ class OrderCard extends StatelessWidget {
                         label: 'الاسم',
                         value: order['customerName'] ?? 'غير معروف',
                       ),
+                      if (order['customerReliability'] != null) ...[
+                        const Divider(height: 20),
+                        _buildInfoRow(
+                          icon: Icons.verified_user_outlined,
+                          label: 'نسبة الالتزام',
+                          value:
+                              '${(order['customerReliability'] as num).toStringAsFixed(1)}%',
+                        ),
+                      ],
                       const Divider(height: 20),
                       _buildInfoRow(
                         icon: Icons.phone_outlined,
@@ -496,6 +509,35 @@ class OrderCard extends StatelessWidget {
                               ],
                             ),
                           ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                ],
+
+                // ================== تقييم المندوب من العميل ==================
+                if (deliveryRating != null &&
+                    (assignedDriverName.isNotEmpty || assignedDriverPhone.isNotEmpty)) ...[
+                  _buildSectionCard(
+                    title: 'تقييم المندوب',
+                    icon: Icons.star_rate_rounded,
+                    iconColor: Colors.amber.shade700,
+                    child: Column(
+                      children: [
+                        _buildInfoRow(
+                          icon: Icons.star_rounded,
+                          label: 'التقييم',
+                          value:
+                              '${(deliveryRating['rating'] ?? 0).toString()}/5',
+                        ),
+                        if ((deliveryRating['comment'] ?? '').toString().isNotEmpty) ...[
+                          const Divider(height: 20),
+                          _buildInfoRow(
+                            icon: Icons.comment_outlined,
+                            label: 'تعليق العميل',
+                            value: (deliveryRating['comment'] ?? '').toString(),
+                          ),
+                        ],
                       ],
                     ),
                   ),
@@ -1264,6 +1306,8 @@ class OrderCard extends StatelessWidget {
         return Colors.redAccent;
       case 'المكتب رفض الطلب':
         return Colors.deepOrange;
+      case 'التسليم الذاتي':
+        return Colors.purple;
       // حالات المندوب المستقل
       case 'المندوب قبل الطلب':
         return Colors.teal;

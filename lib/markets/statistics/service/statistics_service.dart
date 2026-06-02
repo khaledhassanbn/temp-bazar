@@ -1,13 +1,20 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:bazar_suez/markets/order_of_markets/services/OrderService.dart';
+import 'package:bazar_suez/markets/order_of_markets/utils/order_status_helper.dart';
 
 class StatisticsService {
   final FirebaseFirestore _firestore;
   final FirebaseAuth _auth;
+  final OrderService _orderService;
 
-  StatisticsService({FirebaseFirestore? firestore, FirebaseAuth? auth})
-    : _firestore = firestore ?? FirebaseFirestore.instance,
-      _auth = auth ?? FirebaseAuth.instance;
+  StatisticsService({
+    FirebaseFirestore? firestore,
+    FirebaseAuth? auth,
+    OrderService? orderService,
+  })  : _firestore = firestore ?? FirebaseFirestore.instance,
+        _auth = auth ?? FirebaseAuth.instance,
+        _orderService = orderService ?? OrderService();
 
   Future<String?> getCurrentUserMarketId() async {
     final user = _auth.currentUser;
@@ -29,119 +36,109 @@ class StatisticsService {
     return null;
   }
 
+  // ─── حساب الإحصائيات مباشرة من orders collection ───────────────────────────
+
+  Future<void> syncCompletedOrders(String marketId) async {
+    await _orderService.syncCompletedOrdersForMarket(marketId);
+  }
+
+  Map<String, double> _aggregateMonthly(
+    QuerySnapshot<Map<String, dynamic>> snapshot,
+    int year,
+  ) {
+    final startOfYear = Timestamp.fromDate(DateTime(year, 1, 1));
+    final startOfNextYear = Timestamp.fromDate(DateTime(year + 1, 1, 1));
+    final Map<String, double> result = {};
+
+    for (final doc in snapshot.docs) {
+      final data = doc.data();
+      if (!_isCompletedOrder(data)) continue;
+
+      final ts = _orderDateTimestamp(data);
+      if (ts == null) continue;
+      if (ts.compareTo(startOfYear) < 0 ||
+          ts.compareTo(startOfNextYear) >= 0) {
+        continue;
+      }
+
+      final date = ts.toDate();
+      final monthKey = date.month.toString().padLeft(2, '0');
+      final amount = _asDouble(data['totalAmount']) ?? 0.0;
+      result[monthKey] = (result[monthKey] ?? 0.0) + amount;
+    }
+    return result;
+  }
+
+  Map<String, double> _aggregateDaily(
+    QuerySnapshot<Map<String, dynamic>> snapshot,
+    int year,
+    int month,
+  ) {
+    final startOfMonth = Timestamp.fromDate(DateTime(year, month, 1));
+    final startOfNextMonth = Timestamp.fromDate(DateTime(year, month + 1, 1));
+    final Map<String, double> result = {};
+
+    for (final doc in snapshot.docs) {
+      final data = doc.data();
+      if (!_isCompletedOrder(data)) continue;
+
+      final ts = _orderDateTimestamp(data);
+      if (ts == null) continue;
+      if (ts.compareTo(startOfMonth) < 0 ||
+          ts.compareTo(startOfNextMonth) >= 0) {
+        continue;
+      }
+
+      final date = ts.toDate();
+      final dayKey = date.day.toString().padLeft(2, '0');
+      final amount = _asDouble(data['totalAmount']) ?? 0.0;
+      result[dayKey] = (result[dayKey] ?? 0.0) + amount;
+    }
+    return result;
+  }
+
+  /// يجلب كل الطلبات المكتملة للمتجر في سنة معينة ويحسب الإجمالي الشهري
   Future<Map<String, double>> fetchMonthlyTotals({
     required String marketId,
     required int year,
   }) async {
-    final doc = await _firestore
-        .collection('markets')
-        .doc(marketId)
-        .collection('statistics')
-        .doc(year.toString())
+    await syncCompletedOrders(marketId);
+
+    final snapshot = await _firestore
+        .collection('orders')
+        .where('storeId', isEqualTo: marketId)
         .get();
 
-    if (!doc.exists) return {};
-    final data = doc.data() ?? {};
-
-    final dynamic monthly = data['monthly'];
-    if (monthly != null) {
-      return _normalizeNumericMap(monthly, keyPad: 2);
-    }
-    final dynamic months = data['months'];
-    if (months is Map) {
-      final Map<String, double> result = {};
-      months.forEach((k, v) {
-        final String key = _stringKey(k, keyPad: 2);
-        double? value;
-        if (v is Map) {
-          value = _asDouble(v['totalSales'] ?? v['sales'] ?? v['value']);
-        } else {
-          value = _asDouble(v);
-        }
-        if (value != null) result[key] = value;
-      });
-      return result;
-    }
-    return {};
+    return _aggregateMonthly(snapshot, year);
   }
 
   Stream<Map<String, double>> streamMonthlyTotals({
     required String marketId,
     required int year,
   }) {
+    syncCompletedOrders(marketId);
+
     return _firestore
-        .collection('markets')
-        .doc(marketId)
-        .collection('statistics')
-        .doc(year.toString())
+        .collection('orders')
+        .where('storeId', isEqualTo: marketId)
         .snapshots()
-        .map((doc) {
-          if (!doc.exists) return <String, double>{};
-          final data = doc.data() ?? {};
-          final dynamic monthly = data['monthly'];
-          if (monthly != null) {
-            return _normalizeNumericMap(monthly, keyPad: 2);
-          }
-          final dynamic months = data['months'];
-          if (months is Map) {
-            final Map<String, double> result = {};
-            months.forEach((k, v) {
-              final String key = _stringKey(k, keyPad: 2);
-              double? value;
-              if (v is Map) {
-                value = _asDouble(v['totalSales'] ?? v['sales'] ?? v['value']);
-              } else {
-                value = _asDouble(v);
-              }
-              if (value != null) result[key] = value;
-            });
-            return result;
-          }
-          return <String, double>{};
-        });
+        .map((snapshot) => _aggregateMonthly(snapshot, year));
   }
 
+  /// يجلب الإجمالي اليومي لشهر معين
   Future<Map<String, double>> fetchDailyTotals({
     required String marketId,
     required int year,
     required int month,
   }) async {
-    final doc = await _firestore
-        .collection('markets')
-        .doc(marketId)
-        .collection('statistics')
-        .doc(year.toString())
+    await syncCompletedOrders(marketId);
+
+    final snapshot = await _firestore
+        .collection('orders')
+        .where('storeId', isEqualTo: marketId)
         .get();
 
-    if (!doc.exists) return {};
-    final data = doc.data() ?? {};
-
-    final dynamic daily = data['daily'];
-    if (daily is Map) {
-      final Object? monthNode =
-          daily[_monthKey(month)] ?? daily[month] ?? daily[month.toString()];
-      return _normalizeNumericMap(monthNode, keyPad: 2);
-    }
-    // Alternative structure: days: { 'YYYY-MM-DD': { totalSales, totalOrders } }
-    final dynamic days = data['days'];
-    if (days is Map) {
-      final String monthPrefix = '${year.toString()}-${_monthKey(month)}-';
-      final Map<String, double> result = {};
-      days.forEach((k, v) {
-        if (k is String && k.startsWith(monthPrefix)) {
-          final String day = k.substring(k.length - 2);
-          double? value;
-          if (v is Map) {
-            value = _asDouble(v['totalSales'] ?? v['sales'] ?? v['value']);
-          } else {
-            value = _asDouble(v);
-          }
-          if (value != null) result[day] = value;
-        }
-      });
-      return result;
-    }
-    return {};
+    return _aggregateDaily(snapshot, year, month);
   }
 
   Stream<Map<String, double>> streamDailyTotals({
@@ -149,96 +146,35 @@ class StatisticsService {
     required int year,
     required int month,
   }) {
+    syncCompletedOrders(marketId);
+
     return _firestore
-        .collection('markets')
-        .doc(marketId)
-        .collection('statistics')
-        .doc(year.toString())
+        .collection('orders')
+        .where('storeId', isEqualTo: marketId)
         .snapshots()
-        .map((doc) {
-          if (!doc.exists) return <String, double>{};
-          final data = doc.data() ?? {};
-
-          final dynamic daily = data['daily'];
-          if (daily is Map) {
-            final Object? monthNode =
-                daily[_monthKey(month)] ?? daily[month] ?? daily[month.toString()];
-            return _normalizeNumericMap(monthNode, keyPad: 2);
-          }
-
-          final dynamic days = data['days'];
-          if (days is Map) {
-            final String monthPrefix = '${year.toString()}-${_monthKey(month)}-';
-            final Map<String, double> result = {};
-            days.forEach((k, v) {
-              if (k is String && k.startsWith(monthPrefix)) {
-                final String day = k.substring(k.length - 2);
-                double? value;
-                if (v is Map) {
-                  value = _asDouble(v['totalSales'] ?? v['sales'] ?? v['value']);
-                } else {
-                  value = _asDouble(v);
-                }
-                if (value != null) result[day] = value;
-              }
-            });
-            return result;
-          }
-
-          return <String, double>{};
-        });
+        .map((snapshot) => _aggregateDaily(snapshot, year, month));
   }
 
-  Map<String, double> _normalizeNumericMap(dynamic node, {int? keyPad}) {
-    final Map<String, double> result = {};
+  // ─── helpers ────────────────────────────────────────────────────────────────
 
-    if (node is Map) {
-      node.forEach((k, v) {
-        final String key = _stringKey(k, keyPad: keyPad);
-        final double? numValue = _asDouble(v);
-        if (numValue != null) {
-          result[key] = numValue;
-        }
-      });
-    } else if (node is List) {
-      for (int i = 0; i < node.length; i++) {
-        final double? numValue = _asDouble(node[i]);
-        if (numValue != null) {
-          final int oneBased = i + 1;
-          final String key = keyPad != null
-              ? oneBased.toString().padLeft(keyPad, '0')
-              : oneBased.toString();
-          result[key] = numValue;
-        }
-      }
-    }
-    return result;
+  Timestamp? _orderDateTimestamp(Map<String, dynamic> data) {
+    final completedAt = data['completedAt'];
+    if (completedAt is Timestamp) return completedAt;
+
+    final createdAt = data['createdAt'];
+    if (createdAt is Timestamp) return createdAt;
+
+    return null;
   }
 
-  String _monthKey(int month) => month.toString().padLeft(2, '0');
-
-  String _stringKey(dynamic key, {int? keyPad}) {
-    if (key is int) {
-      return keyPad != null
-          ? key.toString().padLeft(keyPad, '0')
-          : key.toString();
-    }
-    if (key is String) {
-      if (keyPad != null) {
-        final parsed = int.tryParse(key);
-        if (parsed != null) return parsed.toString().padLeft(keyPad, '0');
-      }
-      return key;
-    }
-    return key.toString();
+  /// الطلبات المكتملة فقط تُحسب في الإحصائيات
+  bool _isCompletedOrder(Map<String, dynamic> data) {
+    return OrderStatusHelper.isDelivered(data);
   }
 
   double? _asDouble(dynamic v) {
     if (v is num) return v.toDouble();
-    if (v is String) {
-      final parsed = double.tryParse(v);
-      return parsed;
-    }
+    if (v is String) return double.tryParse(v);
     return null;
   }
 }

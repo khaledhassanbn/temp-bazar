@@ -587,7 +587,15 @@ class _MarketOrdersPageState extends State<MarketOrdersPage>
                       // تحويل البيانات وتصفيتها
                       final orders = snapshot.data!.docs
                           .map((doc) => _viewModel.convertOrder(doc))
-                          .toList();
+                          .toList()
+                        ..sort((a, b) {
+                          final aTime = a['orderTime'] as DateTime?;
+                          final bTime = b['orderTime'] as DateTime?;
+                          if (aTime == null && bTime == null) return 0;
+                          if (aTime == null) return 1;
+                          if (bTime == null) return -1;
+                          return bTime.compareTo(aTime); // الأحدث أولاً
+                        });
 
                       final filteredOrders = orders.where((order) {
                         final orderId = order['id'].toString().toLowerCase();
@@ -610,7 +618,7 @@ class _MarketOrdersPageState extends State<MarketOrdersPage>
                           .where((o) => o['status'] == 'تم استلام الطلب')
                           .length;
                       final preparingOrders = orders
-                          .where((o) => o['status'] == 'جارى تسليم للدليفري')
+                          .where((o) => o['status'] == 'جارى تسليم للدليفري' || o['status'] == 'التسليم الذاتي')
                           .length;
                       final deliveredOrders = orders
                           .where((o) => o['status'] == 'تم التسليم للطيار')

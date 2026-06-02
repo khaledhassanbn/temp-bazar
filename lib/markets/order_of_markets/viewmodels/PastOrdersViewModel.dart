@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import '../services/OrderService.dart';
+import '../utils/order_status_helper.dart';
 import 'package:bazar_suez/markets/create_market/services/store_service.dart';
 import 'package:bazar_suez/services/delivery_fee/delivery_fee_service.dart';
 
@@ -49,6 +50,13 @@ class PastOrdersViewModel extends ChangeNotifier {
     });
     _setupOrdersStream();
     _fetchMarketLocation();
+    _syncCompletedOrders();
+  }
+
+  Future<void> _syncCompletedOrders() async {
+    try {
+      await _service.syncCompletedOrdersForMarket(marketId);
+    } catch (_) {}
   }
 
   void _onScroll() {
@@ -140,7 +148,28 @@ class PastOrdersViewModel extends ChangeNotifier {
       final customerInfo = data['customerInfo'] as Map<String, dynamic>? ?? {};
       final items = data['items'] as List<dynamic>? ?? [];
 
-      String status = _convertStatusToArabic(data['status'] ?? 'قيد المراجعة');
+      final deliveryInfo = data['deliveryRequest'] as Map<String, dynamic>?;
+      final independentDispatch =
+          data['dispatchType'] == 'independent_courier' ? data : null;
+
+      String status;
+      if (deliveryInfo != null && deliveryInfo['status'] != null) {
+        status = _convertDeliveryStatusToArabic(
+          deliveryInfo['status'].toString(),
+        );
+      } else if (independentDispatch != null &&
+          independentDispatch['status'] != null) {
+        status = _convertIndependentStatusToArabic(
+          independentDispatch['status'].toString(),
+        );
+      } else {
+        final rawStatus = _resolveRawOrderStatus(data);
+        status = _convertStatusToArabic(rawStatus);
+      }
+
+      if (OrderStatusHelper.isDelivered(data)) {
+        status = 'تم التسليم';
+      }
 
       DateTime orderTime;
       Timestamp? createdAtTimestamp;
@@ -236,9 +265,8 @@ class PastOrdersViewModel extends ChangeNotifier {
 
   // ======== Date filtering ========
   bool isOrderOnSelectedDate(Map<String, dynamic> order) {
-    if (selectedDate == null) return true;
+    if (selectedDate == null && _filterStartDate == null) return true;
 
-    // استخدام createdAt للفلترة
     DateTime orderDate;
     if (order['createdAt'] != null) {
       final timestamp = order['createdAt'] as Timestamp;
@@ -247,12 +275,86 @@ class PastOrdersViewModel extends ChangeNotifier {
       orderDate = order['orderTime'] as DateTime;
     }
 
-    return orderDate.year == selectedDate!.year &&
-        orderDate.month == selectedDate!.month &&
-        orderDate.day == selectedDate!.day;
+    if (selectedDate != null) {
+      return orderDate.year == selectedDate!.year &&
+          orderDate.month == selectedDate!.month &&
+          orderDate.day == selectedDate!.day;
+    }
+
+    return isOrderInFilterRange(orderDate);
+  }
+
+  bool isOrderInFilterRange(DateTime orderDate) {
+    if (_filterStartDate == null && _filterEndDate == null) return true;
+    if (_filterStartDate != null && orderDate.isBefore(_filterStartDate!)) {
+      return false;
+    }
+    if (_filterEndDate != null && !orderDate.isBefore(_filterEndDate!)) {
+      return false;
+    }
+    return true;
+  }
+
+  String _resolveRawOrderStatus(Map<String, dynamic> data) {
+    final rawStatus = (data['status'] as String?)?.trim();
+    final rawOrderStatus = (data['orderStatus'] as String?)?.trim();
+
+    const notificationOnly = {'new', 'accepted', 'rejected'};
+    if (rawStatus != null &&
+        notificationOnly.contains(rawStatus.toLowerCase()) &&
+        rawOrderStatus != null &&
+        rawOrderStatus.isNotEmpty) {
+      return rawOrderStatus;
+    }
+    if (rawStatus != null && rawStatus.isNotEmpty) {
+      return rawStatus;
+    }
+    if (rawOrderStatus != null && rawOrderStatus.isNotEmpty) {
+      return rawOrderStatus;
+    }
+    return 'pending';
   }
 
   // ======== Status Translation ========
+  String _convertDeliveryStatusToArabic(String status) {
+    switch (status.toLowerCase()) {
+      case 'pending':
+        return 'في انتظار قبول المكتب';
+      case 'accepted':
+        return 'تم قبوله من المكتب';
+      case 'assigned':
+        return 'تم تعيين مندوب';
+      case 'driver_accepted':
+        return 'المندوب قبل الطلب';
+      case 'picked_up':
+        return 'تم استلام الطلب من المتجر';
+      case 'completed':
+        return 'تم التسليم';
+      case 'driver_rejected':
+        return 'المندوب رفض الطلب';
+      case 'customer_rejected':
+        return 'الزبون رفض الاستلام';
+      case 'rejected':
+        return 'تم رفض الطلب من المكتب';
+      default:
+        return status;
+    }
+  }
+
+  String _convertIndependentStatusToArabic(String status) {
+    switch (status.toLowerCase()) {
+      case 'completed':
+        return 'تم التسليم';
+      case 'picked_up':
+        return 'تم استلام الطلب من المتجر';
+      case 'driver_accepted':
+      case 'accepted':
+        return 'المندوب قبل الطلب';
+      default:
+        return status;
+    }
+  }
+
   String _convertStatusToArabic(String status) {
     if (status == 'قيد المراجعة' ||
         status == 'تم استلام الطلب' ||
@@ -262,14 +364,17 @@ class PastOrdersViewModel extends ChangeNotifier {
       return status;
     }
     switch (status.toLowerCase()) {
+      case 'new':
       case 'pending':
         return 'قيد المراجعة';
       case 'accepted':
         return 'تم استلام الطلب';
       case 'preparing':
+      case 'delivering':
         return 'جارى تسليم للدليفري';
       case 'delivered':
-        return 'تم التسليم للطيار';
+      case 'completed':
+        return 'تم التسليم';
       case 'rejected':
         return 'تم رفض الطلب';
       default:

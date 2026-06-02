@@ -9,95 +9,55 @@ bool _isReturnedToMerchantRaw(String? status) {
   return status.trim().toLowerCase() == 'returned_to_merchant';
 }
 
-void _emitIfReturned({
-  required String storeId,
-  required String? status,
-  required String orderDocumentId,
-}) {
-  if (!_isReturnedToMerchantRaw(status)) return;
-  if (orderDocumentId.isEmpty) return;
-  OrderNotificationCoordinator.instance.notifyOfficeReturnedOrder(
-    orderDocumentId: orderDocumentId,
-    storeId: storeId,
-  );
-}
-
-/// يستمع لتعديلات [present_order] و [request delivery] عندما يضع المكتب
-/// الحالة `returned_to_merchant` (أحدهما أو كلاهما قد يُحدَّث حسب الخادم).
+/// يستمع لتعديلات [orders] عندما يضع المكتب أو الطلب الحالة `returned_to_merchant`.
 class StoreOfficeReturnListener {
   StoreOfficeReturnListener(this.storeId);
 
   final String storeId;
-  StreamSubscription<QuerySnapshot<Map<String, dynamic>>>? _presentSub;
-  StreamSubscription<QuerySnapshot<Map<String, dynamic>>>? _deliverySub;
-  bool _seenPresentInitial = false;
-  bool _seenDeliveryInitial = false;
+  StreamSubscription<QuerySnapshot<Map<String, dynamic>>>? _sub;
+  bool _seenInitial = false;
 
   void start() {
-    _presentSub?.cancel();
-    _deliverySub?.cancel();
-    _seenPresentInitial = false;
-    _seenDeliveryInitial = false;
+    _sub?.cancel();
+    _seenInitial = false;
 
-    _presentSub = FirebaseFirestore.instance
-        .collection('markets')
-        .doc(storeId)
-        .collection('present_order')
+    _sub = FirebaseFirestore.instance
+        .collection('orders')
+        .where('storeId', isEqualTo: storeId)
         .snapshots()
         .listen(
           (snapshot) {
-            if (!_seenPresentInitial) {
-              _seenPresentInitial = true;
-              return;
-            }
-            for (final change in snapshot.docChanges) {
-              if (change.type != DocumentChangeType.modified) continue;
-              _emitIfReturned(
-                storeId: storeId,
-                status: change.doc.data()?['status']?.toString(),
-                orderDocumentId: change.doc.id,
-              );
-            }
-          },
-          onError: (Object e, StackTrace st) {
-            // ignore: avoid_print
-            print('StoreOfficeReturnListener (present_order): $e\n$st');
-          },
-        );
-
-    _deliverySub = FirebaseFirestore.instance
-        .collection('request delivery')
-        .where('marketId', isEqualTo: storeId)
-        .snapshots()
-        .listen(
-          (snapshot) {
-            if (!_seenDeliveryInitial) {
-              _seenDeliveryInitial = true;
+            if (!_seenInitial) {
+              _seenInitial = true;
               return;
             }
             for (final change in snapshot.docChanges) {
               if (change.type != DocumentChangeType.modified) continue;
               final data = change.doc.data();
-              final orderDocumentId =
-                  data?['orderDocumentId']?.toString() ?? '';
-              _emitIfReturned(
-                storeId: storeId,
-                status: data?['status']?.toString(),
-                orderDocumentId: orderDocumentId,
-              );
+              if (data == null) continue;
+              
+              final deliveryRequest = data['deliveryRequest'] as Map<String, dynamic>? ?? {};
+              
+              final isReturnedMain = _isReturnedToMerchantRaw(data['orderStatus']?.toString() ?? data['status']?.toString());
+              final isReturnedDelivery = _isReturnedToMerchantRaw(deliveryRequest['status']?.toString());
+              
+              if (isReturnedMain || isReturnedDelivery) {
+                OrderNotificationCoordinator.instance.notifyOfficeReturnedOrder(
+                  orderDocumentId: change.doc.id,
+                  storeId: storeId,
+                );
+              }
             }
           },
           onError: (Object e, StackTrace st) {
             // ignore: avoid_print
-            print('StoreOfficeReturnListener (request delivery): $e\n$st');
+            print('StoreOfficeReturnListener error: $e\n$st');
           },
         );
   }
 
   Future<void> dispose() async {
-    await _presentSub?.cancel();
-    await _deliverySub?.cancel();
-    _presentSub = null;
-    _deliverySub = null;
+    await _sub?.cancel();
+    _sub = null;
   }
 }

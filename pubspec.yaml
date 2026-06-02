@@ -110,6 +110,7 @@ flutter:
     - assets/sounds/notification.mp3
     - assets/images/404.png
     - assets/images/no_internet.png
+    - assets/images/delvery.png
 
   fonts:
     - family: Tajawal

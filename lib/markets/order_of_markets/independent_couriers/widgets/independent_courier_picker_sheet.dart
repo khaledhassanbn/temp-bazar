@@ -86,7 +86,7 @@ class _IndependentCourierPickerSheetState
                       const SizedBox(width: 12),
                       const Expanded(
                         child: Text(
-                          'اختر مناديب مستقلين (حتى 3)',
+                          'اختر مناديب مستقلين 3',
                           style: TextStyle(
                             fontWeight: FontWeight.bold,
                             fontSize: 18,

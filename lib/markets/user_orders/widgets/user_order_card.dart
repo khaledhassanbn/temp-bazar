@@ -1,16 +1,24 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_database/firebase_database.dart';
 import 'package:intl/intl.dart';
 import 'package:bazar_suez/theme/app_color.dart';
-import '../services/user_orders_service.dart';
+import 'package:bazar_suez/markets/order_of_markets/utils/order_status_helper.dart';
 import 'store_rating_dialog.dart';
 import 'delivery_rating_dialog.dart';
 import 'package:go_router/go_router.dart';
 import 'package:bazar_suez/services/review_service.dart';
 import 'package:flutter/services.dart';
+import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:url_launcher/url_launcher.dart';
+import 'dart:math' as math;
+import 'dart:ui' as ui;
+import 'package:flutter/foundation.dart';
+import 'package:flutter/gestures.dart';
+import '../services/user_orders_service.dart';
 
 /// كارت عرض طلب المستخدم
-class UserOrderCard extends StatelessWidget {
+class UserOrderCard extends StatefulWidget {
   final Map<String, dynamic> order;
   final String orderId;
   final VoidCallback onRatingSubmitted;
@@ -26,27 +34,130 @@ class UserOrderCard extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) {
-    final statusFromOrder = order['status'] as String? ?? 'pending';
+  State<UserOrderCard> createState() => _UserOrderCardState();
+}
 
-    // لو فيه طلب توصيل (request delivery) لهذا الطلب، نستخدم حالته
-    final String effectiveStatus;
-    final String statusArabic;
-    final Color statusColor;
+class _UserOrderCardState extends State<UserOrderCard> {
+  bool _expanded = false;
+  bool _isCancelling = false;
+  bool _isAccountingSuccess = false;
+  final UserOrdersService _ordersService = UserOrdersService();
+  Map<String, dynamic>? _fetchedCourierData;
+  bool _loadingCourier = false;
+  GoogleMapController? _mapController;
+  BitmapDescriptor? _motorcycleIcon;
 
-    if (deliveryInfo != null && deliveryInfo!['status'] != null) {
-      effectiveStatus = deliveryInfo!['status'] as String? ?? statusFromOrder;
-      statusArabic = UserOrdersService.getDeliveryStatusArabic(effectiveStatus);
-      statusColor = Color(
-        UserOrdersService.getDeliveryStatusColor(effectiveStatus),
+  @override
+  void initState() {
+    super.initState();
+    _checkAndFetchCourier();
+    _loadMotorcycleIcon();
+  }
+
+  Future<void> _loadMotorcycleIcon() async {
+    try {
+      final ByteData data = await rootBundle.load('assets/images/delvery.png');
+      final ui.Codec codec = await ui.instantiateImageCodec(
+        data.buffer.asUint8List(),
+        targetWidth: 100, // تصغير الأيقونة لتظهر بشكل مناسب
       );
-    } else {
-      effectiveStatus = statusFromOrder;
-      statusArabic = UserOrdersService.getLegacyStatusArabic(effectiveStatus);
-      statusColor = Color(
-        UserOrdersService.getLegacyStatusColor(effectiveStatus),
-      );
+      final ui.FrameInfo fi = await codec.getNextFrame();
+      final ByteData? resizedData = await fi.image.toByteData(format: ui.ImageByteFormat.png);
+      if (resizedData != null && mounted) {
+        setState(() {
+          _motorcycleIcon = BitmapDescriptor.bytes(resizedData.buffer.asUint8List());
+        });
+      }
+    } catch (e) {
+      // Fallback
+      if (mounted) {
+        setState(() {
+          _motorcycleIcon = BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueOrange);
+        });
+      }
     }
+  }
+
+  @override
+  void didUpdateWidget(covariant UserOrderCard oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    final oldCourierId = _resolveCourierId(oldWidget.order, oldWidget.deliveryInfo);
+    final newCourierId = _resolveCourierId(widget.order, widget.deliveryInfo);
+    if (newCourierId != oldCourierId && newCourierId.isNotEmpty) {
+      _fetchCourierDetails(newCourierId);
+    }
+  }
+
+  void _checkAndFetchCourier() {
+    final courierId = _resolveCourierId(widget.order, widget.deliveryInfo);
+    if (courierId.isNotEmpty) {
+      _fetchCourierDetails(courierId);
+    }
+  }
+
+  String _resolveCourierId(Map<String, dynamic> order, Map<String, dynamic>? deliveryInfo) {
+    final assignedCourierIdFromOrder = (order['assignedCourierId'] ?? '').toString();
+    final directDeliveryMap = _asMap(order['deliveryRequest']);
+    String cId = '';
+    if (deliveryInfo != null || directDeliveryMap.isNotEmpty) {
+      final Map<String, dynamic> source = deliveryInfo ?? directDeliveryMap;
+      cId = (source['courierId'] ??
+              source['driverId'] ??
+              source['assignedDriverId'] ??
+              source['assignedCourierId'] ??
+              assignedCourierIdFromOrder ??
+              '')
+          .toString();
+    }
+    if (cId.isEmpty && assignedCourierIdFromOrder.isNotEmpty) {
+      cId = assignedCourierIdFromOrder;
+    }
+    if (cId.isEmpty) {
+      cId = (order['courierId'] ?? order['driverId'] ?? '').toString();
+    }
+    return cId;
+  }
+
+  void _fetchCourierDetails(String courierId) {
+    if (courierId.isEmpty) return;
+    setState(() {
+      _loadingCourier = true;
+    });
+    FirebaseFirestore.instance
+        .collection('courier_requests')
+        .doc(courierId)
+        .get()
+        .then((doc) {
+      if (doc.exists && mounted) {
+        setState(() {
+          _fetchedCourierData = doc.data();
+          _loadingCourier = false;
+        });
+      } else if (mounted) {
+        setState(() {
+          _loadingCourier = false;
+        });
+      }
+    }).catchError((_) {
+      if (mounted) {
+        setState(() {
+          _loadingCourier = false;
+        });
+      }
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final order = widget.order;
+    final orderId = widget.orderId;
+    final deliveryInfo = widget.deliveryInfo;
+
+    final rawStatus = OrderStatusHelper.resolveRawStatus(order);
+    final statusArabic = OrderStatusHelper.toCustomerArabic(rawStatus);
+    final statusColor = Color(OrderStatusHelper.statusColor(rawStatus));
+    final isCompleted = OrderStatusHelper.isDelivered(order);
+    final isRejected = OrderStatusHelper.isRejected(order);
 
     final createdAt = order['createdAt'] as Timestamp?;
     final dateStr = createdAt != null
@@ -92,24 +203,89 @@ class UserOrderCard extends StatelessWidget {
     final totalAmount = (order['totalAmount'] ?? 0.0) as num;
 
     final storeRating = order['storeRating'] as Map<String, dynamic>?;
-    final hasRated = storeRating != null;
+    final deliveryRating = order['deliveryRating'] as Map<String, dynamic>?;
+    final hasRatedStore = storeRating != null;
+    final hasRatedDelivery = deliveryRating != null;
+    final hasFullyRated = hasRatedStore && hasRatedDelivery;
     final userRating = storeRating?['rating'] as int?;
-
-    final isCompleted = effectiveStatus.toLowerCase() == 'completed';
 
     // ================== بيانات المندوب المعروضة للزبون ==================
     String driverName = '';
     String driverPhone = '';
+    String driverPhoto = '';
+    String courierId = '';
 
     // 1) لو الطلب داخل نظام المكاتب → نستخدم بيانات المندوب من request delivery
-    if (deliveryInfo != null) {
-      driverName = (deliveryInfo!['assignedDriverName'] ?? '').toString();
-      driverPhone = (deliveryInfo!['assignedDriverPhone'] ?? '').toString();
+    final directDeliveryMap = _asMap(order['deliveryRequest']);
+    final couriersDir = _asMap(order['independentCouriersDirectory']);
+    final assignedCourierIdFromOrder = (order['assignedCourierId'] ?? '').toString();
+
+    if (deliveryInfo != null || directDeliveryMap.isNotEmpty) {
+      final Map<String, dynamic> source = deliveryInfo ?? directDeliveryMap;
+      driverName = (source['assignedDriverName'] ??
+              source['driverName'] ??
+              source['driver_name'] ??
+              '')
+          .toString();
+      driverPhone = (source['assignedDriverPhone'] ??
+              source['driverPhone'] ??
+              source['driver_phone'] ??
+              '')
+          .toString();
+      driverPhoto = (source['assignedDriverPhoto'] ??
+              source['driverPhoto'] ??
+              source['driverImage'] ??
+              '')
+          .toString();
+      courierId = (source['courierId'] ??
+              source['driverId'] ??
+              source['assignedDriverId'] ??
+              source['assignedCourierId'] ??
+              assignedCourierIdFromOrder ??
+              '')
+          .toString();
+    }
+    // 2) الطلب عبر مندوب مستقل
+    if (courierId.isEmpty && assignedCourierIdFromOrder.isNotEmpty) {
+      courierId = assignedCourierIdFromOrder;
+    }
+    if (courierId.isEmpty) {
+      courierId = (order['courierId'] ?? order['driverId'] ?? '').toString();
+    }
+    if (courierId.isNotEmpty && (driverName.isEmpty || driverPhone.isEmpty || driverPhoto.isEmpty)) {
+      final cData = _fetchedCourierData ?? _asMap(couriersDir[courierId]);
+      final nameRaw = cData['name'] ??
+          cData['fullName'] ??
+          cData['full_name'] ??
+          cData['userName'] ??
+          cData['user_name'] ??
+          cData['displayName'] ??
+          cData['display_name'];
+      driverName = driverName.isEmpty
+          ? (nameRaw ?? 'مندوب').toString()
+          : driverName;
+      final phoneRaw = cData['phone'] ??
+          cData['phoneNumber'] ??
+          cData['phone_number'];
+      driverPhone = driverPhone.isEmpty ? (phoneRaw ?? '').toString() : driverPhone;
+      final photoRaw = cData['profileImage'] ??
+          cData['personalPhoto'] ??
+          cData['personal_photo'] ??
+          cData['photoUrl'] ??
+          cData['photo_url'] ??
+          cData['personalImage'] ??
+          cData['personal_image'] ??
+          cData['image'] ??
+          cData['photo'] ??
+          cData['avatar'] ??
+          cData['avatarUrl'] ??
+          cData['avatar_url'];
+      driverPhoto = driverPhoto.isEmpty
+          ? (photoRaw ?? '').toString()
+          : driverPhoto;
     }
     // 2) لو مفيش DeliveryInfo، لكن التاجر اختار "هسلمه بنفسى"
-    //    نكتشف ذلك من حالة الطلب: delivered / تم التسليم للطيار
-    else if (effectiveStatus.toLowerCase() == 'delivered' ||
-        statusArabic == 'تم التسليم للطيار') {
+    else if (isCompleted && deliveryInfo == null) {
       // نحاول إيجاد رقم هاتف المتجر من الطلب
       final dynamic rawStorePhone =
           order['marketPhone'] ??
@@ -126,6 +302,21 @@ class UserOrderCard extends StatelessWidget {
 
     // التحقق من إمكانية التقييم (يجب أن يكون هناك storeId)
     final canRate = isCompleted && marketId.isNotEmpty;
+    final rawStatusLower = OrderStatusHelper.resolveRawStatus(order).toLowerCase();
+    final shouldShowTrackingMap =
+        rawStatusLower == 'picked_up' || rawStatusLower == 'out_for_delivery';
+
+    if (isCompleted && !_isAccountingSuccess) {
+      _isAccountingSuccess = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        final uid = (order['userId'] ?? order['customerInfo']?['userId'] ?? '').toString();
+        if (uid.isEmpty) return;
+        _ordersService.accountSuccessfulOrderIfNeeded(
+          orderId: orderId,
+          userId: uid,
+        );
+      });
+    }
 
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -182,9 +373,8 @@ class UserOrderCard extends StatelessWidget {
           ),
 
           // معلومات المندوب عندما يكون الطلب فى نظام الشحن
-          // تُعرض فقط إذا لم يتم تسليم الطلب بعد
           if ((driverName.isNotEmpty || driverPhone.isNotEmpty) &&
-              effectiveStatus.toLowerCase() != 'completed')
+              !isRejected)
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
               child: Container(
@@ -200,19 +390,7 @@ class UserOrderCard extends StatelessWidget {
                 ),
                 child: Row(
                   children: [
-                    Container(
-                      width: 32,
-                      height: 32,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        color: Colors.orange.withOpacity(0.15),
-                      ),
-                      child: const Icon(
-                        Icons.delivery_dining,
-                        color: Colors.orange,
-                        size: 18,
-                      ),
-                    ),
+                    _buildDriverAvatar(driverPhoto),
                     const SizedBox(width: 10),
                     Expanded(
                       child: Column(
@@ -240,22 +418,11 @@ class UserOrderCard extends StatelessWidget {
                                 ),
                                 IconButton(
                                   icon: const Icon(
-                                    Icons.copy,
+                                    Icons.phone,
                                     size: 18,
-                                    color: Colors.blue,
+                                    color: Colors.green,
                                   ),
-                                  onPressed: () {
-                                    Clipboard.setData(
-                                      ClipboardData(text: driverPhone),
-                                    );
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      const SnackBar(
-                                        content: Text(
-                                          'تم نسخ رقم هاتف المندوب',
-                                        ),
-                                      ),
-                                    );
-                                  },
+                                  onPressed: () => _callPhone(driverPhone),
                                 ),
                               ],
                             ),
@@ -266,6 +433,16 @@ class UserOrderCard extends StatelessWidget {
                 ),
               ),
             ),
+
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            child: _buildTrackingSection(
+              order: order,
+              marketName: marketName,
+              courierId: courierId,
+              showMap: shouldShowTrackingMap,
+            ),
+          ),
 
           // معلومات المتجر
           Padding(
@@ -316,7 +493,13 @@ class UserOrderCard extends StatelessWidget {
                 // عدد المنتجات
                 Column(
                   children: [
-                    Icon(Icons.expand_more, color: Colors.grey[400]),
+                    InkWell(
+                      onTap: () => setState(() => _expanded = !_expanded),
+                      child: Icon(
+                        _expanded ? Icons.expand_less : Icons.expand_more,
+                        color: Colors.grey[400],
+                      ),
+                    ),
                     Text(
                       '${items.length} منتج',
                       style: TextStyle(fontSize: 12, color: Colors.grey[600]),
@@ -327,12 +510,12 @@ class UserOrderCard extends StatelessWidget {
             ),
           ),
 
-          // قائمة المنتجات (أول 2 فقط)
+          // قائمة المنتجات
           if (items.isNotEmpty)
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16),
               child: Column(
-                children: items.take(2).map((item) {
+                children: (_expanded ? items : items.take(2)).map((item) {
                   final itemData = item as Map<String, dynamic>;
                   final quantity = itemData['quantity'] ?? 1;
                   final name = itemData['productName'] ?? 'منتج';
@@ -389,28 +572,59 @@ class UserOrderCard extends StatelessWidget {
             padding: const EdgeInsets.all(16),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // زر اطلب مجدداً
-                OutlinedButton(
-                  onPressed: marketId.isNotEmpty
-                      ? () =>
-                            context.push('/HomeMarketPage?marketLink=$marketId')
-                      : null,
-                  style: OutlinedButton.styleFrom(
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(20),
+                // زر اطلب مجدداً وإلغاء الطلب
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    OutlinedButton(
+                      onPressed: marketId.isNotEmpty
+                          ? () =>
+                                context.push('/HomeMarketPage?marketLink=$marketId')
+                          : null,
+                      style: OutlinedButton.styleFrom(
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        side: const BorderSide(color: AppColors.mainColor),
+                      ),
+                      child: const Text(
+                        'اطلب مجدداً',
+                        style: TextStyle(
+                          color: AppColors.mainColor,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
                     ),
-                    side: const BorderSide(color: AppColors.mainColor),
-                  ),
-                  child: const Text(
-                    'اطلب مجدداً',
-                    style: TextStyle(
-                      color: AppColors.mainColor,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
+                    if (!isCompleted && !isRejected)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 8.0, right: 8.0),
+                        child: InkWell(
+                          onTap: _isCancelling ? null : () => _confirmCancel(order, orderId),
+                          child: _isCancelling
+                              ? const SizedBox(
+                                  width: 16,
+                                  height: 16,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    color: Colors.red,
+                                  ),
+                                )
+                              : Text(
+                                  'إلغاء الطلب',
+                                  style: TextStyle(
+                                    color: Colors.red[600],
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.bold,
+                                    decoration: TextDecoration.underline,
+                                  ),
+                                ),
+                        ),
+                      ),
+                  ],
                 ),
-                // المبلغ
+                // المبلغ وتفاصيل الدفع
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
@@ -421,12 +635,17 @@ class UserOrderCard extends StatelessWidget {
                         fontWeight: FontWeight.bold,
                       ),
                     ),
-                    Text(
-                      'تفاصيل الدفع',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: Colors.grey[600],
-                        decoration: TextDecoration.underline,
+                    const SizedBox(height: 4),
+                    InkWell(
+                      onTap: () => _showInvoiceDialog(context, order, items, totalAmount),
+                      child: Text(
+                        'تفاصيل الدفع',
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: Colors.blue[700],
+                          fontWeight: FontWeight.bold,
+                          decoration: TextDecoration.underline,
+                        ),
                       ),
                     ),
                   ],
@@ -444,7 +663,7 @@ class UserOrderCard extends StatelessWidget {
                 bottom: Radius.circular(16),
               ),
             ),
-            child: hasRated
+            child: hasFullyRated
                 ? Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
@@ -467,6 +686,8 @@ class UserOrderCard extends StatelessWidget {
                       marketId,
                       marketName,
                       marketLogo,
+                      hasRatedStore: hasRatedStore,
+                      hasRatedDelivery: hasRatedDelivery,
                     ),
                     child: Container(
                       padding: const EdgeInsets.symmetric(vertical: 10),
@@ -505,8 +726,55 @@ class UserOrderCard extends StatelessWidget {
     String storeId,
     String storeName,
     String? storeLogo,
-  ) {
+    {
+    required bool hasRatedStore,
+    required bool hasRatedDelivery,
+  }) {
     final reviewService = ReviewService();
+
+    Future<void> openDeliveryDialog() async {
+      if (hasRatedDelivery) return;
+      showModalBottomSheet(
+        context: context,
+        isScrollControlled: true,
+        backgroundColor: Colors.transparent,
+        builder: (context) => DeliveryRatingDialog(
+          onSubmit: (deliveryRating, deliveryComment) async {
+            try {
+              await reviewService.submitDeliveryRating(
+                orderId: widget.orderId,
+                rating: deliveryRating,
+                comment: deliveryComment,
+              );
+              if (context.mounted) {
+                Navigator.pop(context);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('شكراً لتقييمك!'),
+                    backgroundColor: Colors.green,
+                  ),
+                );
+                widget.onRatingSubmitted();
+              }
+            } catch (e) {
+              if (context.mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text('حدث خطأ: $e'),
+                    backgroundColor: Colors.red,
+                  ),
+                );
+              }
+            }
+          },
+        ),
+      );
+    }
+
+    if (hasRatedStore && !hasRatedDelivery) {
+      openDeliveryDialog();
+      return;
+    }
 
     showModalBottomSheet(
       context: context,
@@ -519,7 +787,7 @@ class UserOrderCard extends StatelessWidget {
           try {
             // حفظ تقييم المتجر
             await reviewService.submitStoreRating(
-              orderId: orderId,
+              orderId: widget.orderId,
               storeId: storeId,
               rating: rating,
               comment: comment,
@@ -529,44 +797,7 @@ class UserOrderCard extends StatelessWidget {
 
             if (context.mounted) {
               Navigator.pop(context);
-
-              // عرض نافذة تقييم الشحن
-              showModalBottomSheet(
-                context: context,
-                isScrollControlled: true,
-                backgroundColor: Colors.transparent,
-                builder: (context) => DeliveryRatingDialog(
-                  onSubmit: (deliveryRating, deliveryComment) async {
-                    try {
-                      await reviewService.submitDeliveryRating(
-                        orderId: orderId,
-                        rating: deliveryRating,
-                        comment: deliveryComment,
-                      );
-
-                      if (context.mounted) {
-                        Navigator.pop(context);
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text('شكراً لتقييمك!'),
-                            backgroundColor: Colors.green,
-                          ),
-                        );
-                        onRatingSubmitted();
-                      }
-                    } catch (e) {
-                      if (context.mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text('حدث خطأ: $e'),
-                            backgroundColor: Colors.red,
-                          ),
-                        );
-                      }
-                    }
-                  },
-                ),
-              );
+              await openDeliveryDialog();
             }
           } catch (e) {
             if (context.mounted) {
@@ -581,5 +812,455 @@ class UserOrderCard extends StatelessWidget {
         },
       ),
     );
+  }
+
+  Widget _buildDriverAvatar(String driverPhoto) {
+    if (driverPhoto.isEmpty) {
+      return Container(
+        width: 36,
+        height: 36,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          color: Colors.orange.withOpacity(0.15),
+        ),
+        child: const Icon(
+          Icons.delivery_dining,
+          color: Colors.orange,
+          size: 20,
+        ),
+      );
+    }
+    return ClipOval(
+      child: Image.network(
+        driverPhoto,
+        width: 36,
+        height: 36,
+        fit: BoxFit.cover,
+        errorBuilder: (_, __, ___) => Container(
+          width: 36,
+          height: 36,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: Colors.orange.withOpacity(0.15),
+          ),
+          child: const Icon(
+            Icons.delivery_dining,
+            color: Colors.orange,
+            size: 20,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTrackingSection({
+    required Map<String, dynamic> order,
+    required String marketName,
+    required String courierId,
+    required bool showMap,
+  }) {
+    final customerInfoMap = _asMap(order['customerInfo']);
+    final deliveryMap = _asMap(order['deliveryRequest']);
+    final marketMap = _asMap(order['market']);
+    
+    GeoPoint? customerLocation = _extractGeoPoint(
+      customerInfoMap['location'] ?? order['customerLocation'],
+    );
+    if (customerLocation == null &&
+        order['customerLatitude'] != null &&
+        order['customerLongitude'] != null) {
+      final lat = order['customerLatitude'];
+      final lng = order['customerLongitude'];
+      if (lat is num && lng is num) {
+        customerLocation = GeoPoint(lat.toDouble(), lng.toDouble());
+      }
+    }
+
+    GeoPoint? marketLocation = _extractGeoPoint(
+      order['marketLocation'] ??
+          order['storeLocation'] ??
+          deliveryMap['marketLocation'] ??
+          deliveryMap['storeLocation'] ??
+          marketMap['location'] ??
+          order['storeGeoPoint'] ??
+          order['marketGeoPoint'],
+    );
+    if (marketLocation == null &&
+        order['storeLatitude'] != null &&
+        order['storeLongitude'] != null) {
+      final lat = order['storeLatitude'];
+      final lng = order['storeLongitude'];
+      if (lat is num && lng is num) {
+        marketLocation = GeoPoint(lat.toDouble(), lng.toDouble());
+      }
+    }
+
+    if (!showMap) {
+      return Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: Colors.blueGrey.withOpacity(0.08),
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: const Text(
+          'بانتظار استلام المندوب للطلب',
+          style: TextStyle(fontWeight: FontWeight.w600),
+          textAlign: TextAlign.center,
+        ),
+      );
+    }
+
+    if (courierId.isEmpty || customerLocation == null || marketLocation == null) {
+      return Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: Colors.orange.withOpacity(0.08),
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: const Text(
+          'لا تتوفر بيانات كافية للتتبع الآن',
+          style: TextStyle(fontWeight: FontWeight.w600),
+          textAlign: TextAlign.center,
+        ),
+      );
+    }
+
+    return StreamBuilder<DatabaseEvent>(
+      stream: FirebaseDatabase.instance.ref('couriers_live/$courierId').onValue,
+      builder: (context, snapshot) {
+        final val = snapshot.data?.snapshot.value;
+        GeoPoint? courierPoint;
+        if (val is Map) {
+          final map = Map<dynamic, dynamic>.from(val);
+          final lat = map['latitude'];
+          final lng = map['longitude'];
+          if (lat is num && lng is num) {
+            courierPoint = GeoPoint(lat.toDouble(), lng.toDouble());
+          }
+        }
+
+        final nonNullMarket = marketLocation!;
+        final nonNullCustomer = customerLocation!;
+        final totalDistance = _distanceMeters(nonNullMarket, nonNullCustomer);
+        final remainingDistance = courierPoint == null
+            ? totalDistance
+            : _distanceMeters(courierPoint, nonNullCustomer);
+        final progress = totalDistance <= 0
+            ? 0.0
+            : (1 - (remainingDistance / totalDistance)).clamp(0.0, 1.0);
+
+        final markers = <Marker>{
+          Marker(
+            markerId: const MarkerId('store'),
+            position: LatLng(nonNullMarket.latitude, nonNullMarket.longitude),
+            infoWindow: InfoWindow(title: marketName),
+            icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueAzure),
+          ),
+          Marker(
+            markerId: const MarkerId('customer'),
+            position: LatLng(nonNullCustomer.latitude, nonNullCustomer.longitude),
+            infoWindow: const InfoWindow(title: 'موقع الوصول'),
+            icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueGreen),
+          ),
+          if (courierPoint != null)
+            Marker(
+              markerId: const MarkerId('courier'),
+              position: LatLng(courierPoint.latitude, courierPoint.longitude),
+              infoWindow: const InfoWindow(title: 'المندوب'),
+              icon: _motorcycleIcon ?? BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueOrange),
+            ),
+        };
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Container(
+              height: 250,
+              clipBehavior: Clip.antiAlias,
+              decoration: BoxDecoration(borderRadius: BorderRadius.circular(12)),
+              child: Stack(
+                children: [
+                  GoogleMap(
+                    onMapCreated: (controller) => _mapController = controller,
+                    initialCameraPosition: CameraPosition(
+                      target: courierPoint != null 
+                          ? LatLng(courierPoint.latitude, courierPoint.longitude) 
+                          : LatLng(nonNullCustomer.latitude, nonNullCustomer.longitude),
+                      zoom: 14,
+                    ),
+                    markers: markers,
+                    myLocationButtonEnabled: false,
+                    zoomControlsEnabled: true,
+                    mapToolbarEnabled: true,
+                    scrollGesturesEnabled: true,
+                    zoomGesturesEnabled: true,
+                    gestureRecognizers: <Factory<OneSequenceGestureRecognizer>>{
+                      Factory<OneSequenceGestureRecognizer>(() => EagerGestureRecognizer()),
+                    },
+                  ),
+                  if (courierPoint != null)
+                    Positioned(
+                      top: 16,
+                      left: 16,
+                      child: FloatingActionButton(
+                        mini: true,
+                        backgroundColor: Colors.orange,
+                        onPressed: () {
+                          _mapController?.animateCamera(
+                            CameraUpdate.newLatLngZoom(
+                              LatLng(courierPoint!.latitude, courierPoint!.longitude),
+                              15,
+                            ),
+                          );
+                        },
+                        child: const Icon(Icons.my_location, color: Colors.white),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 10),
+            LinearProgressIndicator(
+              value: progress,
+              minHeight: 8,
+              borderRadius: BorderRadius.circular(8),
+              color: AppColors.mainColor,
+              backgroundColor: Colors.grey.shade300,
+            ),
+            const SizedBox(height: 6),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  'المتبقي: ${_formatDistance(remainingDistance)}',
+                  style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+                ),
+                Text(
+                  'التقدم: ${(progress * 100).toStringAsFixed(0)}%',
+                  style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
+                ),
+              ],
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  GeoPoint? _extractGeoPoint(dynamic raw) {
+    if (raw is GeoPoint) return raw;
+    if (raw is Map) {
+      final lat = raw['lat'] ?? raw['latitude'];
+      final lng = raw['lng'] ?? raw['longitude'];
+      if (lat is num && lng is num) {
+        return GeoPoint(lat.toDouble(), lng.toDouble());
+      }
+    }
+    return null;
+  }
+
+  Map<String, dynamic> _asMap(dynamic raw) {
+    if (raw is Map<String, dynamic>) return raw;
+    if (raw is Map) {
+      return raw.map((key, value) => MapEntry(key.toString(), value));
+    }
+    return <String, dynamic>{};
+  }
+
+  double _distanceMeters(GeoPoint a, GeoPoint b) {
+    const r = 6371000.0;
+    final dLat = _toRad(b.latitude - a.latitude);
+    final dLng = _toRad(b.longitude - a.longitude);
+    final s1 = math.sin(dLat / 2);
+    final s2 = math.sin(dLng / 2);
+    final aa = s1 * s1 +
+        math.cos(_toRad(a.latitude)) * math.cos(_toRad(b.latitude)) * s2 * s2;
+    final c = 2 * math.atan2(math.sqrt(aa), math.sqrt(1 - aa));
+    return r * c;
+  }
+
+  double _toRad(double d) => d * math.pi / 180;
+
+  String _formatDistance(double meters) {
+    if (meters < 1000) return '${meters.round()} م';
+    return '${(meters / 1000).toStringAsFixed(1)} كم';
+  }
+
+  void _showInvoiceDialog(BuildContext context, Map<String, dynamic> order, List<dynamic> items, num totalAmount) {
+    final deliveryFee = (order['deliveryFee'] ?? 0.0) as num;
+    final discount = (order['discount'] ?? 0.0) as num;
+
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) {
+        return Container(
+          padding: const EdgeInsets.all(20),
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+          ),
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text('فاتورة الطلب', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                const Divider(height: 30),
+                ...items.map((item) {
+                  final itemData = item as Map<String, dynamic>;
+                  final name = itemData['productName'] ?? 'منتج';
+                  final quantity = itemData['quantity'] ?? 1;
+                  final price = itemData['price'] ?? 0.0;
+                  return Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 4),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Expanded(
+                          child: Text(
+                            'x$quantity $name',
+                            style: const TextStyle(fontSize: 14),
+                          ),
+                        ),
+                        Text(
+                          '${(price * quantity).toStringAsFixed(2)} ج.م',
+                          style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+                        ),
+                      ],
+                    ),
+                  );
+                }),
+                const Divider(height: 30),
+                if (deliveryFee > 0)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 4),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text('رسوم التوصيل', style: TextStyle(fontSize: 14)),
+                        Text('${deliveryFee.toStringAsFixed(2)} ج.م', style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
+                      ],
+                    ),
+                  ),
+                if (discount > 0)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 4),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text('الخصم', style: TextStyle(fontSize: 14, color: Colors.green)),
+                        Text('-${discount.toStringAsFixed(2)} ج.م', style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Colors.green)),
+                      ],
+                    ),
+                  ),
+                const Divider(height: 30),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text('الإجمالي', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                    Text(
+                      '${totalAmount.toStringAsFixed(2)} ج.م',
+                      style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppColors.mainColor),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 20),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: () => Navigator.pop(context),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.mainColor,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                    ),
+                    child: const Text('إغلاق', style: TextStyle(color: Colors.white, fontSize: 16)),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Future<void> _confirmCancel(Map<String, dynamic> order, String orderId) async {
+    final status = OrderStatusHelper.resolveRawStatus(order).toLowerCase();
+    final isPendingReview =
+        status == 'pending' || status == 'pending_review' || status == 'قيد المراجعة';
+    final warning = isPendingReview
+        ? 'سيتم إلغاء الطلب بدون تأثير على نسبة الالتزام.'
+        : 'إلغاء الطلب في هذه المرحلة سيؤثر على نسبة الالتزام الخاصة بك عند المتاجر.';
+
+    final ok = await showDialog<bool>(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text('تأكيد إلغاء الطلب'),
+            content: Text(warning),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context, false),
+                child: const Text('رجوع'),
+              ),
+              ElevatedButton(
+                style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+                onPressed: () => Navigator.pop(context, true),
+                child: const Text('إلغاء الطلب'),
+              ),
+            ],
+          ),
+        ) ??
+        false;
+
+    if (!ok) return;
+    setState(() => _isCancelling = true);
+    try {
+      final resolvedUserId = (order['userId'] ??
+              (order['customerInfo'] is Map
+                  ? (order['customerInfo'] as Map)['userId']
+                  : ''))
+          .toString()
+          .trim();
+      if (resolvedUserId.isEmpty || resolvedUserId.toLowerCase() == 'null') {
+        throw Exception('معرف العميل غير متوفر في بيانات الطلب');
+      }
+
+      await _ordersService.cancelOrderByCustomer(
+        orderId: orderId,
+        userId: resolvedUserId,
+      );
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('تم إلغاء الطلب بنجاح'),
+          backgroundColor: Colors.green,
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('تعذر إلغاء الطلب: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _isCancelling = false);
+      }
+    }
+  }
+
+  Future<void> _callPhone(String phone) async {
+    if (phone.trim().isEmpty) return;
+    final uri = Uri.parse('tel:${phone.trim()}');
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri);
+    }
   }
 }

@@ -31,10 +31,8 @@ class ReviewService {
       createdAt: now,
     );
 
-    // 1. حفظ في document الطلب (في مسار المستخدم)
+    // 1. حفظ في document الطلب (في مسار المجموعه الموحده)
     await _firestore
-        .collection('users')
-        .doc(user.uid)
         .collection('orders')
         .doc(orderId)
         .update({
@@ -73,6 +71,27 @@ class ReviewService {
     final user = _auth.currentUser;
     if (user == null) throw Exception('يجب تسجيل الدخول');
 
+    final orderDoc = await _firestore.collection('orders').doc(orderId).get();
+    final orderData = orderDoc.data() ?? <String, dynamic>{};
+
+    final deliveryRequest =
+        (orderData['deliveryRequest'] is Map<String, dynamic>)
+            ? orderData['deliveryRequest'] as Map<String, dynamic>
+            : (orderData['deliveryRequest'] is Map
+                ? Map<String, dynamic>.from(orderData['deliveryRequest'] as Map)
+                : <String, dynamic>{});
+    final courierId = (orderData['assignedCourierId'] ??
+            deliveryRequest['courierId'] ??
+            deliveryRequest['driverId'] ??
+            deliveryRequest['assignedDriverId'] ??
+            '')
+        .toString();
+    final courierName = (deliveryRequest['assignedDriverName'] ??
+            deliveryRequest['driverName'] ??
+            orderData['assignedDriverName'] ??
+            '')
+        .toString();
+
     final deliveryRating = DeliveryRatingModel(
       rating: rating,
       comment: comment,
@@ -80,13 +99,30 @@ class ReviewService {
     );
 
     await _firestore
-        .collection('users')
-        .doc(user.uid)
         .collection('orders')
         .doc(orderId)
         .update({
-      'deliveryRating': deliveryRating.toMap(),
+      'deliveryRating': {
+        ...deliveryRating.toMap(),
+        'courierId': courierId,
+        'courierName': courierName,
+        'ratedByUserId': user.uid,
+      },
     });
+
+    // سجل مركزي لتطبيق المناديب: query مباشر بـ courierId
+    if (courierId.isNotEmpty) {
+      await _firestore.collection('courier_ratings').add({
+        'orderId': orderId,
+        'courierId': courierId,
+        'courierName': courierName,
+        'rating': rating,
+        'comment': comment,
+        'userId': user.uid,
+        'userName': user.displayName ?? 'مستخدم',
+        'createdAt': Timestamp.now(),
+      });
+    }
   }
 
   /// تحديث إحصائيات تقييم المتجر
@@ -173,8 +209,6 @@ class ReviewService {
   /// التحقق من وجود تقييم سابق للطلب
   Future<bool> hasOrderBeenRated(String userId, String orderId) async {
     final orderDoc = await _firestore
-        .collection('users')
-        .doc(userId)
         .collection('orders')
         .doc(orderId)
         .get();
@@ -188,8 +222,6 @@ class ReviewService {
   /// جلب تقييم الطلب (إن وجد)
   Future<StoreRatingInOrder?> getOrderStoreRating(String userId, String orderId) async {
     final orderDoc = await _firestore
-        .collection('users')
-        .doc(userId)
         .collection('orders')
         .doc(orderId)
         .get();
@@ -205,8 +237,6 @@ class ReviewService {
   /// جلب تقييم الشحن للطلب (للاستخدام في تطبيق الشحن)
   Future<DeliveryRatingModel?> getOrderDeliveryRating(String userId, String orderId) async {
     final orderDoc = await _firestore
-        .collection('users')
-        .doc(userId)
         .collection('orders')
         .doc(orderId)
         .get();

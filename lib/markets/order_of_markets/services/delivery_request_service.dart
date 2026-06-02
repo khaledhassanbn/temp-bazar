@@ -26,8 +26,11 @@ class DeliveryRequestService {
 
   Future<void> createRequest(Map<String, dynamic> data) async {
     try {
-      print('📤 محاولة إرسال طلب التوصيل...');
+      print('📤 محاولة إرسال طلب التوصيل لـ unified orders...');
       print('📋 البيانات: ${data.keys.toList()}');
+
+      final orderId = data['orderDocumentId'] as String? ?? data['orderId'] as String;
+      final officeId = data['officeId'] as String;
 
       // تنظيف البيانات من أي قيم null غير صالحة
       final cleanedData = <String, dynamic>{};
@@ -37,74 +40,131 @@ class DeliveryRequestService {
         }
       });
 
-      final docRef = await _firestore.collection('request delivery').add({
-        ...cleanedData,
-        'createdAt': FieldValue.serverTimestamp(),
+      final deliveryRequestData = {
+        'officeId': officeId,
+        'officeName': cleanedData['officeName'],
+        'officePhone': cleanedData['officePhone'],
+        'officeEmail': cleanedData['officeEmail'],
+        'status': 'pending',
+        'requestedAt': FieldValue.serverTimestamp(),
+        'assignedDriverName': null,
+        'assignedDriverPhone': null,
+      };
+
+      await _firestore.collection('orders').doc(orderId).update({
+        'deliveryRequest': deliveryRequestData,
+        'access.$officeId': true,
+        'updatedAt': FieldValue.serverTimestamp(),
       });
 
-      print('✅ تم إنشاء الطلب بنجاح: ${docRef.id}');
+      print('✅ تم إنشاء طلب التوصيل بنجاح في المستند: $orderId');
     } catch (e, stackTrace) {
       print('❌ خطأ في إنشاء طلب التوصيل: $e');
       print('📍 Stack trace: $stackTrace');
-      rethrow; // إعادة رمي الخطأ حتى يتم التعامل معه في الـ ViewModel
+      rethrow;
     }
   }
 
   // الاستماع لطلبات التوصيل المرفوضة لمتجر معين
   Stream<List<Map<String, dynamic>>> streamRejectedRequests(String marketId) {
     return _firestore
-        .collection('request delivery')
-        .where('marketId', isEqualTo: marketId)
-        .where('status', isEqualTo: 'rejected')
+        .collection('orders')
+        .where('storeId', isEqualTo: marketId)
+        .where('deliveryRequest.status', isEqualTo: 'rejected')
         .snapshots()
         .map(
           (snapshot) => snapshot.docs
-              .map((doc) => {'id': doc.id, ...doc.data()})
+              .map((doc) {
+                final docData = doc.data();
+                final deliveryRequest = docData['deliveryRequest'] as Map<String, dynamic>? ?? {};
+                return {
+                  'id': doc.id,
+                  'orderDocumentId': doc.id,
+                  'officeName': deliveryRequest['officeName'],
+                  ...deliveryRequest,
+                };
+              })
               .toList(),
         );
   }
 
   /// ✅ stream all delivery requests for a specific market
-  /// يُستخدم لعرض حالة الطلب ورقم المندوب داخل تطبيق التاجر/الزبون
   Stream<List<Map<String, dynamic>>> streamRequestsForMarket(
     String marketId,
   ) {
     return _firestore
-        .collection('request delivery')
-        .where('marketId', isEqualTo: marketId)
+        .collection('orders')
+        .where('storeId', isEqualTo: marketId)
         .snapshots()
         .map(
           (snapshot) => snapshot.docs
-              .map((doc) => {'id': doc.id, ...doc.data()})
+              .where((doc) {
+                final docData = doc.data();
+                return docData['deliveryRequest'] != null;
+              })
+              .map((doc) {
+                final docData = doc.data();
+                final deliveryRequest = docData['deliveryRequest'] as Map<String, dynamic>? ?? {};
+                return {
+                  'id': doc.id,
+                  'orderDocumentId': doc.id,
+                  ...deliveryRequest,
+                };
+              })
               .toList(),
         );
   }
 
   /// ✅ stream all delivery requests for a specific customer (user)
-  /// تستخدم فى صفحة طلبات المستخدم لعرض حالة مكتب الشحن
   Stream<List<Map<String, dynamic>>> streamRequestsForCustomer(
     String customerId,
   ) {
     return _firestore
-        .collection('request delivery')
-        .where('customerId', isEqualTo: customerId)
+        .collection('orders')
+        .where('userId', isEqualTo: customerId)
         .snapshots()
         .map(
           (snapshot) => snapshot.docs
-              .map((doc) => {'id': doc.id, ...doc.data()})
+              .where((doc) {
+                final docData = doc.data();
+                return docData['deliveryRequest'] != null;
+              })
+              .map((doc) {
+                final docData = doc.data();
+                final deliveryRequest = docData['deliveryRequest'] as Map<String, dynamic>? ?? {};
+                return {
+                  'id': doc.id,
+                  'orderDocumentId': doc.id,
+                  ...deliveryRequest,
+                };
+              })
               .toList(),
         );
   }
 
   // حذف طلب توصيل بعد معالجته
   Future<void> deleteRequest(String requestId) async {
-    await _firestore.collection('request delivery').doc(requestId).delete();
+    final doc = await _firestore.collection('orders').doc(requestId).get();
+    if (doc.exists) {
+      final docData = doc.data() ?? {};
+      final deliveryRequest = docData['deliveryRequest'] as Map<String, dynamic>? ?? {};
+      final officeId = deliveryRequest['officeId'] as String?;
+      
+      final updates = <String, dynamic>{
+        'deliveryRequest': FieldValue.delete(),
+      };
+      if (officeId != null) {
+        updates['access.$officeId'] = FieldValue.delete();
+      }
+      await _firestore.collection('orders').doc(requestId).update(updates);
+    }
   }
 
   // تحديث حالة طلب التوصيل
   Future<void> updateRequestStatus(String requestId, String newStatus) async {
-    await _firestore.collection('request delivery').doc(requestId).update({
-      'status': newStatus,
+    await _firestore.collection('orders').doc(requestId).update({
+      'deliveryRequest.status': newStatus,
+      'deliveryRequest.updatedAt': FieldValue.serverTimestamp(),
       'updatedAt': FieldValue.serverTimestamp(),
     });
   }

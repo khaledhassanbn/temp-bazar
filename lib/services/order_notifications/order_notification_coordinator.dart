@@ -134,10 +134,23 @@ class OrderNotificationCoordinator {
   }
 
   Future<void> _persistResponse(String orderId, {required bool accepted}) async {
+    final now = DateTime.now();
+    final String statusText = accepted ? 'تم استلام الطلب' : 'تم رفض الطلب';
+    
     await FirebaseFirestore.instance.collection('orders').doc(orderId).update({
-      OrderNotificationFields.status:
-          accepted ? OrderIndexStatus.accepted : OrderIndexStatus.rejected,
       OrderNotificationFields.respondedAt: FieldValue.serverTimestamp(),
+      // `status` للعرض فى واجهة التاجر؛ `orderStatus` للحالة الموحدة
+      'status': statusText,
+      'orderStatus': accepted ? 'accepted' : 'rejected',
+      if (!accepted) 'isActive': false,
+      if (!accepted) 'completedAt': FieldValue.serverTimestamp(),
+      'updatedAt': FieldValue.serverTimestamp(),
+      'statusHistory': FieldValue.arrayUnion([
+        {
+          'status': statusText,
+          'time': Timestamp.fromDate(now),
+        }
+      ]),
     });
   }
 

@@ -178,6 +178,57 @@ service cloud.firestore {
     }
     
     // ============================================================================
+    // UNIFIED ORDERS COLLECTION (top-level /orders)
+    // ============================================================================
+
+    match /orders/{orderId} {
+      function orderStoreId() {
+        return resource.data.storeId;
+      }
+
+      function isOrderCustomer() {
+        return isAuthenticated() && resource.data.userId == request.auth.uid;
+      }
+
+      function hasOrderAccess() {
+        return isAuthenticated() &&
+          resource.data.get('access', {}).get(request.auth.uid, false) == true;
+      }
+
+      allow read: if isAdmin() ||
+        isOrderCustomer() ||
+        hasOrderAccess() ||
+        (resource.data.keys().hasAny(['storeId']) &&
+          isStoreOwner(orderStoreId()));
+
+      allow create: if isAuthenticated() &&
+        request.resource.data.userId == request.auth.uid &&
+        canStoreReceiveOrders(request.resource.data.storeId);
+
+      allow update: if isAdmin() ||
+        (isAuthenticated() && (
+          isStoreOwner(resource.data.storeId) ||
+          isOrderCustomer() ||
+          hasOrderAccess()
+        ));
+
+      allow delete: if isAdmin();
+    }
+
+    // ============================================================================
+    // USERS COLLECTION
+    // ============================================================================
+
+    match /users/{userId} {
+      allow read: if isAuthenticated() && (
+        request.auth.uid == userId || isAdmin()
+      );
+      allow write: if isAuthenticated() && (
+        request.auth.uid == userId || isAdmin()
+      );
+    }
+
+    // ============================================================================
     // DEFAULT DENY
     // ============================================================================
     

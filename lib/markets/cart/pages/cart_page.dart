@@ -590,16 +590,33 @@ class _CartPageState extends State<CartPage> {
         userLocationOverride: userInfo.selectedLocationValue,
       );
 
+      // جلب معرف صاحب المتجر للأمان
+      final storeOwnerId = marketData['ownerId'] as String?;
+      final accessMap = <String, bool>{
+        currentUser?.uid ?? '': true,
+      };
+      if (storeOwnerId != null && storeOwnerId.isNotEmpty) {
+        accessMap[storeOwnerId] = true;
+      }
+
       // إعداد بيانات الطلب
       final orderData = {
         'orderId': orderId,
-        'userId':
-            currentUser?.uid ?? '', // إضافة معرف المستخدم في المستوى العلوي
+        'userId': currentUser?.uid ?? '', // إضافة معرف المستخدم في المستوى العلوي
         'storeId': marketId, // معرف المتجر للتقييم
         'storeName': _marketName ?? 'متجر', // اسم المتجر للعرض
         'storeLogo': _marketLogo, // شعار المتجر للعرض
         'createdAt': FieldValue.serverTimestamp(),
-        'status': 'pending', // حالة الطلب
+        'status': 'new', // حالة الإشعارات (للاستماع)
+        'orderStatus': 'pending', // الحالة الفعلية الموحدة
+        'isActive': true, // الطلب نشط وحالي
+        'access': accessMap,
+        'statusHistory': [
+          {
+            'status': 'قيد المراجعة',
+            'time': Timestamp.now(),
+          }
+        ],
         'customerInfo': {
           'userId': currentUser?.uid ?? '',
           'name': customerName,
@@ -633,30 +650,11 @@ class _CartPageState extends State<CartPage> {
         'notes': notes,
       };
 
-      // حفظ الطلب في Firebase - في قاعدة بيانات المتجر
+      // حفظ الطلب في Firebase - في المجموعة الموحدة `orders`
       await FirebaseFirestore.instance
-          .collection('markets')
-          .doc(marketId)
-          .collection('present_order')
+          .collection('orders')
           .doc(orderId)
           .set(orderData);
-
-      // سجل علوي `orders` — يفعّل Cloud Function + إشعارات المتجر (status: new)
-      await OrderIndexService.instance.createOrUpdateOrderIndex(
-        orderId: orderId,
-        storeId: marketId,
-        userId: currentUser?.uid ?? '',
-      );
-
-      // حفظ الطلب في قاعدة بيانات العميل أيضاً
-      if (currentUser != null) {
-        await FirebaseFirestore.instance
-            .collection('users')
-            .doc(currentUser.uid)
-            .collection('orders')
-            .doc(orderId)
-            .set(orderData);
-      }
 
       // ══════════════════════════════════════════════════════════════════
       // 🔹 تسجيل عمليات البيع لكل منتج (يزيد soldCount في Firestore)

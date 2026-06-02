@@ -27,9 +27,7 @@ class NewOrderAlertDialog extends StatelessWidget {
   Widget build(BuildContext context) {
     Future<Map<String, dynamic>?> loadOrder() async {
       final doc = await FirebaseFirestore.instance
-          .collection('markets')
-          .doc(storeId)
-          .collection('present_order')
+          .collection('orders')
           .doc(orderId)
           .get();
       return doc.data();

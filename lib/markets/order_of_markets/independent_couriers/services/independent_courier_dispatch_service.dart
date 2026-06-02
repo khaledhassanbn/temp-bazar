@@ -108,7 +108,10 @@ class IndependentCourierDispatchService {
       final snap = await tx.get(ref);
 
       if (!snap.exists) {
-        tx.set(ref, payload);
+        tx.set(ref, {
+          ...payload,
+          for (final uid in courierUids) 'access.$uid': true,
+        });
         return;
       }
 
@@ -131,6 +134,14 @@ class IndependentCourierDispatchService {
         mergedCourierResponses[uid] = 'pending';
       }
 
+      final accessUpdates = <String, dynamic>{};
+      for (final uid in courierUids) {
+        accessUpdates['access.$uid'] = true;
+      }
+      if (assigned.isNotEmpty) {
+        accessUpdates['access.$assigned'] = FieldValue.delete();
+      }
+
       tx.update(ref, {
         ...payload,
         'courierResponses': mergedCourierResponses,
@@ -138,6 +149,7 @@ class IndependentCourierDispatchService {
         if (assigned.isNotEmpty) 'reassignedAt': FieldValue.serverTimestamp(),
         // keep original createdAt if present
         if (data['createdAt'] != null) 'createdAt': data['createdAt'],
+        ...accessUpdates,
       });
     });
 
@@ -151,4 +163,3 @@ class IndependentCourierDispatchService {
     }
   }
 }
-

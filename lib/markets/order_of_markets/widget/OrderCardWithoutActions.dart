@@ -357,6 +357,8 @@ class OrderCardWithoutActions extends StatelessWidget {
       case 'جارى تسليم للدليفري':
         return Colors.orange;
       case 'تم التسليم للطيار':
+      case 'تم التسليم':
+      case 'الطلب مكتمل':
         return Colors.green;
       case 'تم رفض الطلب':
         return Colors.redAccent;

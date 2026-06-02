@@ -83,6 +83,7 @@ class OrderActionButtons extends StatelessWidget {
           // الحالة الثانية: تم استلام الطلب (فقط لو مفيش مندوب مستقل - لتجنب التكرار مع الأزرار الأربعة)
           if (status == 'تم استلام الطلب' && !hasIndependentDispatch) ...[
             Expanded(
+              flex: 3,
               child: _buildActionButton(
                 'طلب طيار',
                 Icons.delivery_dining,
@@ -100,8 +101,9 @@ class OrderActionButtons extends StatelessWidget {
                 },
               ),
             ),
-            const SizedBox(width: 8),
+            const SizedBox(width: 4),
             Expanded(
+              flex: 3,
               child: _buildActionButton(
                 'هسلمه بنفسى',
                 Icons.person,
@@ -109,7 +111,50 @@ class OrderActionButtons extends StatelessWidget {
                 () => _confirmAction(
                   context,
                   'هل أنت متأكد أنك هتسلمه بنفسك؟',
+                  'التسليم الذاتي',
+                ),
+              ),
+            ),
+            const SizedBox(width: 4),
+            Expanded(
+              flex: 2,
+              child: _buildActionButton(
+                'إلغاء',
+                Icons.cancel,
+                Colors.redAccent,
+                () => _confirmAction(
+                  context,
+                  'هل أنت متأكد من إلغاء الطلب؟',
+                  'تم رفض الطلب',
+                ),
+              ),
+            ),
+          ],
+
+          // حالة التسليم الذاتي: تأكيد التسليم أو إلغاء الطلب
+          if (status == 'التسليم الذاتي') ...[
+            Expanded(
+              child: _buildActionButton(
+                'تأكيد التسليم',
+                Icons.check_circle,
+                Colors.green,
+                () => _confirmAction(
+                  context,
+                  'هل أنت متأكد من تأكيد تسليم الطلب للعميل؟',
                   'تم التسليم للطيار',
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: _buildActionButton(
+                'إلغاء الطلب',
+                Icons.cancel,
+                Colors.redAccent,
+                () => _confirmAction(
+                  context,
+                  'هل أنت متأكد من إلغاء الطلب؟',
+                  'تم رفض الطلب',
                 ),
               ),
             ),
