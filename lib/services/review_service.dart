@@ -118,10 +118,14 @@ class ReviewService {
         'courierName': courierName,
         'rating': rating,
         'comment': comment,
+        'raterType': 'customer',
         'userId': user.uid,
         'userName': user.displayName ?? 'مستخدم',
         'createdAt': Timestamp.now(),
       });
+
+      // تحديث متوسط تقييم المندوب الموحد في courier_requests
+      await _updateCourierRatingAverage(courierId, rating);
     }
   }
 
@@ -247,5 +251,91 @@ class ReviewService {
     if (deliveryRatingData == null) return null;
 
     return DeliveryRatingModel.fromMap(deliveryRatingData);
+  }
+
+  /// تقييم التاجر للمندوب بعد استلامه الطلب
+  /// يُحفظ في:
+  /// 1. orders/{orderId} → merchantCourierRating
+  /// 2. courier_ratings collection → سجل مركزي مع raterType = 'merchant'
+  /// 3. تحديث متوسط rating المندوب في courier_requests/{courierUid}
+  Future<void> submitMerchantCourierRating({
+    required String orderId,
+    required String courierId,
+    required String courierName,
+    required String marketId,
+    required int rating,
+    String? comment,
+  }) async {
+    final now = Timestamp.now();
+
+    // 1. حفظ في document الطلب
+    await _firestore.collection('orders').doc(orderId).update({
+      'merchantCourierRating': {
+        'rating': rating,
+        'comment': comment,
+        'courierId': courierId,
+        'courierName': courierName,
+        'marketId': marketId,
+        'createdAt': now,
+      },
+    });
+
+    // 2. سجل مركزي في courier_ratings
+    await _firestore.collection('courier_ratings').add({
+      'orderId': orderId,
+      'courierId': courierId,
+      'courierName': courierName,
+      'rating': rating,
+      'comment': comment,
+      'raterType': 'merchant',
+      'marketId': marketId,
+      'createdAt': now,
+    });
+
+    // 3. تحديث متوسط تقييم المندوب في courier_requests
+    await _updateCourierRatingAverage(courierId, rating);
+  }
+
+  /// تحديث متوسط تقييم المندوب في courier_requests/{courierId}
+  Future<void> _updateCourierRatingAverage(String courierId, int newRating) async {
+    // البحث عن document المندوب في courier_requests بالـ courierUid
+    final query = await _firestore
+        .collection('courier_requests')
+        .where('courierUid', isEqualTo: courierId)
+        .limit(1)
+        .get();
+
+    // لو ما فيش نتيجة جرب بـ uid
+    final docs = query.docs.isNotEmpty
+        ? query.docs
+        : (await _firestore
+                .collection('courier_requests')
+                .where('uid', isEqualTo: courierId)
+                .limit(1)
+                .get())
+            .docs;
+
+    if (docs.isEmpty) return;
+
+    final docRef = docs.first.reference;
+
+    await _firestore.runTransaction((transaction) async {
+      final snap = await transaction.get(docRef);
+      if (!snap.exists) return;
+
+      final data = snap.data() ?? {};
+      final currentRating = (data['rating'] ?? data['rate'] ?? 0.0) is num
+          ? (data['rating'] ?? data['rate'] ?? 0.0).toDouble()
+          : 0.0;
+      final totalRatings = (data['totalRatings'] ?? 0) as int;
+
+      final newTotal = totalRatings + 1;
+      final newAverage = ((currentRating * totalRatings) + newRating) / newTotal;
+
+      transaction.update(docRef, {
+        'rating': double.parse(newAverage.toStringAsFixed(2)),
+        'totalRatings': newTotal,
+      });
+    });
   }
 }

@@ -1088,6 +1088,32 @@ class _UserOrderCardState extends State<UserOrderCard> {
     return '${(meters / 1000).toStringAsFixed(1)} كم';
   }
 
+  /// استخراج سعر المنتج من أي حقل متاح في بيانات الطلب
+  double _extractItemPrice(Map<String, dynamic> itemData) {
+    // totalPrice = (productPrice + additionalPrice) * quantity → أدق قيمة لإجمالي العنصر
+    // unitPrice  = productPrice + additionalPrice              → السعر لكل وحدة
+    // productPrice                                             → السعر الأساسي
+    // price                                                    → قد يكون موجوداً في بعض الطلبات القديمة
+    const candidateFields = [
+      'totalPrice',
+      'total',
+      'finalPrice',
+      'unitPrice',
+      'productPrice',
+      'price',
+      'subtotal',
+    ];
+    for (final field in candidateFields) {
+      final value = itemData[field];
+      if (value is num) return value.toDouble();
+      if (value != null) {
+        final parsed = double.tryParse(value.toString());
+        if (parsed != null && parsed > 0) return parsed;
+      }
+    }
+    return 0.0;
+  }
+
   void _showInvoiceDialog(BuildContext context, Map<String, dynamic> order, List<dynamic> items, num totalAmount) {
     final deliveryFee = (order['deliveryFee'] ?? 0.0) as num;
     final discount = (order['discount'] ?? 0.0) as num;
@@ -1112,9 +1138,17 @@ class _UserOrderCardState extends State<UserOrderCard> {
                 const Divider(height: 30),
                 ...items.map((item) {
                   final itemData = item as Map<String, dynamic>;
-                  final name = itemData['productName'] ?? 'منتج';
-                  final quantity = itemData['quantity'] ?? 1;
-                  final price = itemData['price'] ?? 0.0;
+                  final name = itemData['productName'] ?? itemData['name'] ?? 'منتج';
+                  final quantity = (itemData['quantity'] ?? 1) as num;
+                  final itemPrice = _extractItemPrice(itemData);
+
+                  // إذا كان totalPrice موجوداً فهو يعكس الإجمالي للعنصر مباشرة
+                  // وإلا نضرب unitPrice/productPrice في الكمية
+                  final hasTotal = itemData['totalPrice'] is num ||
+                      itemData['total'] is num ||
+                      itemData['finalPrice'] is num;
+                  final displayTotal = hasTotal ? itemPrice : itemPrice * quantity.toDouble();
+
                   return Padding(
                     padding: const EdgeInsets.symmetric(vertical: 4),
                     child: Row(
@@ -1127,7 +1161,7 @@ class _UserOrderCardState extends State<UserOrderCard> {
                           ),
                         ),
                         Text(
-                          '${(price * quantity).toStringAsFixed(2)} ج.م',
+                          '${displayTotal.toStringAsFixed(2)} ج.م',
                           style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
                         ),
                       ],

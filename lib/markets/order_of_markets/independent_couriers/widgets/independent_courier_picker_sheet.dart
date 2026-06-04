@@ -244,6 +244,12 @@ class _CourierTile extends StatelessWidget {
     this.disabled = false,
   });
 
+  Color _ratingBadgeColor(double rating) {
+    if (rating >= 4.0) return Colors.green.shade600;
+    if (rating >= 3.0) return Colors.orange.shade700;
+    return Colors.red.shade600;
+  }
+
   @override
   Widget build(BuildContext context) {
     final distanceText = courier.distanceKmFromStore == null
@@ -334,20 +340,48 @@ class _CourierTile extends StatelessWidget {
                                 vertical: 4,
                               ),
                               decoration: BoxDecoration(
-                                color: Colors.amber.withOpacity(0.15),
+                                color: _ratingBadgeColor(courier.rating!).withOpacity(0.15),
                                 borderRadius: BorderRadius.circular(10),
                               ),
                               child: Row(
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
-                                  const Icon(Icons.star,
-                                      size: 14, color: Colors.amber),
-                                  const SizedBox(width: 4),
+                                  Icon(Icons.star_rounded,
+                                      size: 14,
+                                      color: _ratingBadgeColor(courier.rating!)),
+                                  const SizedBox(width: 3),
                                   Text(
                                     courier.rating!.toStringAsFixed(1),
-                                    style: const TextStyle(
+                                    style: TextStyle(
                                       fontSize: 12,
                                       fontWeight: FontWeight.bold,
+                                      color: _ratingBadgeColor(courier.rating!),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            )
+                          else
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                                vertical: 4,
+                              ),
+                              decoration: BoxDecoration(
+                                color: Colors.grey.shade100,
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(Icons.star_outline_rounded,
+                                      size: 14, color: Colors.grey.shade400),
+                                  const SizedBox(width: 3),
+                                  Text(
+                                    'جديد',
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      color: Colors.grey.shade500,
                                     ),
                                   ),
                                 ],

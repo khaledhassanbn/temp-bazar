@@ -15,6 +15,8 @@ import 'package:bazar_suez/markets/order_of_markets/widget/OrderCard.dart';
 import 'package:bazar_suez/markets/order_of_markets/widget/OrderStats.dart';
 import 'package:bazar_suez/markets/order_of_markets/viewmodels/MarketOrdersViewModel.dart';
 import 'package:bazar_suez/markets/order_of_markets/independent_couriers/widgets/independent_courier_picker_sheet.dart';
+import 'package:bazar_suez/services/review_service.dart';
+import 'package:bazar_suez/theme/app_color.dart';
 
 class MarketOrdersPage extends StatefulWidget {
   final String marketId;
@@ -34,6 +36,327 @@ class _MarketOrdersPageState extends State<MarketOrdersPage>
   late final MarketOrdersViewModel _viewModel;
   late final TextEditingController _searchController;
   AnimationController? _animController;
+
+  /// طلبات ظهر dialog التقييم للمندوب فيها (لتجنب الإعادة)
+  final Set<String> _ratingShownForOrders = {};
+
+  /// يتحقق من الطلبات ويعرض dialog التقييم لو المندوب استلم الطلب
+  void _checkAndShowRatingDialogIfNeeded(List<Map<String, dynamic>> orders) {
+    for (final order in orders) {
+      final orderId = (order['documentId'] ?? order['id'] ?? '').toString();
+      if (orderId.isEmpty) continue;
+      if (_ratingShownForOrders.contains(orderId)) continue;
+
+      // تحقق من وجود merchantCourierRating (تم التقييم مسبقاً)
+      if (order['merchantCourierRating'] != null) {
+        _ratingShownForOrders.add(orderId);
+        continue;
+      }
+
+      final dispatch = order['independentDispatch'] as Map<String, dynamic>?;
+      if (dispatch == null) continue;
+
+      final dispatchStatus = (dispatch['status'] ?? '').toString().toLowerCase();
+      // عرض dialog لما المندوب يستلم الطلب من المتجر
+      if (dispatchStatus != 'picked_up' && dispatchStatus != 'completed') continue;
+
+      final courierId = (dispatch['assignedCourierId'] ?? '').toString();
+      if (courierId.isEmpty) continue;
+
+      // جيب اسم المندوب من الدليل
+      final directory = (order['independentCouriersDirectory'] is Map)
+          ? Map<String, dynamic>.from(order['independentCouriersDirectory'])
+          : <String, dynamic>{};
+      final courierData = directory[courierId] is Map
+          ? Map<String, dynamic>.from(directory[courierId])
+          : <String, dynamic>{};
+      final courierName = (courierData['name'] ??
+              courierData['fullName'] ??
+              courierData['displayName'] ??
+              'المندوب')
+          .toString();
+
+      _ratingShownForOrders.add(orderId);
+
+      // عرض dialog بعد بناء الـ frame
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        _showMerchantCourierRatingDialog(
+          orderId: orderId,
+          courierId: courierId,
+          courierName: courierName,
+        );
+      });
+    }
+  }
+
+  /// dialog تقييم المندوب من التاجر
+  Future<void> _showMerchantCourierRatingDialog({
+    required String orderId,
+    required String courierId,
+    required String courierName,
+  }) async {
+    int selectedRating = 0;
+    final commentController = TextEditingController();
+    bool isSubmitting = false;
+
+    await showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (ctx, setDialogState) {
+            return Directionality(
+              textDirection: TextDirection.rtl,
+              child: Dialog(
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(24),
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.all(24),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      // أيقونة وعنوان
+                      Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: Colors.orange.shade50,
+                          shape: BoxShape.circle,
+                        ),
+                        child: Icon(
+                          Icons.delivery_dining_rounded,
+                          size: 36,
+                          color: Colors.orange.shade700,
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      const Text(
+                        'قيّم المندوب',
+                        style: TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        'استلم $courierName الطلب\nكيف كانت تجربتك معه؟',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: Colors.grey.shade600,
+                          height: 1.5,
+                        ),
+                      ),
+                      const SizedBox(height: 20),
+
+                      // النجوم
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: List.generate(5, (i) {
+                          final star = i + 1;
+                          return GestureDetector(
+                            onTap: () =>
+                                setDialogState(() => selectedRating = star),
+                            child: AnimatedContainer(
+                              duration: const Duration(milliseconds: 150),
+                              padding: const EdgeInsets.all(6),
+                              child: Icon(
+                                star <= selectedRating
+                                    ? Icons.star_rounded
+                                    : Icons.star_outline_rounded,
+                                size: 40,
+                                color: star <= selectedRating
+                                    ? Colors.amber
+                                    : Colors.grey.shade300,
+                              ),
+                            ),
+                          );
+                        }),
+                      ),
+
+                      if (selectedRating > 0) ...[
+                        const SizedBox(height: 6),
+                        Text(
+                          _ratingLabel(selectedRating),
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.bold,
+                            color: _ratingColor(selectedRating),
+                          ),
+                        ),
+                      ],
+
+                      const SizedBox(height: 16),
+
+                      // تعليق اختياري
+                      TextField(
+                        controller: commentController,
+                        maxLines: 2,
+                        maxLength: 200,
+                        decoration: InputDecoration(
+                          hintText: 'تعليق (اختياري)',
+                          filled: true,
+                          fillColor: Colors.grey.shade50,
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide:
+                                BorderSide(color: Colors.grey.shade200),
+                          ),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide:
+                                BorderSide(color: Colors.grey.shade200),
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: BorderSide(
+                              color: AppColors.mainColor,
+                            ),
+                          ),
+                          contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 14, vertical: 10),
+                        ),
+                      ),
+
+                      const SizedBox(height: 16),
+
+                      // أزرار
+                      Row(
+                        children: [
+                          Expanded(
+                            child: OutlinedButton(
+                              onPressed: isSubmitting
+                                  ? null
+                                  : () => Navigator.of(ctx).pop(),
+                              style: OutlinedButton.styleFrom(
+                                side: BorderSide(
+                                    color: Colors.grey.shade300),
+                                padding: const EdgeInsets.symmetric(
+                                    vertical: 12),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                              ),
+                              child: const Text('تخطي'),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            flex: 2,
+                            child: ElevatedButton(
+                              onPressed: (selectedRating == 0 || isSubmitting)
+                                  ? null
+                                  : () async {
+                                      setDialogState(
+                                          () => isSubmitting = true);
+                                      try {
+                                        await ReviewService()
+                                            .submitMerchantCourierRating(
+                                          orderId: orderId,
+                                          courierId: courierId,
+                                          courierName: courierName,
+                                          marketId: widget.marketId,
+                                          rating: selectedRating,
+                                          comment: commentController.text
+                                                  .trim()
+                                                  .isEmpty
+                                              ? null
+                                              : commentController.text
+                                                  .trim(),
+                                        );
+                                        if (ctx.mounted) {
+                                          Navigator.of(ctx).pop();
+                                        }
+                                        if (mounted) {
+                                          ScaffoldMessenger.of(context)
+                                              .showSnackBar(
+                                            const SnackBar(
+                                              content: Text(
+                                                  'شكراً! تم حفظ تقييمك'),
+                                              backgroundColor: Colors.green,
+                                            ),
+                                          );
+                                        }
+                                      } catch (e) {
+                                        setDialogState(
+                                            () => isSubmitting = false);
+                                        if (mounted) {
+                                          ScaffoldMessenger.of(context)
+                                              .showSnackBar(
+                                            SnackBar(
+                                              content: Text(
+                                                  'حدث خطأ: ${e.toString()}'),
+                                              backgroundColor: Colors.red,
+                                            ),
+                                          );
+                                        }
+                                      }
+                                    },
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: AppColors.mainColor,
+                                foregroundColor: Colors.white,
+                                disabledBackgroundColor:
+                                    Colors.grey.shade200,
+                                padding: const EdgeInsets.symmetric(
+                                    vertical: 12),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                              ),
+                              child: isSubmitting
+                                  ? const SizedBox(
+                                      height: 18,
+                                      width: 18,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                        color: Colors.white,
+                                      ),
+                                    )
+                                  : const Text(
+                                      'إرسال التقييم',
+                                      style: TextStyle(
+                                          fontWeight: FontWeight.bold),
+                                    ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+
+    commentController.dispose();
+  }
+
+  String _ratingLabel(int rating) {
+    switch (rating) {
+      case 1:
+        return 'سيء جداً';
+      case 2:
+        return 'سيء';
+      case 3:
+        return 'مقبول';
+      case 4:
+        return 'جيد';
+      case 5:
+        return 'ممتاز';
+      default:
+        return '';
+    }
+  }
+
+  Color _ratingColor(int rating) {
+    if (rating <= 2) return Colors.red;
+    if (rating == 3) return Colors.orange;
+    return Colors.green;
+  }
 
   Future<void> _handleRequestDelivery(
     Map<String, dynamic> order,
@@ -623,6 +946,11 @@ class _MarketOrdersPageState extends State<MarketOrdersPage>
                       final deliveredOrders = orders
                           .where((o) => o['status'] == 'تم التسليم للطيار')
                           .length;
+
+                      // تحقق من الطلبات التي يجب عرض dialog التقييم فيها
+                      WidgetsBinding.instance.addPostFrameCallback((_) {
+                        _checkAndShowRatingDialogIfNeeded(orders);
+                      });
 
                       return SliverList(
                         delegate: SliverChildListDelegate([
