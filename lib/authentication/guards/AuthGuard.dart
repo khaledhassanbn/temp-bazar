@@ -11,10 +11,10 @@ class AuthGuard extends ChangeNotifier {
   StreamSubscription<User?>? _authSubscription;
   StreamSubscription<DocumentSnapshot<Map<String, dynamic>>>?
   _statusSubscription;
-  
+
   /// Flag to track if this ChangeNotifier has been disposed
   bool _isDisposed = false;
-  
+
   /// Safe wrapper for notifyListeners that checks disposal state
   void _safeNotifyListeners() {
     if (!_isDisposed) {
@@ -78,7 +78,9 @@ class AuthGuard extends ChangeNotifier {
         _hasSetupLocation = data?['hasSetupLocation'] ?? false;
         final dynamic mid = data?['market_id'] ?? data?['marketId'];
         _marketId = mid is String && mid.isNotEmpty ? mid : null;
-        debugPrint('✅ User status loaded: $userStatus, hasSetupLocation: $_hasSetupLocation');
+        debugPrint(
+          '✅ User status loaded: $userStatus, hasSetupLocation: $_hasSetupLocation',
+        );
       } else {
         userStatus = 'user';
         _hasSetupLocation = false;
@@ -120,9 +122,10 @@ class AuthGuard extends ChangeNotifier {
             final newStatus = data?['status'] ?? 'user';
             final newHasSetupLocation = data?['hasSetupLocation'] ?? false;
             final dynamic mid = data?['market_id'] ?? data?['marketId'];
-            final String? newMarketId =
-                mid is String && mid.isNotEmpty ? mid : null;
-            
+            final String? newMarketId = mid is String && mid.isNotEmpty
+                ? mid
+                : null;
+
             bool changed = false;
             if (newStatus != userStatus) {
               userStatus = newStatus;
@@ -131,7 +134,9 @@ class AuthGuard extends ChangeNotifier {
             }
             if (newHasSetupLocation != _hasSetupLocation) {
               _hasSetupLocation = newHasSetupLocation;
-              debugPrint('🔄 Location setup status updated: $_hasSetupLocation');
+              debugPrint(
+                '🔄 Location setup status updated: $_hasSetupLocation',
+              );
               changed = true;
             }
             if (newMarketId != _marketId) {
@@ -139,7 +144,7 @@ class AuthGuard extends ChangeNotifier {
               debugPrint('🔄 marketId updated: $_marketId');
               changed = true;
             }
-            
+
             if (changed) {
               _safeNotifyListeners();
             }
@@ -155,4 +160,3 @@ class AuthGuard extends ChangeNotifier {
     super.dispose();
   }
 }
-

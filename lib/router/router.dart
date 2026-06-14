@@ -40,6 +40,8 @@ bool _requiresAuth(String path) {
     '/license-status',
     '/admin/wallet-requests',
     '/store-reviews',
+    '/craftsmen/register',
+    '/craftsmen/dashboard',
   ];
   return protectedPaths.any((p) => path.startsWith(p));
 }
@@ -50,6 +52,15 @@ bool _isPublicPath(String path) {
   if (path == '/CategoryMarketPage') return true;
   if (path.startsWith('/market/')) return true;
   if (path.startsWith('/productdetails')) return true;
+  if (path.startsWith('/craftsman/')) return true;
+  if (path == '/craftsmen/categories') return true;
+  if (path.startsWith('/craftsmen/') &&
+      !path.startsWith('/craftsmen/register') &&
+      !path.startsWith('/craftsmen/dashboard') &&
+      !path.startsWith('/craftsmen/browse')) {
+    final segs = path.split('/').where((s) => s.isNotEmpty).toList();
+    if (segs.length == 2) return true;
+  }
   final segs = path.split('/').where((s) => s.isNotEmpty).toList();
   if (segs.length == 1 && isStoreShareSlugSegment(segs.first)) return true;
   if (segs.length == 2 && isPublicProductSharePath(segs[0], segs[1])) {
@@ -98,8 +109,11 @@ Future<GoRouter> createRouter(AuthGuard authGuard) async {
         // المسارات المحمية: إعادة التوجيه للرئيسية (تسجيل الدخول عبر الورقة المنبثقة)
         if (!loggedIn && _requiresAuth(path)) return '/';
 
+        // مسارات تسجيل الدخول/إنشاء الحساب فقط — لا تشمل /craftsmen/register
         if (loggedIn &&
-            (location.contains('/login') || location.contains('/register'))) {
+            (path == '/login' ||
+                path == '/login-email' ||
+                path == '/register')) {
           if (isAdmin) return '/admin/dashboard';
           return '/';
         }

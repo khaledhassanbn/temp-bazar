@@ -43,6 +43,7 @@ dependencies:
   flutter_animate: ^4.5.2
   smooth_page_indicator: ^1.2.1
   flutter_custom_clippers: ^2.0.0
+  google_fonts: ^6.2.1
 
   # 📱 صلاحيات وصور ومشاركة
   permission_handler: ^12.0.1

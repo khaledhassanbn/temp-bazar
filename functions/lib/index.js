@@ -42,7 +42,7 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.sendPastOrderNotification = exports.sendOrderStatusNotification = exports.sendNewOrderNotification = exports.facebookDataDeletionRequest = exports.updateStoreOpenStatusScheduled = exports.cleanupExpiredPendingPaymentsScheduled = exports.deleteExpiredAdsImagesScheduled = exports.autoRenewSubscriptionsScheduled = exports.paymobWebhookHandler = void 0;
+exports.setAdminRole = exports.sendPastOrderNotification = exports.sendOrderStatusNotification = exports.sendNewOrderNotification = exports.facebookDataDeletionRequest = exports.updateStoreOpenStatusScheduled = exports.cleanupExpiredPendingPaymentsScheduled = exports.deleteExpiredAdsImagesScheduled = exports.autoRenewSubscriptionsScheduled = exports.paymobWebhookHandler = void 0;
 // ---------------------------------------------------------------------------
 // INITIALIZE FIREBASE ADMIN
 // ---------------------------------------------------------------------------
@@ -80,6 +80,9 @@ Object.defineProperty(exports, "sendNewOrderNotification", { enumerable: true, g
 const sendStatusNotification_1 = require("./notifications/sendStatusNotification");
 Object.defineProperty(exports, "sendOrderStatusNotification", { enumerable: true, get: function () { return sendStatusNotification_1.sendOrderStatusNotification; } });
 Object.defineProperty(exports, "sendPastOrderNotification", { enumerable: true, get: function () { return sendStatusNotification_1.sendPastOrderNotification; } });
+// Admin
+const setAdminRole_1 = require("./admin/setAdminRole");
+Object.defineProperty(exports, "setAdminRole", { enumerable: true, get: function () { return setAdminRole_1.setAdminRole; } });
 // ---------------------------------------------------------------------------
 // GLOBAL OPTIONS
 // ---------------------------------------------------------------------------

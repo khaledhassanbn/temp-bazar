@@ -731,18 +731,21 @@ class _SearchBar extends StatelessWidget {
           ),
         ),
         const SizedBox(width: 10),
-        Container(
-          width: 50,
-          height: 50,
-          decoration: BoxDecoration(
-            color: Colors.white.withOpacity(0.15),
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: Colors.white.withOpacity(0.3), width: 1),
-          ),
-          child: const Icon(
-            Icons.tune_rounded,
-            color: Colors.white70,
-            size: 20,
+        GestureDetector(
+          onTap: () => context.push('/craftsmen'),
+          child: Container(
+            width: 50,
+            height: 50,
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.15),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: Colors.white.withOpacity(0.3), width: 1),
+            ),
+            child: const Icon(
+              Icons.handyman_outlined,
+              color: Colors.white,
+              size: 22,
+            ),
           ),
         ),
       ],

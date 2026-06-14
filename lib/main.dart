@@ -122,41 +122,40 @@ class _MyAppState extends State<MyApp> {
           }
 
           return MaterialApp.router(
-              debugShowCheckedModeBanner: false,
-              locale: const Locale("ar"),
-              localizationsDelegates: const [
-                GlobalMaterialLocalizations.delegate,
-                GlobalWidgetsLocalizations.delegate,
-                GlobalCupertinoLocalizations.delegate,
-              ],
-              supportedLocales: const [Locale("ar"), Locale("en")],
-              routerConfig: snapshot.data!,
-              builder: (context, child) => ConnectivityListener(
-                child: child ?? const SizedBox.shrink(),
-              ),
-              theme: ThemeData(
-                fontFamily: "Tajawal",
-                textTheme: const TextTheme(
-                  bodyMedium: TextStyle(fontSize: 16, fontFamily: "Tajawal"),
-                  bodyLarge: TextStyle(fontSize: 18, fontFamily: "Tajawal"),
-                  headlineSmall: TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                    fontFamily: "Tajawal",
-                  ),
-                  headlineMedium: TextStyle(
-                    fontSize: 24,
-                    fontWeight: FontWeight.bold,
-                    fontFamily: "Tajawal",
-                  ),
-                  titleLarge: TextStyle(
-                    fontSize: 22,
-                    fontWeight: FontWeight.bold,
-                    fontFamily: "Tajawal",
-                  ),
+            debugShowCheckedModeBanner: false,
+            locale: const Locale("ar"),
+            localizationsDelegates: const [
+              GlobalMaterialLocalizations.delegate,
+              GlobalWidgetsLocalizations.delegate,
+              GlobalCupertinoLocalizations.delegate,
+            ],
+            supportedLocales: const [Locale("ar"), Locale("en")],
+            routerConfig: snapshot.data!,
+            builder: (context, child) =>
+                ConnectivityListener(child: child ?? const SizedBox.shrink()),
+            theme: ThemeData(
+              fontFamily: "Tajawal",
+              textTheme: const TextTheme(
+                bodyMedium: TextStyle(fontSize: 16, fontFamily: "Tajawal"),
+                bodyLarge: TextStyle(fontSize: 18, fontFamily: "Tajawal"),
+                headlineSmall: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                  fontFamily: "Tajawal",
+                ),
+                headlineMedium: TextStyle(
+                  fontSize: 24,
+                  fontWeight: FontWeight.bold,
+                  fontFamily: "Tajawal",
+                ),
+                titleLarge: TextStyle(
+                  fontSize: 22,
+                  fontWeight: FontWeight.bold,
+                  fontFamily: "Tajawal",
                 ),
               ),
-            );
+            ),
+          );
         },
       ),
     );

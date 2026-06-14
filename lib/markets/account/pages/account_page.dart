@@ -5,6 +5,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:bazar_suez/widgets/auth_gate.dart';
+import 'package:bazar_suez/craftsmen/services/craftsman_service.dart';
 
 class AccountPage extends StatefulWidget {
   const AccountPage({super.key});
@@ -15,20 +16,30 @@ class AccountPage extends StatefulWidget {
 
 class _AccountPageState extends State<AccountPage> {
   final _service = MarketAccountService();
+  final _craftsmanService = CraftsmanService();
   late Future<AccountSummary> _summaryFuture;
+  late Future<bool> _hasCraftsmanProfileFuture;
   bool _isSigningOut = false;
 
   @override
   void initState() {
     super.initState();
     _summaryFuture = _service.loadAccountSummary();
+    _hasCraftsmanProfileFuture = _loadCraftsmanProfileFlag();
+  }
+
+  Future<bool> _loadCraftsmanProfileFlag() async {
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid == null) return false;
+    return _craftsmanService.hasProfile(uid);
   }
 
   Future<void> _refresh() async {
     setState(() {
       _summaryFuture = _service.loadAccountSummary();
+      _hasCraftsmanProfileFuture = _loadCraftsmanProfileFlag();
     });
-    await _summaryFuture;
+    await Future.wait([_summaryFuture, _hasCraftsmanProfileFuture]);
   }
 
   // التحقق من pending payment قبل فتح صفحة plan
@@ -319,6 +330,12 @@ class _AccountPageState extends State<AccountPage> {
             subtitle: 'مراجعة وقبول أو رفض طلبات المناديب الجدد',
             onTap: () => context.push('/admin/courier-requests'),
           ),
+          _MenuTileData(
+            icon: Icons.handyman_outlined,
+            label: 'إدارة الصنايعية',
+            subtitle: 'اعتماد وإخفاء وحظر ملفات الصنايعية',
+            onTap: () => context.push('/admin/craftsmen'),
+          ),
         ],
       ),
     ];
@@ -326,6 +343,39 @@ class _AccountPageState extends State<AccountPage> {
 
   List<Widget> _buildUserContent(AccountSummary summary) {
     return [
+      FutureBuilder<bool>(
+        future: _hasCraftsmanProfileFuture,
+        builder: (context, craftsmanSnap) {
+          if (craftsmanSnap.data != true) {
+            return const SizedBox.shrink();
+          }
+          return _SectionCard(
+            title: 'الصنايعية والخدمات',
+            tiles: [
+              _MenuTileData(
+                icon: Icons.analytics_outlined,
+                label: 'لوحة الصنايعي',
+                subtitle: 'إحصائيات وإدارة ظهورك',
+                onTap: () => pushIfAuthed(
+                  context,
+                  '/craftsmen/dashboard',
+                  message: 'سجّل دخولك للوصول للوحة الصنايعي',
+                ),
+              ),
+              _MenuTileData(
+                icon: Icons.edit_outlined,
+                label: 'تعديل ملفي',
+                subtitle: 'تحديث بيانات وخدمات الصنايعي',
+                onTap: () => pushIfAuthed(
+                  context,
+                  '/craftsmen/register?edit=1',
+                  message: 'سجّل دخولك لتعديل ملف الصنايعي',
+                ),
+              ),
+            ],
+          );
+        },
+      ),
       _SectionCard(
         title: '',
         tiles: [

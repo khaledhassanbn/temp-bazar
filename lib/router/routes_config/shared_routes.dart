@@ -12,6 +12,12 @@ import 'package:bazar_suez/markets/wallet/pages/admin_wallet_requests_page.dart'
 import 'package:bazar_suez/markets/saved_locations/pages/delivery_addresses_page.dart';
 import 'package:bazar_suez/markets/license/pages/license_status_page.dart';
 import 'package:bazar_suez/markets/favourite_markets/pages/favourite_markets_page.dart';
+import 'package:bazar_suez/craftsmen/pages/craftsmen_home_page.dart';
+import 'package:bazar_suez/craftsmen/pages/craftsmen_list_page.dart';
+import 'package:bazar_suez/craftsmen/pages/craftsman_detail_page.dart';
+import 'package:bazar_suez/craftsmen/pages/craftsman_register_page.dart';
+import 'package:bazar_suez/craftsmen/pages/craftsman_dashboard_page.dart';
+import 'package:bazar_suez/craftsmen/pages/craftsmen_all_categories_page.dart';
 import 'package:bazar_suez/router/site_path_rules.dart';
 import 'package:go_router/go_router.dart';
 
@@ -32,6 +38,55 @@ final sharedRoutes = [
   GoRoute(path: '/request-ads', builder: (_, __) => const RequestAdsPage()),
   GoRoute(path: '/AccountPage', builder: (_, __) => const AccountPage()),
   GoRoute(path: '/favourite-markets', builder: (_, __) => const FavouriteMarketsPage()),
+  GoRoute(
+    path: '/craftsmen',
+    builder: (_, __) => const CraftsmenHomePage(),
+    routes: [
+      GoRoute(
+        path: 'browse',
+        builder: (context, state) {
+          final q = state.uri.queryParameters;
+          return CraftsmenListPage(
+            groupId: q['groupId'],
+            professionId: q['professionId'],
+            sort: q['sort'],
+            query: q['q'],
+          );
+        },
+      ),
+      GoRoute(
+        path: 'register',
+        builder: (context, state) {
+          final edit = state.uri.queryParameters['edit'] == '1';
+          return CraftsmanRegisterPage(isEdit: edit);
+        },
+      ),
+      GoRoute(
+        path: 'dashboard',
+        builder: (_, __) => const CraftsmanDashboardPage(),
+      ),
+      GoRoute(
+        path: 'categories',
+        builder: (_, __) => const CraftsmenAllCategoriesPage(),
+      ),
+      GoRoute(
+        path: ':id',
+        builder: (context, state) {
+          return CraftsmanDetailPage(
+            craftsmanId: state.pathParameters['id']!,
+          );
+        },
+      ),
+    ],
+  ),
+  GoRoute(
+    path: '/craftsman/:id',
+    builder: (context, state) {
+      return CraftsmanDetailPage(
+        craftsmanId: state.pathParameters['id']!,
+      );
+    },
+  ),
   GoRoute(
     path: '/license-status',
     builder: (context, state) {

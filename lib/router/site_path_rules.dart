@@ -21,6 +21,8 @@ final Set<String> _reservedStoreSlugSegments = {
   'favourite-markets',
   'admin',
   'market',
+  'craftsmen',
+  'craftsman',
 };
 
 bool isStoreShareSlugSegment(String segment) {

@@ -5,3 +5,6 @@ String publicStoreShareUrl(String storeLink) => '$kPublicSiteOrigin/$storeLink';
 
 String publicProductShareUrl(String storeLink, String itemId) =>
     '$kPublicSiteOrigin/$storeLink/$itemId';
+
+String publicCraftsmanShareUrl(String craftsmanId) =>
+    '$kPublicSiteOrigin/craftsman/$craftsmanId';
