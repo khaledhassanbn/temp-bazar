@@ -17,6 +17,45 @@ service cloud.firestore {
              (request.auth.token.role == 'admin' || 
               request.auth.token.userStatus == 'admin');
     }
+
+    function hasAdminRoleDoc(uid) {
+      return exists(/databases/$(database)/documents/admin_roles/$(uid));
+    }
+
+    function adminRoleDoc(uid) {
+      return get(/databases/$(database)/documents/admin_roles/$(uid));
+    }
+
+    function getAdminRole() {
+      return adminRoleDoc(request.auth.uid).data.role;
+    }
+
+    function hasPermission(permission) {
+      return isAdmin() && (
+        !hasAdminRoleDoc(request.auth.uid) ||
+        getAdminRole() == 'super_admin' ||
+        adminRoleDoc(request.auth.uid).data.permissions[permission] == true
+      );
+    }
+
+    function isSuperAdmin() {
+      return isAdmin() && (
+        !hasAdminRoleDoc(request.auth.uid) ||
+        getAdminRole() == 'super_admin'
+      );
+    }
+
+    function isModeratorOrAbove() {
+      return isAdmin() && (
+        !hasAdminRoleDoc(request.auth.uid) ||
+        getAdminRole() in ['super_admin', 'admin', 'moderator']
+      );
+    }
+
+    function isNotDeletedUser(uid) {
+      return !exists(/databases/$(database)/documents/users/$(uid)) ||
+        get(/databases/$(database)/documents/users/$(uid)).data.isDeleted != true;
+    }
     
     // Check if store subscription is active
     function isStoreActive(storeId) {
@@ -223,9 +262,90 @@ service cloud.firestore {
       allow read: if isAuthenticated() && (
         request.auth.uid == userId || isAdmin()
       );
-      allow write: if isAuthenticated() && (
-        request.auth.uid == userId || isAdmin()
+      allow create: if isAuthenticated() && request.auth.uid == userId;
+      allow update: if isAuthenticated() && (
+        (request.auth.uid == userId && isNotDeletedUser(userId)) ||
+        isAdmin()
       );
+      allow delete: if isSuperAdmin();
+    }
+
+    // ============================================================================
+    // ADMIN ROLES
+    // ============================================================================
+
+    match /admin_roles/{adminUid} {
+      allow read: if isAdmin();
+      allow write: if isSuperAdmin();
+    }
+
+    // ============================================================================
+    // ADMIN ACTIVITY LOGS
+    // ============================================================================
+
+    match /admin_activity_logs/{logId} {
+      allow read: if hasPermission('view_logs');
+      allow create: if isAdmin();
+      allow update, delete: if false;
+    }
+
+    // ============================================================================
+    // REPORTS
+    // ============================================================================
+
+    match /reports/{reportId} {
+      allow read: if isModeratorOrAbove();
+      allow create: if isAuthenticated() &&
+        request.resource.data.reporterUid == request.auth.uid;
+      allow update: if hasPermission('manage_reports');
+      allow delete: if isSuperAdmin();
+    }
+
+    // ============================================================================
+    // CRAFTSMEN
+    // ============================================================================
+
+    match /craftsmen/{craftsmanId} {
+      allow read: if resource.data.visibility == 'public' ||
+        (isAuthenticated() && request.auth.uid == craftsmanId) ||
+        hasPermission('manage_craftsmen');
+      allow create: if isAuthenticated() && request.auth.uid == craftsmanId;
+      allow update: if (isAuthenticated() && request.auth.uid == craftsmanId) ||
+        hasPermission('manage_craftsmen');
+      allow delete: if hasPermission('delete_accounts');
+
+      match /reviews/{reviewId} {
+        allow read: if true;
+        allow write: if isAuthenticated();
+      }
+
+      match /contact_events/{eventId} {
+        allow read: if isAuthenticated();
+        allow create: if isAuthenticated();
+      }
+    }
+
+    // ============================================================================
+    // COURIER REQUESTS
+    // ============================================================================
+
+    match /courier_requests/{requestId} {
+      allow read: if isAdmin() ||
+        (isAuthenticated() && request.auth.uid == requestId);
+      allow create: if isAuthenticated();
+      allow update: if isAdmin() || hasPermission('manage_couriers');
+      allow delete: if hasPermission('delete_accounts');
+    }
+
+    // ============================================================================
+    // COURIER RATINGS
+    // ============================================================================
+
+    match /courier_ratings/{ratingId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated();
+      allow update: if isAdmin();
+      allow delete: if hasPermission('manage_couriers');
     }
 
     // ============================================================================

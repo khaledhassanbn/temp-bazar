@@ -60,6 +60,10 @@ class CraftsmanModel {
   final bool isSelfHidden;
   final String visibility;
   final String adminStatus;
+  final String accountStatus;
+  final bool isDeleted;
+  final String? suspendedReason;
+  final String? bannedReason;
   final List<String> badges;
   final double averageRating;
   final int totalReviews;
@@ -97,6 +101,10 @@ class CraftsmanModel {
     this.isSelfHidden = false,
     this.visibility = 'public',
     this.adminStatus = 'none',
+    this.accountStatus = 'active',
+    this.isDeleted = false,
+    this.suspendedReason,
+    this.bannedReason,
     this.badges = const [],
     this.averageRating = 0,
     this.totalReviews = 0,
@@ -117,7 +125,48 @@ class CraftsmanModel {
   });
 
   bool get isPublicVisible =>
-      visibility == 'public' && !isSelfHidden;
+      visibility == 'public' && !isSelfHidden && !isDeleted && accountStatus == 'active';
+
+  bool get hasAccountRestriction =>
+      isDeleted ||
+      accountStatus == 'deleted' ||
+      accountStatus == 'suspended' ||
+      accountStatus == 'banned' ||
+      visibility == 'banned' ||
+      visibility == 'hidden';
+
+  String get accountStatusLabel {
+    if (isDeleted || accountStatus == 'deleted') return 'محذوف';
+    switch (accountStatus) {
+      case 'suspended':
+        return 'موقوف';
+      case 'banned':
+        return 'محظور';
+      case 'active':
+        return 'نشط';
+      default:
+        if (visibility == 'banned') return 'محظور';
+        if (visibility == 'hidden') return 'موقوف';
+        return accountStatus;
+    }
+  }
+
+  String? get accountRestrictionMessage {
+    if (isDeleted || accountStatus == 'deleted') {
+      return 'تم حذف حسابك. تواصل مع الإدارة لاستعادته.';
+    }
+    if (accountStatus == 'banned' || visibility == 'banned') {
+      return bannedReason?.isNotEmpty == true
+          ? 'حسابك محظور: $bannedReason'
+          : 'حسابك محظور من قبل الإدارة.';
+    }
+    if (accountStatus == 'suspended' || visibility == 'hidden') {
+      return suspendedReason?.isNotEmpty == true
+          ? 'حسابك موقوف مؤقتاً: $suspendedReason'
+          : 'حسابك موقوف مؤقتاً من قبل الإدارة.';
+    }
+    return null;
+  }
 
   bool get hasNewBadge => badges.contains('new');
   bool get isVerified => badges.contains('verified');
@@ -156,6 +205,9 @@ class CraftsmanModel {
         ? badgeRaw.map((e) => e.toString()).toList()
         : <String>[];
 
+    final accountStatus = map['accountStatus'] as String? ??
+        _legacyAccountStatus(map);
+
     return CraftsmanModel(
       id: id,
       name: (map['name'] ?? '').toString(),
@@ -175,6 +227,10 @@ class CraftsmanModel {
       isSelfHidden: map['isSelfHidden'] == true,
       visibility: (map['visibility'] ?? 'public').toString(),
       adminStatus: (map['adminStatus'] ?? 'none').toString(),
+      accountStatus: accountStatus,
+      isDeleted: map['isDeleted'] == true,
+      suspendedReason: map['suspendedReason']?.toString(),
+      bannedReason: map['bannedReason']?.toString(),
       badges: badgeList,
       averageRating: (map['averageRating'] is num)
           ? (map['averageRating'] as num).toDouble()
@@ -222,6 +278,7 @@ class CraftsmanModel {
       'isSelfHidden': isSelfHidden,
       'visibility': visibility,
       'adminStatus': adminStatus,
+      'accountStatus': accountStatus,
       'badges': badges,
       'averageRating': averageRating,
       'totalReviews': totalReviews,
@@ -250,6 +307,13 @@ class CraftsmanModel {
       m['coverImageUrl'] = coverImageUrl;
     }
     return m;
+  }
+
+  static String _legacyAccountStatus(Map<String, dynamic> data) {
+    if (data['isDeleted'] == true) return 'deleted';
+    if (data['visibility'] == 'banned') return 'banned';
+    if (data['visibility'] == 'hidden') return 'suspended';
+    return 'active';
   }
 
   CraftsmanListItem toListItem() {

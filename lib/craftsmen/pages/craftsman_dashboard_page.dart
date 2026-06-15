@@ -58,6 +58,9 @@ class _CraftsmanDashboardPageState extends State<CraftsmanDashboardPage> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         const SizedBox(height: 16),
+                        if (c.hasAccountRestriction)
+                          _AccountStatusBanner(craftsman: c),
+                        if (c.hasAccountRestriction) const SizedBox(height: 16),
                         _QuickStatsRow(craftsman: c),
                         const SizedBox(height: 20),
                         _sectionHeader('الإعدادات السريعة', Icons.tune_rounded),
@@ -211,8 +214,16 @@ class _DashboardHeader extends StatelessWidget {
                             ),
                           ),
                           const SizedBox(height: 8),
-                          _AvailabilityBadge(
-                              isAvailable: craftsman.isAvailableNow),
+                          Row(
+                            children: [
+                              _AvailabilityBadge(
+                                  isAvailable: craftsman.isAvailableNow),
+                              if (craftsman.hasAccountRestriction) ...[
+                                const SizedBox(width: 8),
+                                _AccountStatusChip(craftsman: craftsman),
+                              ],
+                            ],
+                          ),
                         ],
                       ),
                     ),
@@ -258,6 +269,124 @@ class _AvailabilityBadge extends StatelessWidget {
               color: Colors.white,
               fontSize: 12,
               fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _AccountStatusChip extends StatelessWidget {
+  final CraftsmanModel craftsman;
+  const _AccountStatusChip({required this.craftsman});
+
+  Color get _color {
+    final label = craftsman.accountStatusLabel;
+    if (label == 'محذوف') return const Color(0xFF6B7280);
+    if (label == 'محظور') return const Color(0xFFEF4444);
+    if (label == 'موقوف') return const Color(0xFFF59E0B);
+    return const Color(0xFF6B7280);
+  }
+
+  IconData get _icon {
+    final label = craftsman.accountStatusLabel;
+    if (label == 'محذوف') return Icons.delete_outline;
+    if (label == 'محظور') return Icons.block;
+    if (label == 'موقوف') return Icons.pause_circle_outline;
+    return Icons.info_outline;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final color = _color;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.18),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: color.withOpacity(0.5)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(_icon, color: Colors.white, size: 14),
+          const SizedBox(width: 5),
+          Text(
+            craftsman.accountStatusLabel,
+            style: GoogleFonts.cairo(
+              color: Colors.white,
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _AccountStatusBanner extends StatelessWidget {
+  final CraftsmanModel craftsman;
+  const _AccountStatusBanner({required this.craftsman});
+
+  Color get _color {
+    final label = craftsman.accountStatusLabel;
+    if (label == 'محذوف') return const Color(0xFF6B7280);
+    if (label == 'محظور') return const Color(0xFFEF4444);
+    if (label == 'موقوف') return const Color(0xFFF59E0B);
+    return const Color(0xFF6B7280);
+  }
+
+  IconData get _icon {
+    final label = craftsman.accountStatusLabel;
+    if (label == 'محذوف') return Icons.delete_outline_rounded;
+    if (label == 'محظور') return Icons.block_rounded;
+    if (label == 'موقوف') return Icons.pause_circle_outline_rounded;
+    return Icons.info_outline_rounded;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final color = _color;
+    final message = craftsman.accountRestrictionMessage ??
+        'حسابك ${craftsman.accountStatusLabel}';
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: color.withOpacity(0.35)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(_icon, color: color, size: 22),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'حالة الحساب: ${craftsman.accountStatusLabel}',
+                  style: GoogleFonts.cairo(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w800,
+                    color: const Color(0xFF1F2937),
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  message,
+                  style: GoogleFonts.cairo(
+                    fontSize: 13,
+                    color: const Color(0xFF4B5563),
+                    height: 1.4,
+                  ),
+                ),
+              ],
             ),
           ),
         ],

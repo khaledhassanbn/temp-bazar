@@ -380,6 +380,8 @@ class _MarketAnimatedPageState extends State<MarketAnimatedPage>
                       tabController: _tabController,
                       tabBarHeight: tabBarHeight,
                       storeName: vm.store?.name,
+                      storeId: vm.store?.id,
+                      isOwner: vm.store != null ? _isStoreOwner(vm.store!.id) : false,
                       tabs: tabReady
                           ? ordered.map((c) => c.name).toList()
                           : const [],

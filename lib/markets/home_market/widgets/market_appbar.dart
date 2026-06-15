@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:bazar_suez/shared/widgets/report_dialog.dart';
 
 class MarketAppBar extends StatelessWidget {
   final double scrollOffset;
@@ -9,6 +10,8 @@ class MarketAppBar extends StatelessWidget {
   final Function(int) onTabSelected;
   final List<String> tabs;
   final String? storeName;
+  final String? storeId; // معرف المتجر
+  final bool isOwner; // هل المستخدم صاحب المتجر
   final VoidCallback? onSearchPressed;
 
   const MarketAppBar({
@@ -20,6 +23,8 @@ class MarketAppBar extends StatelessWidget {
     required this.onTabSelected,
     required this.tabs,
     this.storeName,
+    this.storeId,
+    this.isOwner = false,
     this.onSearchPressed,
   });
 
@@ -83,6 +88,20 @@ class MarketAppBar extends StatelessWidget {
                           icon: const Icon(Icons.search),
                           onPressed: onSearchPressed,
                         ),
+                        // زر الإبلاغ (لغير صاحب المتجر فقط)
+                        if (storeId != null && !isOwner)
+                          IconButton(
+                            icon: const Icon(Icons.report_outlined),
+                            color: Colors.red[700],
+                            onPressed: () {
+                              showReportDialog(
+                                context,
+                                targetId: storeId!,
+                                targetType: 'store',
+                                targetName: storeName ?? 'المتجر',
+                              );
+                            },
+                          ),
                         IconButton(
                           icon: const Icon(Icons.favorite_border),
                           onPressed: () {},

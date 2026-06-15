@@ -42,7 +42,7 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.setAdminRole = exports.sendPastOrderNotification = exports.sendOrderStatusNotification = exports.sendNewOrderNotification = exports.facebookDataDeletionRequest = exports.updateStoreOpenStatusScheduled = exports.cleanupExpiredPendingPaymentsScheduled = exports.deleteExpiredAdsImagesScheduled = exports.autoRenewSubscriptionsScheduled = exports.paymobWebhookHandler = void 0;
+exports.restoreAccount = exports.softDeleteAccount = exports.removeAdminRole = exports.setAdminRole = exports.assignAdminByEmail = exports.sendPastOrderNotification = exports.sendOrderStatusNotification = exports.sendNewOrderNotification = exports.facebookDataDeletionRequest = exports.updateStoreOpenStatusScheduled = exports.cleanupExpiredPendingPaymentsScheduled = exports.deleteExpiredAdsImagesScheduled = exports.autoRenewSubscriptionsScheduled = exports.paymobWebhookHandler = void 0;
 // ---------------------------------------------------------------------------
 // INITIALIZE FIREBASE ADMIN
 // ---------------------------------------------------------------------------
@@ -80,9 +80,13 @@ Object.defineProperty(exports, "sendNewOrderNotification", { enumerable: true, g
 const sendStatusNotification_1 = require("./notifications/sendStatusNotification");
 Object.defineProperty(exports, "sendOrderStatusNotification", { enumerable: true, get: function () { return sendStatusNotification_1.sendOrderStatusNotification; } });
 Object.defineProperty(exports, "sendPastOrderNotification", { enumerable: true, get: function () { return sendStatusNotification_1.sendPastOrderNotification; } });
-// Admin
-const setAdminRole_1 = require("./admin/setAdminRole");
-Object.defineProperty(exports, "setAdminRole", { enumerable: true, get: function () { return setAdminRole_1.setAdminRole; } });
+// Admin role management
+const adminRoles_1 = require("./admin/adminRoles");
+Object.defineProperty(exports, "assignAdminByEmail", { enumerable: true, get: function () { return adminRoles_1.assignAdminByEmail; } });
+Object.defineProperty(exports, "setAdminRole", { enumerable: true, get: function () { return adminRoles_1.setAdminRole; } });
+Object.defineProperty(exports, "removeAdminRole", { enumerable: true, get: function () { return adminRoles_1.removeAdminRole; } });
+Object.defineProperty(exports, "softDeleteAccount", { enumerable: true, get: function () { return adminRoles_1.softDeleteAccount; } });
+Object.defineProperty(exports, "restoreAccount", { enumerable: true, get: function () { return adminRoles_1.restoreAccount; } });
 // ---------------------------------------------------------------------------
 // GLOBAL OPTIONS
 // ---------------------------------------------------------------------------

@@ -14,6 +14,7 @@ import 'package:bazar_suez/craftsmen/models/craftsman_model.dart';
 import 'package:bazar_suez/craftsmen/services/craftsman_analytics_service.dart';
 import 'package:bazar_suez/craftsmen/services/craftsman_review_service.dart';
 import 'package:bazar_suez/craftsmen/services/craftsman_service.dart';
+import 'package:bazar_suez/shared/widgets/report_dialog.dart';
 import 'package:bazar_suez/theme/app_color.dart';
 
 class CraftsmanDetailPage extends StatefulWidget {
@@ -170,6 +171,16 @@ class _CraftsmanDetailPageState extends State<CraftsmanDetailPage> {
       actions: [
         if (_craftsman != null)
           _appBarAction(Icons.share_outlined, _share),
+        // زر الإبلاغ (لغير صاحب الصفحة فقط)
+        if (_craftsman != null && !_isOwner)
+          _appBarAction(Icons.report_outlined, () {
+            showReportDialog(
+              context,
+              targetId: _craftsman!.id,
+              targetType: 'craftsman',
+              targetName: _craftsman!.name,
+            );
+          }),
         // زر التعديل يظهر فقط لصاحب الصفحة
         if (_craftsman != null && _isOwner)
           _appBarAction(Icons.edit_outlined, () {

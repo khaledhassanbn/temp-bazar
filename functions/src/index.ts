@@ -49,6 +49,15 @@ import { updateStoreOpenStatus } from "./workingHours/updateStoreOpenStatus";
 import { sendNewOrderNotification } from "./notifications/sendOrderNotification";
 import { sendOrderStatusNotification, sendPastOrderNotification } from "./notifications/sendStatusNotification";
 
+// Admin role management
+import {
+  assignAdminByEmail,
+  setAdminRole,
+  removeAdminRole,
+  softDeleteAccount,
+  restoreAccount,
+} from "./admin/adminRoles";
+
 // ---------------------------------------------------------------------------
 // GLOBAL OPTIONS
 // ---------------------------------------------------------------------------
@@ -138,3 +147,12 @@ export { sendOrderStatusNotification };
 
 // إشعار للعميل عند نقل الطلب إلى past_order (completed)
 export { sendPastOrderNotification };
+
+// Admin management
+export {
+  assignAdminByEmail,
+  setAdminRole,
+  removeAdminRole,
+  softDeleteAccount,
+  restoreAccount,
+};

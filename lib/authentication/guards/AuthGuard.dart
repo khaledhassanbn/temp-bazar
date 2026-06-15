@@ -4,18 +4,21 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
+import 'package:bazar_suez/admin/security/models/admin_permission.dart';
+import 'package:bazar_suez/admin/security/models/admin_role.dart';
+import 'package:bazar_suez/admin/security/services/admin_permission_service.dart';
+
 /// AuthGuard كلاس لإدارة حالة تسجيل الدخول وحالة المستخدم
 class AuthGuard extends ChangeNotifier {
   final _auth = FirebaseAuth.instance;
   final _firestore = FirebaseFirestore.instance;
+  final AdminPermissionService _permissionService = AdminPermissionService();
   StreamSubscription<User?>? _authSubscription;
   StreamSubscription<DocumentSnapshot<Map<String, dynamic>>>?
-  _statusSubscription;
+      _statusSubscription;
 
-  /// Flag to track if this ChangeNotifier has been disposed
   bool _isDisposed = false;
 
-  /// Safe wrapper for notifyListeners that checks disposal state
   void _safeNotifyListeners() {
     if (!_isDisposed) {
       notifyListeners();
@@ -29,7 +32,9 @@ class AuthGuard extends ChangeNotifier {
 
       if (user == null) {
         userStatus = null;
+        adminRole = null;
         _hasSetupLocation = false;
+        _permissionService.clear();
         _safeNotifyListeners();
         return;
       }
@@ -40,31 +45,33 @@ class AuthGuard extends ChangeNotifier {
   }
 
   User? get currentUser => _auth.currentUser;
-  String? userStatus; // user | market_owner
+  String? userStatus;
+  AdminRoleType? adminRole;
   bool _hasSetupLocation = false;
   String? _marketId;
 
-  /// ✅ معرّف متجر المستخدم (إن وُجد)
   String? get marketId => _marketId;
-
-  /// ✅ هل المستخدم داخل التطبيق؟
   bool get isAuthenticated => currentUser != null;
-
-  /// ✅ هل المستخدم صاحب متجر؟
   bool get isMarketOwner => userStatus == 'market_owner';
-
-  /// ✅ هل المستخدم أعد الموقع؟
+  bool get isAdmin => userStatus == 'admin';
   bool get hasSetupLocation => _hasSetupLocation;
-
-  /// ✅ هل يحتاج المستخدم لإعداد الموقع؟
   bool get needsLocationSetup => isAuthenticated && !_hasSetupLocation;
+  bool get isSuperAdmin => isAdmin && _permissionService.isSuperAdmin;
 
-  /// 🔹 تحميل حالة المستخدم عند التشغيل
+  bool hasPermission(AdminPermission permission) {
+    if (!isAdmin) return false;
+    return _permissionService.hasPermission(permission);
+  }
+
+  AdminPermissionService get permissionService => _permissionService;
+
   Future<void> loadUserStatus() async {
     final user = _auth.currentUser;
     if (user == null) {
       userStatus = null;
+      adminRole = null;
       _hasSetupLocation = false;
+      _permissionService.clear();
       debugPrint('👤 No user logged in');
       return;
     }
@@ -74,36 +81,54 @@ class AuthGuard extends ChangeNotifier {
       final doc = await _firestore.collection('users').doc(user.uid).get();
       if (doc.exists) {
         final data = doc.data();
+        if (data?['isDeleted'] == true) {
+          userStatus = null;
+          adminRole = null;
+          _permissionService.clear();
+          debugPrint('⚠️ User account is soft-deleted');
+          _safeNotifyListeners();
+          return;
+        }
         userStatus = data?['status'] ?? 'user';
+        adminRole = AdminRoleType.fromKey(data?['adminRole'] as String?);
         _hasSetupLocation = data?['hasSetupLocation'] ?? false;
         final dynamic mid = data?['market_id'] ?? data?['marketId'];
         _marketId = mid is String && mid.isNotEmpty ? mid : null;
+
+        if (userStatus == 'admin') {
+          await _permissionService.loadForUid(user.uid);
+        } else {
+          _permissionService.clear();
+        }
+
         debugPrint(
-          '✅ User status loaded: $userStatus, hasSetupLocation: $_hasSetupLocation',
+          '✅ User status loaded: $userStatus, adminRole: $adminRole',
         );
       } else {
         userStatus = 'user';
+        adminRole = null;
         _hasSetupLocation = false;
         _marketId = null;
+        _permissionService.clear();
         debugPrint('⚠️ User document not found, defaulting to user');
       }
     } catch (e) {
       debugPrint('⚠️ Error loading user status: $e');
       userStatus = 'user';
+      adminRole = null;
       _hasSetupLocation = false;
       _marketId = null;
+      _permissionService.clear();
     }
 
     _safeNotifyListeners();
   }
 
-  /// 🔹 تحديث حالة إعداد الموقع
   void updateLocationSetupStatus(bool hasSetup) {
     _hasSetupLocation = hasSetup;
     _safeNotifyListeners();
   }
 
-  /// 🔹 متابعة التغييرات في حالة المستخدم من Firestore لحظيًا
   void startStatusListener() {
     final user = _auth.currentUser;
     if (user == null) return;
@@ -116,33 +141,47 @@ class AuthGuard extends ChangeNotifier {
         .collection('users')
         .doc(uid)
         .snapshots()
-        .listen((snapshot) {
+        .listen((snapshot) async {
           if (snapshot.exists) {
             final data = snapshot.data();
+            if (data?['isDeleted'] == true) {
+              userStatus = null;
+              adminRole = null;
+              _permissionService.clear();
+              _safeNotifyListeners();
+              return;
+            }
+
             final newStatus = data?['status'] ?? 'user';
+            final newAdminRole =
+                AdminRoleType.fromKey(data?['adminRole'] as String?);
             final newHasSetupLocation = data?['hasSetupLocation'] ?? false;
             final dynamic mid = data?['market_id'] ?? data?['marketId'];
-            final String? newMarketId = mid is String && mid.isNotEmpty
-                ? mid
-                : null;
+            final String? newMarketId =
+                mid is String && mid.isNotEmpty ? mid : null;
 
             bool changed = false;
             if (newStatus != userStatus) {
               userStatus = newStatus;
-              debugPrint('🔄 User status updated: $userStatus');
+              changed = true;
+            }
+            if (newAdminRole != adminRole) {
+              adminRole = newAdminRole;
               changed = true;
             }
             if (newHasSetupLocation != _hasSetupLocation) {
               _hasSetupLocation = newHasSetupLocation;
-              debugPrint(
-                '🔄 Location setup status updated: $_hasSetupLocation',
-              );
               changed = true;
             }
             if (newMarketId != _marketId) {
               _marketId = newMarketId;
-              debugPrint('🔄 marketId updated: $_marketId');
               changed = true;
+            }
+
+            if (newStatus == 'admin') {
+              await _permissionService.loadForUid(uid);
+            } else {
+              _permissionService.clear();
             }
 
             if (changed) {
