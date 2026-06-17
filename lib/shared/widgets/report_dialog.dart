@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:bazar_suez/admin/services/services.dart';
+import 'package:bazar_suez/shared/services/user_report_service.dart';
 
 /// Dialog للإبلاغ عن صنايعي، متجر، أو كورير
 class ReportDialog extends StatefulWidget {
@@ -22,7 +22,7 @@ class ReportDialog extends StatefulWidget {
 class _ReportDialogState extends State<ReportDialog> {
   final _formKey = GlobalKey<FormState>();
   final _reasonController = TextEditingController();
-  final _reportService = ReportService();
+  final _reportService = UserReportService();
   bool _isSubmitting = false;
 
   @override

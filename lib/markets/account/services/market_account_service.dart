@@ -21,7 +21,6 @@ class AccountSummary {
   });
 
   bool get isMarketOwner => status == 'market_owner';
-  bool get isAdmin => status == 'admin';
 }
 
 class MarketSummary {

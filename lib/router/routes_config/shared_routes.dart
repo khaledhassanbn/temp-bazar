@@ -8,7 +8,6 @@ import 'package:bazar_suez/markets/home_page/pages/home_page.dart';
 import 'package:bazar_suez/ads/views/request_ads_page.dart';
 import 'package:bazar_suez/markets/wallet/pages/wallet_page.dart';
 import 'package:bazar_suez/markets/wallet/pages/deposit_request_page.dart';
-import 'package:bazar_suez/markets/wallet/pages/admin_wallet_requests_page.dart';
 import 'package:bazar_suez/markets/saved_locations/pages/delivery_addresses_page.dart';
 import 'package:bazar_suez/markets/license/pages/license_status_page.dart';
 import 'package:bazar_suez/markets/favourite_markets/pages/favourite_markets_page.dart';
@@ -98,10 +97,6 @@ final sharedRoutes = [
   GoRoute(
     path: '/deposit-request',
     builder: (_, __) => const DepositRequestPage(),
-  ),
-  GoRoute(
-    path: '/admin/wallet-requests',
-    builder: (_, __) => const AdminWalletRequestsPage(),
   ),
   GoRoute(
     path: '/productdetails',

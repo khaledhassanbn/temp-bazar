@@ -1,5 +1,4 @@
 import 'package:bazar_suez/core/errors/not_found_page.dart';
-import 'package:bazar_suez/Layouts/admin_layout.dart';
 import 'package:bazar_suez/Layouts/market_layout.dart';
 import 'package:bazar_suez/Layouts/user_layout.dart';
 import 'package:bazar_suez/router/app_navigation.dart';
@@ -9,7 +8,6 @@ import 'package:bazar_suez/router/site_path_rules.dart';
 import 'package:go_router/go_router.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-import 'routes_config/admin_routes.dart';
 import 'routes_config/auth_routes.dart';
 import 'routes_config/market_routes.dart';
 import 'routes_config/shared_routes.dart';
@@ -38,7 +36,6 @@ bool _requiresAuth(String path) {
     '/market-dashboard',
     '/MyStorePage',
     '/license-status',
-    '/admin/wallet-requests',
     '/store-reviews',
     '/craftsmen/register',
     '/craftsmen/dashboard',
@@ -85,8 +82,6 @@ Future<GoRouter> createRouter(AuthGuard authGuard) async {
       errorBuilder: (context, state) => const NotFoundPage(),
       redirect: (context, state) {
         final loggedIn = authGuard.isAuthenticated;
-        final isAdmin = authGuard.userStatus == 'admin';
-        final location = state.matchedLocation;
         final path = state.uri.path;
 
         // التحقق من الأونبوردينج أولاً
@@ -100,12 +95,6 @@ Future<GoRouter> createRouter(AuthGuard authGuard) async {
         // السماح بصفحة الأونبوردينج
         if (path == '/onboarding') return null;
 
-        // حماية صفحات الأدمن
-        if (path.startsWith('/admin')) {
-          if (!loggedIn) return '/';
-          if (!isAdmin) return '/CategoriesGrid';
-        }
-
         // المسارات المحمية: إعادة التوجيه للرئيسية (تسجيل الدخول عبر الورقة المنبثقة)
         if (!loggedIn && _requiresAuth(path)) return '/';
 
@@ -114,17 +103,7 @@ Future<GoRouter> createRouter(AuthGuard authGuard) async {
             (path == '/login' ||
                 path == '/login-email' ||
                 path == '/register')) {
-          if (isAdmin) return '/admin/dashboard';
           return '/';
-        }
-
-        // منع الـ admin من الوصول إلى صفحات المستخدمين (ماعدا /AccountPage والصفحات العامة)
-        if (isAdmin &&
-            !path.startsWith('/admin') &&
-            path != '/AccountPage' &&
-            !path.startsWith('/login') &&
-            !_isPublicPath(path)) {
-          return '/admin/dashboard';
         }
 
         return null;
@@ -142,14 +121,6 @@ Future<GoRouter> createRouter(AuthGuard authGuard) async {
             return MarketAnimatedPage(marketLink: marketId);
           },
         ),
-        // Route منفصل لصفحات الـ admin
-        ShellRoute(
-          builder: (context, state, child) {
-            return AdminLayout(child: child);
-          },
-          routes: [...adminRoutes],
-        ),
-        // ShellRoute للمستخدمين العاديين والمتاجر
         ShellRoute(
           builder: (context, state, child) {
             if (authGuard.isMarketOwner) {
@@ -184,4 +155,3 @@ Future<GoRouter> createRouter(AuthGuard authGuard) async {
     );
   }
 }
-

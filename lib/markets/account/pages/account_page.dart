@@ -138,16 +138,12 @@ class _AccountPageState extends State<AccountPage> {
                       onAction: _showAccountActions,
                     ),
                     const SizedBox(height: 20),
-                    // Show create market banner only for regular users (not market owners or admins)
-                    if (!summary.isMarketOwner && !summary.isAdmin) ...[
+                    // Show create market banner only for regular users (not market owners)
+                    if (!summary.isMarketOwner) ...[
                       _CreateMarketBanner(
                         onTap: () => _handleCreateMarketTap(context),
                       ),
                       const SizedBox(height: 20),
-                    ],
-                    if (summary.isAdmin) ...[
-                      ..._buildAdminContent(),
-                      const SizedBox(height: 16),
                     ],
                     ...content,
                   ],
@@ -267,76 +263,6 @@ class _AccountPageState extends State<AccountPage> {
         icon: Icons.verified_user_outlined,
         label: 'إدارة الترخيص',
         onTap: () => context.go('/pricingpage?marketId=${market.id}'),
-      ),
-    ];
-  }
-
-  List<Widget> _buildAdminContent() {
-    return [
-      _SectionCard(
-        title: 'لوحة الأدمن',
-        tiles: [
-          _MenuTileData(
-            icon: Icons.add_business_outlined,
-            label: 'إنشاء باقة جديدة',
-            subtitle: 'إضافة باقة اشتراك جديدة',
-            onTap: () => context.go('/admin/create-package'),
-          ),
-          _MenuTileData(
-            icon: Icons.manage_accounts_outlined,
-            label: 'إدارة الباقات',
-            subtitle: 'عرض وتعديل وحذف الباقات',
-            onTap: () => context.go('/admin/manage-packages'),
-          ),
-          _MenuTileData(
-            icon: Icons.store_outlined,
-            label: 'قائمة المتاجر',
-            subtitle: 'عرض جميع المتاجر ومعلوماتها',
-            onTap: () => context.go('/admin/stores'),
-          ),
-          _MenuTileData(
-            icon: Icons.category_outlined,
-            label: 'إدارة الفئات',
-            subtitle: 'إضافة وتعديل وحذف الفئات',
-            onTap: () => context.go('/admin/manage-categories'),
-          ),
-          _MenuTileData(
-            icon: Icons.photo_library_rounded,
-            label: 'إدارة الإعلانات',
-            subtitle: 'تحكم في إعلانات الصفحة الرئيسية',
-            onTap: () => context.go('/admin/ads'),
-          ),
-          _MenuTileData(
-            icon: Icons.request_quote_outlined,
-            label: 'طلبات الإعلانات',
-            subtitle: 'عرض وإدارة طلبات الإعلانات',
-            onTap: () => context.go('/admin/ad-requests'),
-          ),
-          _MenuTileData(
-            icon: Icons.account_balance_wallet_outlined,
-            label: 'طلبات الإيداع',
-            subtitle: 'عرض وإدارة طلبات شحن المحفظة',
-            onTap: () => context.push('/admin/wallet-requests'),
-          ),
-          _MenuTileData(
-            icon: Icons.delivery_dining,
-            label: 'رسوم التوصيل',
-            subtitle: 'إعدادات حساب رسوم التوصيل',
-            onTap: () => context.push('/admin/delivery-fee-settings'),
-          ),
-          _MenuTileData(
-            icon: Icons.motorcycle_rounded,
-            label: 'طلبات تسجيل المناديب',
-            subtitle: 'مراجعة وقبول أو رفض طلبات المناديب الجدد',
-            onTap: () => context.push('/admin/courier-requests'),
-          ),
-          _MenuTileData(
-            icon: Icons.handyman_outlined,
-            label: 'إدارة الصنايعية',
-            subtitle: 'اعتماد وإخفاء وحظر ملفات الصنايعية',
-            onTap: () => context.push('/admin/craftsmen'),
-          ),
-        ],
       ),
     ];
   }
