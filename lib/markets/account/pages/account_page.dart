@@ -207,7 +207,7 @@ class _AccountPageState extends State<AccountPage> {
             icon: Icons.support_agent_outlined,
             label: 'تواصل مع الدعم',
             subtitle: 'نحن هنا لمساعدتك في أي وقت',
-            onTap: () => _showSnack('سيتم إتاحة الدعم قريبًا'),
+            onTap: () => context.push('/support'),
           ),
           _MenuTileData(
             icon: Icons.verified_user_outlined,
@@ -342,7 +342,7 @@ class _AccountPageState extends State<AccountPage> {
           _MenuTileData(
             icon: Icons.help_outline,
             label: 'احصل على المساعدة',
-            onTap: () => _showSnack('سيتم تحويلك إلى الدعم قريبًا'),
+            onTap: () => context.push('/support'),
           ),
           _MenuTileData(
             icon: Icons.info_outline,

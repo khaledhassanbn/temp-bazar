@@ -1,12 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:bazar_suez/theme/app_color.dart';
+import 'package:go_router/go_router.dart';
 
-/// نافذة تقييم شركة الشحن
+///  نافذة تقييم شركة الشحن
 class DeliveryRatingDialog extends StatefulWidget {
+  final String driverId;
+  final String driverName;
   final Function(int rating, String? comment) onSubmit;
 
   const DeliveryRatingDialog({
     super.key,
+    required this.driverId,
+    required this.driverName,
     required this.onSubmit,
   });
 
@@ -238,6 +243,25 @@ class _DeliveryRatingDialogState extends State<DeliveryRatingDialog> {
                   ),
                 ),
               ),
+              if (widget.driverId.isNotEmpty)
+                TextButton.icon(
+                  onPressed: () {
+                    Navigator.pop(context); // إغلاق dialog التقييم
+                    context.push(
+                      '/support/create?issueType=driverIssue&relatedId=${widget.driverId}&relatedName=${widget.driverName}',
+                    );
+                  },
+                  icon: const Icon(Icons.flag_outlined, color: Colors.red),
+                  label: const Text(
+                    'الإبلاغ عن المندوب',
+                    style: TextStyle(
+                      color: Colors.red,
+                      fontFamily: 'Tajawal',
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+              const SizedBox(height: 10),
             ],
           ),
         ),

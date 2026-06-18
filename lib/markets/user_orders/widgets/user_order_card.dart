@@ -686,6 +686,8 @@ class _UserOrderCardState extends State<UserOrderCard> {
                       marketId,
                       marketName,
                       marketLogo,
+                      courierId: courierId,
+                      driverName: driverName,
                       hasRatedStore: hasRatedStore,
                       hasRatedDelivery: hasRatedDelivery,
                     ),
@@ -725,8 +727,9 @@ class _UserOrderCardState extends State<UserOrderCard> {
     BuildContext context,
     String storeId,
     String storeName,
-    String? storeLogo,
-    {
+    String? storeLogo, {
+    required String courierId,
+    required String driverName,
     required bool hasRatedStore,
     required bool hasRatedDelivery,
   }) {
@@ -739,6 +742,8 @@ class _UserOrderCardState extends State<UserOrderCard> {
         isScrollControlled: true,
         backgroundColor: Colors.transparent,
         builder: (context) => DeliveryRatingDialog(
+          driverId: courierId,
+          driverName: driverName,
           onSubmit: (deliveryRating, deliveryComment) async {
             try {
               await reviewService.submitDeliveryRating(
@@ -781,6 +786,7 @@ class _UserOrderCardState extends State<UserOrderCard> {
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (context) => StoreRatingDialog(
+        storeId: storeId,
         storeName: storeName,
         storeLogo: storeLogo,
         onSubmit: (rating, comment, tags) async {

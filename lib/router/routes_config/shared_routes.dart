@@ -19,6 +19,10 @@ import 'package:bazar_suez/craftsmen/pages/craftsman_dashboard_page.dart';
 import 'package:bazar_suez/craftsmen/pages/craftsmen_all_categories_page.dart';
 import 'package:bazar_suez/router/site_path_rules.dart';
 import 'package:go_router/go_router.dart';
+import 'package:bazar_suez/support/pages/support_center_page.dart';
+import 'package:bazar_suez/support/pages/create_support_request_page.dart';
+import 'package:bazar_suez/support/pages/support_chat_page.dart';
+
 
 final sharedRoutes = [
   GoRoute(path: '/', builder: (_, __) => const HomePage()),
@@ -108,6 +112,31 @@ final sharedRoutes = [
         marketId: marketId,
         categoryId: categoryId,
         itemId: itemId,
+      );
+    },
+  ),
+  GoRoute(
+    path: '/support',
+    builder: (_, __) => const SupportCenterPage(),
+  ),
+  GoRoute(
+    path: '/support/create',
+    builder: (context, state) {
+      final issueType = state.uri.queryParameters['issueType'];
+      final relatedId = state.uri.queryParameters['relatedId'];
+      final relatedName = state.uri.queryParameters['relatedName'];
+      return CreateSupportRequestPage(
+        preselectedIssueType: issueType,
+        preselectedRelatedId: relatedId,
+        preselectedRelatedName: relatedName,
+      );
+    },
+  ),
+  GoRoute(
+    path: '/support/chat/:conversationId',
+    builder: (context, state) {
+      return SupportChatPage(
+        conversationId: state.pathParameters['conversationId']!,
       );
     },
   ),

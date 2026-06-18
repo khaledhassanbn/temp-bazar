@@ -42,7 +42,7 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.restoreAccount = exports.softDeleteAccount = exports.removeAdminRole = exports.setAdminRole = exports.assignAdminByEmail = exports.sendPastOrderNotification = exports.sendOrderStatusNotification = exports.sendNewOrderNotification = exports.facebookDataDeletionRequest = exports.updateStoreOpenStatusScheduled = exports.cleanupExpiredPendingPaymentsScheduled = exports.deleteExpiredAdsImagesScheduled = exports.autoRenewSubscriptionsScheduled = exports.paymobWebhookHandler = void 0;
+exports.restoreAccount = exports.softDeleteAccount = exports.removeAdminRole = exports.setAdminRole = exports.assignAdminByEmail = exports.sendSupportReplyNotification = exports.sendPastOrderNotification = exports.sendOrderStatusNotification = exports.sendNewOrderNotification = exports.facebookDataDeletionRequest = exports.updateStoreOpenStatusScheduled = exports.cleanupExpiredPendingPaymentsScheduled = exports.deleteExpiredAdsImagesScheduled = exports.autoRenewSubscriptionsScheduled = exports.paymobWebhookHandler = void 0;
 // ---------------------------------------------------------------------------
 // INITIALIZE FIREBASE ADMIN
 // ---------------------------------------------------------------------------
@@ -80,6 +80,8 @@ Object.defineProperty(exports, "sendNewOrderNotification", { enumerable: true, g
 const sendStatusNotification_1 = require("./notifications/sendStatusNotification");
 Object.defineProperty(exports, "sendOrderStatusNotification", { enumerable: true, get: function () { return sendStatusNotification_1.sendOrderStatusNotification; } });
 Object.defineProperty(exports, "sendPastOrderNotification", { enumerable: true, get: function () { return sendStatusNotification_1.sendPastOrderNotification; } });
+const sendSupportNotification_1 = require("./notifications/sendSupportNotification");
+Object.defineProperty(exports, "sendSupportReplyNotification", { enumerable: true, get: function () { return sendSupportNotification_1.sendSupportReplyNotification; } });
 // Admin role management
 const adminRoles_1 = require("./admin/adminRoles");
 Object.defineProperty(exports, "assignAdminByEmail", { enumerable: true, get: function () { return adminRoles_1.assignAdminByEmail; } });

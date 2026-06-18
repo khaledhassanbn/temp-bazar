@@ -349,6 +349,44 @@ service cloud.firestore {
     }
 
     // ============================================================================
+    // SUPPORT CONVERSATIONS
+    // ============================================================================
+
+    match /support_conversations/{conversationId} {
+      // القراءة: صاحب المحادثة أو الإدارة
+      allow read: if isAuthenticated() && (
+        resource.data.userId == request.auth.uid || isAdmin()
+      );
+      
+      // الإنشاء: مستخدم مسجل — userId يساوي المستخدم الحالي
+      allow create: if isAuthenticated() && 
+        request.resource.data.userId == request.auth.uid;
+      
+      // التحديث: صاحب المحادثة (لتصفير unreadUserCount) أو الإدارة
+      allow update: if isAuthenticated() && (
+        resource.data.userId == request.auth.uid || isAdmin()
+      );
+      
+      // الحذف: super admin فقط
+      allow delete: if isSuperAdmin();
+      
+      // الرسائل
+      match /messages/{messageId} {
+        allow read: if isAuthenticated() && (
+          get(/databases/$(database)/documents/support_conversations/$(conversationId)).data.userId == request.auth.uid ||
+          isAdmin()
+        );
+        
+        allow create: if isAuthenticated() && (
+          get(/databases/$(database)/documents/support_conversations/$(conversationId)).data.userId == request.auth.uid ||
+          isAdmin()
+        );
+        
+        allow update, delete: if false;
+      }
+    }
+
+    // ============================================================================
     // DEFAULT DENY
     // ============================================================================
     

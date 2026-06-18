@@ -1,14 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:bazar_suez/theme/app_color.dart';
+import 'package:go_router/go_router.dart';
 
 /// نافذة تقييم المتجر
 class StoreRatingDialog extends StatefulWidget {
+  final String storeId;
   final String storeName;
   final String? storeLogo;
   final Function(int rating, String? comment, List<String> tags) onSubmit;
 
   const StoreRatingDialog({
     super.key,
+    required this.storeId,
     required this.storeName,
     this.storeLogo,
     required this.onSubmit,
@@ -356,6 +359,24 @@ class _StoreRatingDialogState extends State<StoreRatingDialog> {
                   ),
                 ),
               ),
+              TextButton.icon(
+                onPressed: () {
+                  Navigator.pop(context); // إغلاق dialog التقييم
+                  context.push(
+                    '/support/create?issueType=storeIssue&relatedId=${widget.storeId}&relatedName=${widget.storeName}',
+                  );
+                },
+                icon: const Icon(Icons.flag_outlined, color: Colors.red),
+                label: const Text(
+                  'الإبلاغ عن المتجر',
+                  style: TextStyle(
+                    color: Colors.red,
+                    fontFamily: 'Tajawal',
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 10),
             ],
           ),
         ),

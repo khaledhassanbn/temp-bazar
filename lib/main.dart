@@ -21,6 +21,8 @@ import 'markets/Markets_after_category/viewmodel/category_filter_viewmodel.dart'
 import 'markets/cart/viewmodels/cart_view_model.dart';
 import 'markets/saved_locations/viewmodels/saved_locations_viewmodel.dart';
 import 'markets/home_page/viewmodels/home_data_provider.dart';
+import 'package:bazar_suez/support/viewmodels/support_viewmodel.dart';
+
 
 // 🐝 Hive
 import 'services/hive_adapters_setup.dart';
@@ -108,6 +110,7 @@ class _MyAppState extends State<MyApp> {
           },
         ),
         ChangeNotifierProvider(create: (_) => HomeDataProvider()),
+        ChangeNotifierProvider(create: (_) => SupportViewModel()),
         ChangeNotifierProvider<ConnectionService>.value(
           value: _connectionService,
         ),

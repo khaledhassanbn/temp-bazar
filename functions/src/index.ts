@@ -48,6 +48,7 @@ import { updateStoreOpenStatus } from "./workingHours/updateStoreOpenStatus";
 // Order Notifications
 import { sendNewOrderNotification } from "./notifications/sendOrderNotification";
 import { sendOrderStatusNotification, sendPastOrderNotification } from "./notifications/sendStatusNotification";
+import { sendSupportReplyNotification } from "./notifications/sendSupportNotification";
 
 // Admin role management
 import {
@@ -147,6 +148,9 @@ export { sendOrderStatusNotification };
 
 // إشعار للعميل عند نقل الطلب إلى past_order (completed)
 export { sendPastOrderNotification };
+
+// إشعار رد الإدارة على طلب الدعم
+export { sendSupportReplyNotification };
 
 // Admin management
 export {
