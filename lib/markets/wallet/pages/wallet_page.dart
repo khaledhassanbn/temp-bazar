@@ -1,9 +1,12 @@
 import 'dart:ui' as ui;
 
 import 'package:bazar_suez/markets/wallet/models/wallet_transaction_model.dart';
+import 'package:bazar_suez/markets/wallet/models/wallet_ledger_model.dart';
 import 'package:bazar_suez/markets/wallet/services/wallet_service.dart';
+import 'package:bazar_suez/markets/wallet/services/wallet_notification_service.dart';
 import 'package:bazar_suez/theme/app_color.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
@@ -22,13 +25,17 @@ class _WalletPageState extends State<WalletPage> {
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final LicenseService _licenseService = LicenseService();
   double _balance = 0.0;
+  double _creditLimit = -50.0;
+  String? _alertMessage;
   bool _isLoading = true;
   LicenseStatus? _licenseStatus;
   String? _marketId;
+  bool _showLedger = true;
 
   @override
   void initState() {
     super.initState();
+    WalletNotificationService.resetForNewBalance();
     _loadData();
   }
 
@@ -38,13 +45,29 @@ class _WalletPageState extends State<WalletPage> {
       final balance = await _walletService.getWalletBalance(user.uid);
       final marketId = await _licenseService.resolveCurrentUserMarketId();
       LicenseStatus? license;
+      double creditLimit = -50.0;
       if (marketId != null) {
         try {
           license = await _licenseService.fetchStatus(marketId);
+          final storeDoc = await FirebaseFirestore.instance
+              .collection('markets')
+              .doc(marketId)
+              .get();
+          if (storeDoc.exists) {
+            final data = storeDoc.data();
+            if (data != null && data['creditLimit'] != null) {
+              creditLimit = (data['creditLimit'] as num).toDouble();
+            }
+          }
         } catch (_) {}
       }
+
+      final alertMessage = WalletNotificationService.checkBalanceAndNotify(balance, creditLimit);
+
       setState(() {
         _balance = balance;
+        _creditLimit = creditLimit;
+        _alertMessage = alertMessage;
         _isLoading = false;
         _licenseStatus = license;
         _marketId = marketId;
@@ -94,6 +117,8 @@ class _WalletPageState extends State<WalletPage> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
+                // Alert Banner
+                _buildAlertBanner(),
                 // Balance Card
                 _buildBalanceCard(),
                 const SizedBox(height: 24),
@@ -102,22 +127,132 @@ class _WalletPageState extends State<WalletPage> {
                 const SizedBox(height: 16),
                 _buildLicenseCard(),
                 const SizedBox(height: 24),
-                // Transactions Section
-                const Text(
-                  'العمليات',
-                  style: TextStyle(
+                // Tab selector
+                _buildTabSelector(),
+                const SizedBox(height: 24),
+                // Title
+                Text(
+                  _showLedger ? 'سجل العمليات الموحد' : 'طلبات الشحن المعلقة والسابقة',
+                  style: const TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.bold,
                     color: Color(0xFF1A1A1A),
                   ),
                 ),
                 const SizedBox(height: 12),
-                // Transactions List
-                _buildTransactionsList(user.uid),
+                // Content List
+                _showLedger
+                    ? _buildLedgerList(user.uid)
+                    : _buildTransactionsList(user.uid),
               ],
             ),
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _buildAlertBanner() {
+    if (_alertMessage == null) return const SizedBox.shrink();
+
+    final isExceeded = _balance <= _creditLimit;
+    final bannerColor = isExceeded ? Colors.red.shade50 : Colors.orange.shade50;
+    final borderColor = isExceeded ? Colors.red.shade200 : Colors.orange.shade200;
+    final textColor = isExceeded ? Colors.red.shade800 : Colors.orange.shade800;
+    final icon = isExceeded ? Icons.error_outline : Icons.warning_amber_outlined;
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 16),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: bannerColor,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: borderColor),
+      ),
+      child: Row(
+        children: [
+          Icon(icon, color: textColor),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              _alertMessage!,
+              style: TextStyle(
+                color: textColor,
+                fontSize: 13,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTabSelector() {
+    return Container(
+      padding: const EdgeInsets.all(4),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.02),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: GestureDetector(
+              onTap: () {
+                setState(() {
+                  _showLedger = true;
+                });
+              },
+              child: Container(
+                padding: const EdgeInsets.symmetric(vertical: 10),
+                decoration: BoxDecoration(
+                  color: _showLedger ? AppColors.mainColor : Colors.transparent,
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Text(
+                  'سجل العمليات',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: _showLedger ? Colors.white : const Color(0xFF6B7280),
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+            ),
+          ),
+          Expanded(
+            child: GestureDetector(
+              onTap: () {
+                setState(() {
+                  _showLedger = false;
+                });
+              },
+              child: Container(
+                padding: const EdgeInsets.symmetric(vertical: 10),
+                decoration: BoxDecoration(
+                  color: !_showLedger ? AppColors.mainColor : Colors.transparent,
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Text(
+                  'طلبات الشحن',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: !_showLedger ? Colors.white : const Color(0xFF6B7280),
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -144,7 +279,7 @@ class _WalletPageState extends State<WalletPage> {
         crossAxisAlignment: CrossAxisAlignment.end,
         children: [
           const Text(
-            'الرصيد المتاح',
+            'الرصيد الفعلي للمحفظة',
             style: TextStyle(
               color: Colors.white,
               fontSize: 16,
@@ -154,7 +289,7 @@ class _WalletPageState extends State<WalletPage> {
           const SizedBox(height: 12),
           if (_isLoading)
             const CircularProgressIndicator(color: Colors.white)
-          else
+          else ...[
             Text(
               '${_balance.toStringAsFixed(2)} جنيه',
               style: const TextStyle(
@@ -163,6 +298,187 @@ class _WalletPageState extends State<WalletPage> {
                 fontWeight: FontWeight.bold,
               ),
             ),
+            const SizedBox(height: 8),
+            Text(
+              'الحد الائتماني: ${_creditLimit.toStringAsFixed(2)} جنيه',
+              style: TextStyle(
+                color: Colors.white.withOpacity(0.9),
+                fontSize: 13,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildLedgerList(String userId) {
+    return StreamBuilder<List<WalletLedgerEntry>>(
+      stream: _walletService.getWalletLedger(userId),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(
+            child: Padding(
+              padding: EdgeInsets.all(24),
+              child: CircularProgressIndicator(),
+            ),
+          );
+        }
+
+        if (snapshot.hasError) {
+          return Center(
+            child: Padding(
+              padding: const EdgeInsets.all(24),
+              child: Text(
+                'خطأ في تحميل السجل: ${snapshot.error}',
+                textAlign: TextAlign.center,
+                style: const TextStyle(color: Colors.red),
+              ),
+            ),
+          );
+        }
+
+        final entries = snapshot.data ?? [];
+
+        if (entries.isEmpty) {
+          return Container(
+            padding: const EdgeInsets.all(32),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: Colors.grey.withOpacity(0.1)),
+            ),
+            child: const Center(
+              child: Text(
+                'لا توجد عمليات مسجلة حتى الآن',
+                style: TextStyle(color: Color(0xFF6B7280), fontSize: 16),
+              ),
+            ),
+          );
+        }
+
+        return Column(
+          children: entries.map((entry) {
+            return _buildLedgerCard(entry);
+          }).toList(),
+        );
+      },
+    );
+  }
+
+  Widget _buildLedgerCard(WalletLedgerEntry entry) {
+    Color typeColor;
+    IconData typeIcon;
+    String typeText = WalletLedgerType.arabicName(entry.type);
+
+    switch (entry.type) {
+      case WalletLedgerType.walletRecharge:
+        typeColor = Colors.green;
+        typeIcon = Icons.add_circle_outline;
+        break;
+      case WalletLedgerType.orderCommission:
+        typeColor = Colors.red;
+        typeIcon = Icons.receipt_long_outlined;
+        break;
+      case WalletLedgerType.subscriptionPayment:
+        typeColor = Colors.blue;
+        typeIcon = Icons.card_membership_outlined;
+        break;
+      case WalletLedgerType.manualAdjustment:
+        typeColor = Colors.orange;
+        typeIcon = Icons.tune_outlined;
+        break;
+      case WalletLedgerType.refund:
+        typeColor = Colors.teal;
+        typeIcon = Icons.history_outlined;
+        break;
+      case WalletLedgerType.autoRenewal:
+        typeColor = Colors.purple;
+        typeIcon = Icons.autorenew_outlined;
+        break;
+      default:
+        typeColor = Colors.grey;
+        typeIcon = Icons.help_outline;
+    }
+
+    final isDebit = entry.amount < 0;
+    final amountText = '${isDebit ? "" : "+"}${entry.amount.toStringAsFixed(2)} جنيه';
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.grey.withOpacity(0.1)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.02),
+            blurRadius: 10,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: typeColor.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Icon(typeIcon, color: typeColor, size: 24),
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  entry.description.isNotEmpty ? entry.description : typeText,
+                  style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF1A1A1A),
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  DateFormat(
+                    'yyyy/MM/dd - HH:mm',
+                    'ar',
+                  ).format(entry.createdAt),
+                  style: const TextStyle(
+                    color: Color(0xFF6B7280),
+                    fontSize: 11,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 12),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Text(
+                amountText,
+                style: TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.bold,
+                  color: isDebit ? Colors.red.shade700 : Colors.green.shade700,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                'الرصيد: ${entry.balanceAfter.toStringAsFixed(2)}',
+                style: const TextStyle(
+                  fontSize: 11,
+                  color: Color(0xFF9CA3AF),
+                ),
+              ),
+            ],
+          ),
         ],
       ),
     );

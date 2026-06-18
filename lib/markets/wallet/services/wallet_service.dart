@@ -2,6 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'dart:io';
 import '../models/wallet_transaction_model.dart';
+import '../models/wallet_ledger_model.dart';
 
 class WalletService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
@@ -138,5 +139,18 @@ class WalletService {
     } catch (e) {
       throw Exception('فشل خصم المبلغ: ${e.toString()}');
     }
+  }
+
+  /// جلب سجل المحفظة الموحد
+  Stream<List<WalletLedgerEntry>> getWalletLedger(String userId) {
+    return _firestore
+        .collection('wallet_ledger')
+        .where('userId', isEqualTo: userId)
+        .orderBy('createdAt', descending: true)
+        .limit(50)
+        .snapshots()
+        .map((snapshot) => snapshot.docs
+            .map((doc) => WalletLedgerEntry.fromJson({...doc.data(), 'id': doc.id}))
+            .toList());
   }
 }

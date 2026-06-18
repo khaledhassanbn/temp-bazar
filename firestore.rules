@@ -76,7 +76,13 @@ service cloud.firestore {
     // Check if store can receive orders
     function canStoreReceiveOrders(storeId) {
       let store = get(/databases/$(database)/documents/markets/$(storeId));
-      return store.data.canReceiveOrders == true && isStoreActive(storeId);
+      let ownerId = store.data.get('ownerId', store.data.get('ownerUid', ''));
+      let owner = get(/databases/$(database)/documents/users/$(ownerId));
+      let balance = owner.data.get('walletBalance', 0);
+      let creditLimit = store.data.get('creditLimit', -50);
+      return store.data.canReceiveOrders == true && 
+             isStoreActive(storeId) &&
+             balance > creditLimit;
     }
     
     // Check if user owns the store
@@ -384,6 +390,36 @@ service cloud.firestore {
         
         allow update, delete: if false;
       }
+    }
+
+    // ============================================================================
+    // WALLET LEDGER & COMMISSION RULES
+    // ============================================================================
+
+    // wallet_ledger — سجل المحفظة الموحد (Immutable)
+    match /wallet_ledger/{entryId} {
+      allow read: if isAuthenticated() && (
+        resource.data.userId == request.auth.uid || isAdmin()
+      );
+      allow create: if isAuthenticated();
+      allow update, delete: if false;
+    }
+
+    // commission_config — إعدادات العمولة
+    match /commission_config/{configId} {
+      allow read: if true;
+      allow write: if isSuperAdmin();
+    }
+
+    // wallet_transactions — طلبات شحن المحفظة
+    match /wallet_transactions/{txId} {
+      allow read: if isAuthenticated() && (
+        resource.data.userId == request.auth.uid || isAdmin()
+      );
+      allow create: if isAuthenticated() && 
+        request.resource.data.userId == request.auth.uid;
+      allow update: if isAdmin();
+      allow delete: if false;
     }
 
     // ============================================================================

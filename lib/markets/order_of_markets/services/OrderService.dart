@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../utils/order_status_helper.dart';
+import 'package:bazar_suez/markets/wallet/services/commission_service.dart';
 
 class OrderService {
   Stream<QuerySnapshot> streamPresentOrders(String marketId) {
@@ -158,6 +159,33 @@ class OrderService {
             }
           ]),
         });
+
+    // خصم العمولة عند التسليم الناجح فقط
+    if (newStatus == 'تم التسليم للطيار' || newStatus == 'التسليم الذاتي') {
+      try {
+        final storeDoc = await FirebaseFirestore.instance
+            .collection('markets').doc(marketId).get();
+        final ownerId = storeDoc.data()?['ownerId'] as String?;
+        
+        if (ownerId != null) {
+          final dynamic totalAmountRaw = orderData['totalAmount'];
+          final num totalAmountNum = totalAmountRaw is num
+              ? totalAmountRaw
+              : num.tryParse('$totalAmountRaw') ?? 0;
+          
+          await CommissionService().deductOrderCommission(
+            orderId: documentId,
+            storeId: marketId,
+            ownerId: ownerId,
+            orderTotal: totalAmountNum.toDouble(),
+          );
+        }
+      } catch (e) {
+        // Best-effort: لا نمنع إكمال الطلب بسبب فشل خصم العمولة
+        // ignore: avoid_print
+        print('Failed to deduct commission for order $documentId: $e');
+      }
+    }
 
     // 3) update store statistics if delivered to driver
     if (newStatus == 'تم التسليم للطيار') {

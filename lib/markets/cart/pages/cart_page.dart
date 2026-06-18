@@ -18,6 +18,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'dart:math';
 import 'package:bazar_suez/markets/add_product/services/product_service.dart';
+import 'package:bazar_suez/markets/wallet/services/commission_service.dart';
 
 class CartPage extends StatefulWidget {
   const CartPage({super.key});
@@ -512,6 +513,38 @@ class _CartPageState extends State<CartPage> {
         ),
       );
       return;
+    }
+
+    // التحقق من الحد الائتماني للمتجر قبل المتابعة
+    final cartViewModel = Provider.of<CartViewModel>(context, listen: false);
+    final marketId = cartViewModel.currentMarketId;
+    if (marketId != null) {
+      // إظهار مؤشر تحميل أثناء الفحص
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        useRootNavigator: true,
+        builder: (context) => const Center(child: CircularProgressIndicator()),
+      );
+      
+      final canReceive = await CommissionService().canStoreReceiveNewOrders(marketId);
+      
+      if (mounted) {
+        Navigator.of(context, rootNavigator: true).pop(); // إغلاق مؤشر التحميل
+      }
+      
+      if (!canReceive) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('عذراً، هذا المتجر لا يستقبل طلبات جديدة حالياً لتجاوز الحد الائتماني للمحفظة.'),
+              backgroundColor: Colors.red,
+              duration: Duration(seconds: 4),
+            ),
+          );
+        }
+        return;
+      }
     }
 
     // في حالة نجاح التحقق - حفظ الطلب في Firebase

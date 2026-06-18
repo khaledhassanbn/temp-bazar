@@ -56,6 +56,21 @@ class DashboardMarketService {
         (marketData['status'] == 'active' || marketData['status'] == null) &&
         (status.endAt == null || status.endAt!.isAfter(DateTime.now()));
 
+    final totalCommissionsPaid = (marketData['totalCommissionsPaid'] ?? 0.0).toDouble();
+
+    double creditLimit = -50.0;
+    try {
+      final configDoc = await _firestore.collection('commission_config').doc('default').get();
+      if (configDoc.exists) {
+        creditLimit = (configDoc.data()?['defaultCreditLimit'] ?? -50.0).toDouble();
+      }
+    } catch (_) {}
+    if (marketData['creditLimit'] != null) {
+      creditLimit = (marketData['creditLimit'] as num).toDouble();
+    }
+
+    final isNearCreditLimit = walletBalance <= creditLimit + 20.0;
+
     return DashboardMarketModel(
       marketId: resolvedMarketId,
       currentPackageName: status.currentPackageName ?? 'باقة غير محددة',
@@ -65,6 +80,9 @@ class DashboardMarketService {
       packageProgress: progress,
       isPackageActive: isActive,
       walletBalance: walletBalance,
+      totalCommissionsPaid: totalCommissionsPaid,
+      creditLimit: creditLimit,
+      isNearCreditLimit: isNearCreditLimit,
       totalProducts: totalProducts,
       weeklySalesCount: weeklySalesCount,
       monthlyRevenue: monthlyRevenue,

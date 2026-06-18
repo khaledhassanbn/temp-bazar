@@ -9,6 +9,9 @@ class DashboardMarketModel {
   final double packageProgress;
   final bool isPackageActive;
   final double walletBalance;
+  final double totalCommissionsPaid;
+  final double creditLimit;
+  final bool isNearCreditLimit;
   final int totalProducts;
   final int weeklySalesCount;
   final double monthlyRevenue;
@@ -25,6 +28,9 @@ class DashboardMarketModel {
     required this.packageProgress,
     required this.isPackageActive,
     required this.walletBalance,
+    required this.totalCommissionsPaid,
+    required this.creditLimit,
+    required this.isNearCreditLimit,
     required this.totalProducts,
     required this.weeklySalesCount,
     required this.monthlyRevenue,
