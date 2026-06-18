@@ -1,0 +1,1478 @@
+Bazaar Suez — Wallet Commission System
+
+Architecture Design & Implementation Plan
+
+1. تحليل المشروع الحالي (Current State Analysis)
+
+1.1 هيكل قاعدة البيانات الحالي (Firestore Schema)
+
+Collection
+
+الوصف
+
+الحقول الرئيسية
+
+users/{uid}
+
+بيانات المستخدمين
+
+walletBalance, market_id, fcmToken, role
+
+markets/{storeId}
+
+بيانات المتاجر
+
+ownerId, isActive, licenseStartAt, licenseEndAt, canReceiveOrders, fcmToken, status
+
+orders/{orderId}
+
+الطلبات الموحدة (top-level)
+
+storeId, userId, status, orderStatus, isActive, totalAmount, completedAt
+
+wallet_transactions/{txId}
+
+طلبات شحن المحفظة
+
+userId, amount, status (pending/approved/rejected), imageUrl
+
+pending_payments/{id}
+
+مدفوعات اشتراكات معلقة
+
+userId, packageId, amount, status
+
+packages/{id}
+
+باقات الاشتراكات
+
+name, days, price, features
+
+markets/{id}/statistics/{year}
+
+إحصائيات المبيعات
+
+summary.totalSales, summary.totalOrders
+
+1.2 هيكل المحفظة الحالي (Current Wallet Architecture)
+
+users/{uid}.walletBalance → الرصيد الفعلي (double)
+wallet_transactions/{txId} → طلبات الشحن فقط (deposit requests)
+
+[!WARNING]مشكلة حرجة في النظام الحالي: WalletService.deductFromWallet() لا يستخدم Firestore Transaction — يقرأ الرصيد ثم يحدثه بشكل منفصل مما يتيح Race Conditions. كذلك يمنع الخصم إذا كان الرصيد أقل من المبلغ (balance < amount).
+
+الملفات المتأثرة:
+
+wallet_transaction_model.dart — موديل بسيط لطلبات الشحن فقط (لا يدعم أنواع حركات متعددة)
+
+wallet_service.dart — deductFromWallet() بدون Transaction, getWalletBalance(), createDepositRequest()
+
+wallet_page.dart — صفحة عرض الرصيد والعمليات
+
+deposit_request_page.dart — صفحة طلب الشحن
+
+1.3 نظام الاشتراكات الحالي (Subscription System)
+
+التدفق:
+
+المتجر يختار باقة → PendingPaymentService.createPendingPayment() يخصم من المحفظة
+
+عند إنشاء المتجر → linkPaymentToStore() يربط الدفع بالمتجر
+
+التجديد التلقائي → Cloud Function autoRenewSubscriptions (كل ساعة) يستخدم Firestore Transaction لخصم سعر الباقة وتمديد الترخيص
+
+الملفات:
+
+pending_payment_service.dart
+
+license_service.dart — renewWithPackage() يستخدم Transaction
+
+autoRenew.ts — Cloud Function
+
+1.4 نظام الطلبات الحالي (Orders System)
+
+التدفق:
+
+العميل يضع طلب → orders/{orderId} مع isActive: true
+
+المتجر يقبل/يرفض → تحديث status
+
+عند التسليم → OrderService.finalizeDeliveredOrder() يحدث isActive: false ويسجل الإحصائيات
+
+حالة التسليم الناجح = 'تم التسليم للطيار' / 'completed' / 'delivered' / 'self_delivery'
+
+الملفات:
+
+OrderService.dart — finalizeDeliveredOrder(), moveToPastOrder(), _updateStoreStatistics()
+
+order_status_helper.dart — isDelivered(), isRejected()
+
+1.5 نظام الإشعارات الحالي (Notification System)
+
+fcm_service.dart — عميل FCM في التطبيق
+
+sendStatusNotification.ts — Cloud Function (triggers on markets/{storeId}/present_order و past_order)
+
+sendOrderNotification.ts — إشعار طلب جديد
+
+license_notification_service.dart — إشعارات محلية لتنبيهات انتهاء الترخيص
+
+1.6 نظام الأدمن الحالي (Admin System)
+
+stores_service.dart — إدارة المتاجر، تجديد الاشتراكات، إضافة/طرح أيام
+
+store_model.dart — موديل المتجر في الأدمن
+
+dashboard_service.dart — إحصائيات لوحة التحكم
+
+admin_routes.dart — مسارات التنقل
+
+[!NOTE]ملاحظة: لا يوجد حالياً أي نظام لإدارة wallet_transactions في تطبيق الأدمن — الأدمن لا يرى طلبات الشحن ولا يوافق عليها من التطبيق (يتم يدوياً عبر Firebase Console).
+
+1.7 نظام المتاجر الحالي (Store App — Main App)
+
+المتجر يعمل داخل التطبيق الرئيسي (temp_bazar) ويستخدم:
+
+wallet_page.dart — عرض الرصيد + العمليات
+
+dashboard_market_service.dart — لوحة تحكم المتجر (تعرض walletBalance)
+
+2. التصميم المعماري المقترح (Proposed Architecture)
+
+2.1 تغييرات Firestore
+
+حقول جديدة في markets/{storeId}
+
+{
+  "commissionRate": 5.0,
+  "commissionType": "fixed",
+  "creditLimit": -50,
+  "totalCommissionsPaid": 0.0,
+  "lastCommissionAt": null
+}
+
+حقل
+
+نوع
+
+الوصف
+
+commissionRate
+
+double
+
+قيمة العمولة (5 جنيه افتراضياً)
+
+commissionType
+
+string
+
+نوع العمولة: fixed أو percentage (مستقبلاً)
+
+creditLimit
+
+double
+
+الحد الائتماني (-50 افتراضياً)
+
+totalCommissionsPaid
+
+double
+
+إجمالي العمولات المدفوعة
+
+lastCommissionAt
+
+Timestamp?
+
+آخر خصم عمولة
+
+حقول جديدة في orders/{orderId}
+
+{
+  "commissionDeducted": false,
+  "commissionAmount": null,
+  "commissionDeductedAt": null
+}
+
+حقل
+
+نوع
+
+الوصف
+
+commissionDeducted
+
+bool
+
+هل تم خصم العمولة (حماية من الخصم المكرر — Idempotency Flag)
+
+commissionAmount
+
+double?
+
+قيمة العمولة المخصومة
+
+commissionDeductedAt
+
+Timestamp?
+
+وقت خصم العمولة
+
+مجموعة جديدة: wallet_ledger/{entryId} (سجل محفظة موحد)
+
+{
+  "id": "auto-generated",
+  "storeId": "market-xyz",
+  "userId": "user-abc",
+  "type": "order_commission",
+  "amount": -5.0,
+  "balanceBefore": 100.0,
+  "balanceAfter": 95.0,
+  "referenceId": "order-123",
+  "referenceType": "order",
+  "description": "عمولة طلب #123",
+  "createdAt": "Timestamp",
+  "metadata": {
+    "orderId": "order-123",
+    "commissionType": "fixed",
+    "commissionRate": 5.0
+  }
+}
+
+أنواع الحركات المدعومة:
+
+wallet_recharge — شحن المحفظة
+
+subscription_payment — دفع اشتراك
+
+order_commission — عمولة طلب
+
+manual_adjustment — تعديل يدوي من الأدمن
+
+refund — استرداد
+
+auto_renewal — تجديد تلقائي
+
+مجموعة جديدة: commission_config (إعدادات العمولة العامة)
+
+// commission_config/default
+{
+  "defaultCommissionRate": 5.0,
+  "defaultCommissionType": "fixed",
+  "defaultCreditLimit": -50,
+  "balanceWarningThresholds": [50, 20, 10, 0],
+  "creditLimitWarningEnabled": true,
+  "blockOrdersOnCreditExceeded": true,
+  "updatedAt": "Timestamp",
+  "updatedBy": "admin-uid"
+}
+
+2.2 استراتيجية الخصم (Commission Deduction Strategy)
+
+النقطة المثالية للخصم
+
+الخصم يتم عند تحويل الطلب إلى isActive: false مع حالة delivered/completed — أي داخل OrderService.moveToPastOrder() الموجود حالياً.
+
+Order Delivered → moveToPastOrder() → deductCommission() → updateStatistics()
+
+Idempotency Protection (حماية من الخصم المكرر)
+
+// Inside Firestore Transaction:
+1. قراءة order document
+2. التحقق: if (orderData['commissionDeducted'] == true) → SKIP
+3. قراءة market document → الحصول على commissionRate
+4. قراءة user document → الحصول على walletBalance الحالي
+5. حساب العمولة: 
+   - fixed: commissionRate
+   - percentage: totalAmount * (commissionRate / 100)
+6. خصم: walletBalance -= commissionAmount (يُسمح بالسالب)
+7. تحديث order: commissionDeducted = true, commissionAmount, commissionDeductedAt
+8. تحديث user: walletBalance
+9. تحديث market: totalCommissionsPaid += commissionAmount
+10. إنشاء wallet_ledger entry
+
+[!IMPORTANT]كل هذه العمليات يجب أن تتم داخل runTransaction واحد لضمان الـ Atomicity وحماية من Race Conditions.
+
+2.3 نظام الحد الائتماني (Credit Limit System)
+
+منطق التحقق عند إنشاء طلب جديد
+
+Future<bool> canStoreReceiveNewOrders(String storeId) async {
+  final storeDoc = await _firestore.collection('markets').doc(storeId).get();
+  final ownerUid = storeDoc.data()?['ownerId'];
+  final creditLimit = (storeDoc.data()?['creditLimit'] ?? -50).toDouble();
+  
+  final userDoc = await _firestore.collection('users').doc(ownerUid).get();
+  final walletBalance = (userDoc.data()?['walletBalance'] ?? 0).toDouble();
+  
+  return walletBalance > creditLimit; // مثلاً: -30 > -50 = true (مسموح)
+}
+
+ماذا يحدث عند تجاوز الحد الائتماني؟
+
+الإجراء
+
+يتم تنفيذه؟
+
+منع استقبال طلبات جديدة
+
+✅ نعم
+
+تعطيل الحساب
+
+❌ لا
+
+إلغاء الطلبات الحالية
+
+❌ لا
+
+إيقاف الاشتراك
+
+❌ لا
+
+إرسال تنبيه
+
+✅ نعم
+
+2.4 استراتيجية التنبيهات (Notification Strategy)
+
+التنبيهات المطلوبة وطريقة التنفيذ
+
+التنبيه
+
+Trigger
+
+الطريقة
+
+المستهدف
+
+رصيد أقل من 50 جنيه
+
+بعد خصم العمولة
+
+In-App Check + FCM
+
+المتجر
+
+رصيد أقل من 20 جنيه
+
+بعد خصم العمولة
+
+In-App Check + FCM
+
+المتجر
+
+رصيد أقل من 10 جنيه
+
+بعد خصم العمولة
+
+In-App Check + FCM
+
+المتجر
+
+رصيد سالب
+
+بعد خصم العمولة
+
+In-App Check + FCM
+
+المتجر
+
+الوصول للحد الائتماني
+
+بعد خصم العمولة
+
+FCM + منع طلبات
+
+المتجر + أدمن
+
+تجاوز الحد الائتماني
+
+عند محاولة طلب جديد
+
+UI Warning
+
+العميل + المتجر
+
+إعادة الشحن
+
+عند الموافقة على الشحن
+
+FCM
+
+المتجر
+
+خصم عمولة جديدة
+
+بعد خصم العمولة
+
+In-App notification
+
+المتجر
+
+التنفيذ: سيتم إنشاء WalletNotificationService جديد يتحقق من الرصيد بعد كل عملية ويرسل التنبيه المناسب.
+
+2.5 تغييرات Security Rules
+
+// wallet_ledger — سجل المحفظة الموحد
+match /wallet_ledger/{entryId} {
+  allow read: if isAuthenticated() && (
+    resource.data.userId == request.auth.uid || isAdmin()
+  );
+  allow create: if isAdmin() || (
+    isAuthenticated() && 
+    resource.data.userId == request.auth.uid &&
+    resource.data.type in ['order_commission', 'subscription_payment']
+  );
+  allow update, delete: if false; // Immutable ledger
+}
+
+// commission_config — إعدادات العمولة
+match /commission_config/{configId} {
+  allow read: if true;
+  allow write: if isSuperAdmin();
+}
+
+// تحديث orders rule لتشمل commission fields
+// تحديث canStoreReceiveOrders لتفحص creditLimit
+
+2.6 Transaction Strategy
+
+┌─────────────────────────────────────────────────────────┐
+│              Firestore Transaction                       │
+│                                                          │
+│  READ:  orders/{orderId}                                │
+│  READ:  markets/{storeId}                               │
+│  READ:  users/{ownerId}                                 │
+│                                                          │
+│  CHECK: commissionDeducted != true                      │
+│  CHECK: isDelivered(orderData) == true                  │
+│                                                          │
+│  CALC:  commissionAmount = calculateCommission(...)     │
+│                                                          │
+│  WRITE: orders/{orderId}.commissionDeducted = true      │
+│  WRITE: users/{ownerId}.walletBalance -= commission     │
+│  WRITE: markets/{storeId}.totalCommissionsPaid += comm  │
+│  WRITE: wallet_ledger/{newId} = new entry               │
+│                                                          │
+└─────────────────────────────────────────────────────────┘
+
+2.7 Rollback Strategy
+
+في حالة فشل الـ Transaction:
+
+Firestore Transaction يضمن Atomicity — إذا فشلت أي عملية كتابة، يتم التراجع تلقائياً عن جميع العمليات
+
+لا حاجة لـ rollback يدوي
+
+في حالة Network Failure أثناء الـ Transaction → لن يتم تأكيد أي تغيير
+
+الـ Idempotency Flag (commissionDeducted) يحمي من التكرار عند Retry
+
+2.8 Migration Strategy
+
+للمتاجر الحالية
+
+// Migration script (يُنفذ مرة واحدة)
+// يضيف الحقول الجديدة لكل متجر موجود
+async function migrateStores() {
+  const stores = await db.collection('markets').get();
+  const batch = db.batch();
+  
+  stores.docs.forEach(doc => {
+    batch.update(doc.ref, {
+      commissionRate: 5.0,
+      commissionType: 'fixed',
+      creditLimit: -50,
+      totalCommissionsPaid: 0.0,
+    });
+  });
+  
+  await batch.commit();
+}
+
+للطلبات المكتملة سابقاً
+
+لن يتم خصم عمولات على طلبات مكتملة قبل تفعيل النظام — فقط الطلبات الجديدة.
+
+2.9 Edge Cases
+
+الحالة
+
+المعالجة
+
+طلب يتم تسليمه مرتين (duplicate event)
+
+commissionDeducted flag يمنع الخصم الثاني
+
+شبكة تنقطع أثناء الخصم
+
+Transaction يفشل كاملاً ← يُعاد المحاولة
+
+متجر بدون commissionRate
+
+استخدام القيمة الافتراضية من commission_config/default
+
+متجر بدون creditLimit
+
+استخدام -50 كقيمة افتراضية
+
+طلب بقيمة 0
+
+العمولة = 0 ← لا خصم ولا سجل
+
+المتجر يصل للحد الائتماني أثناء طلب نشط
+
+الطلبات الحالية تستمر عادياً ← يُمنع فقط الطلبات الجديدة
+
+الأدمن يعدل الرصيد يدوياً
+
+يُنشئ wallet_ledger entry من نوع manual_adjustment
+
+طلب تسليم ذاتي (self_delivery)
+
+يتم خصم العمولة بنفس الطريقة
+
+طلب ملغى بعد القبول وقبل التسليم
+
+لا خصم — العمولة فقط عند delivered
+
+2.10 Failure Scenarios
+
+السيناريو
+
+التأثير
+
+المعالجة
+
+Cloud Function timeout
+
+العمولة لم تُخصم
+
+Retry تلقائي + idempotency
+
+Firestore unavailable
+
+جميع العمليات تفشل
+
+Error handling + user notification
+
+Token انتهى (FCM)
+
+الإشعار لم يصل
+
+Silent failure (non-critical)
+
+Admin يحذف commission_config
+
+No defaults available
+
+Hardcoded fallback values
+
+2.11 Scalability Considerations
+
+wallet_ledger مفهرس بـ storeId + createdAt للاستعلامات السريعة
+
+Pagination لسجل المحفظة (50 entry per page)
+
+Batch operations في حالة migration
+
+Cloud Function بدل client-side commission deduction مستقبلاً (الأفضل أمنياً)
+
+2.12 Performance Considerations
+
+خصم العمولة يتم داخل moveToPastOrder() الموجود حالياً — لا overhead إضافي على عملية الطلب
+
+wallet_ledger queries تستخدم composite index
+
+التنبيهات تُحسب محلياً (In-App) وليس عبر Cloud Function لتقليل الـ reads
+
+Balance check عند إنشاء طلب يتم مرة واحدة فقط
+
+3. الملفات المطلوب تعديلها/إنشاؤها
+
+3.1 تطبيق المتاجر (Main App — temp_bazar)
+
+الملف
+
+الإجراء
+
+الوصف
+
+lib/markets/wallet/models/wallet_transaction_model.dart
+
+تعديل
+
+إضافة type field ودعم أنواع الحركات المتعددة
+
+lib/markets/wallet/models/wallet_ledger_model.dart
+
+جديد
+
+موديل سجل المحفظة الموحد
+
+lib/markets/wallet/services/wallet_service.dart
+
+تعديل
+
+إضافة deductCommission() مع Transaction، getWalletLedger()
+
+lib/markets/wallet/services/commission_service.dart
+
+جديد
+
+خدمة العمولات: حساب، خصم، فحص الحد الائتماني
+
+lib/markets/wallet/services/wallet_notification_service.dart
+
+جديد
+
+خدمة تنبيهات المحفظة
+
+lib/markets/wallet/pages/wallet_page.dart
+
+تعديل
+
+عرض سجل موحد بأنواع مختلفة
+
+lib/markets/order_of_markets/services/OrderService.dart
+
+تعديل
+
+استدعاء deductCommission() في moveToPastOrder()
+
+lib/markets/dashboard_market/services/dashboard_market_service.dart
+
+تعديل
+
+عرض معلومات العمولة في الداشبورد
+
+lib/markets/dashboard_market/models/dashboard_market_model.dart
+
+تعديل
+
+إضافة حقول العمولة
+
+firestore.rules
+
+تعديل
+
+إضافة rules لـ wallet_ledger و commission_config
+
+firestore.indexes.json
+
+تعديل
+
+إضافة indexes لـ wallet_ledger
+
+3.2 تطبيق الأدمن (bazaar_admin)
+
+الملف
+
+الإجراء
+
+الوصف
+
+lib/stores/models/store_model.dart
+
+تعديل
+
+إضافة حقول العمولة
+
+lib/stores/services/stores_service.dart
+
+تعديل
+
+إدارة إعدادات العمولة لكل متجر
+
+lib/commission/models/commission_config_model.dart
+
+جديد
+
+موديل إعدادات العمولة
+
+lib/commission/models/wallet_ledger_model.dart
+
+جديد
+
+موديل سجل المحفظة
+
+lib/commission/services/commission_admin_service.dart
+
+جديد
+
+إدارة العمولات والتعديل اليدوي
+
+lib/commission/pages/commission_settings_page.dart
+
+جديد
+
+صفحة إعدادات العمولة العامة
+
+lib/commission/pages/store_commission_page.dart
+
+جديد
+
+صفحة عمولة متجر معين
+
+lib/commission/pages/wallet_management_page.dart
+
+جديد
+
+إدارة المحافظ (موافقة/رفض طلبات الشحن)
+
+lib/commission/widgets/
+
+جديد
+
+ويدجتات مشتركة
+
+lib/services/dashboard_service.dart
+
+تعديل
+
+إضافة إحصائيات العمولة
+
+lib/router/routes_config/admin_routes.dart
+
+تعديل
+
+إضافة مسارات العمولة
+
+4. خطة التحقق (Verification Plan)
+
+4.1 اختبارات يدوية
+
+سيناريو طبيعي: طلب → تسليم → خصم عمولة → تحقق من الرصيد
+
+Idempotency: محاولة خصم نفس الطلب مرتين → العمولة تُخصم مرة واحدة
+
+الحد الائتماني: خفض الرصيد إلى ما بعد الحد → التحقق من منع الطلبات الجديدة
+
+التنبيهات: التحقق من إرسال التنبيهات عند كل عتبة (50, 20, 10, 0, حد ائتماني)
+
+التعديل اليدوي (أدمن): تعديل الرصيد → التحقق من إنشاء wallet_ledger entry
+
+حالة الإلغاء: إلغاء طلب → عدم خصم عمولة
+
+4.2 التحقق من عدم كسر الميزات الحالية
+
+✅ نظام الاشتراكات يعمل كما هو
+
+✅ نظام الشحن يعمل كما هو
+
+✅ نظام الطلبات يعمل كما هو
+
+✅ نظام الإشعارات يعمل كما هو
+
+✅ نظام الداشبورد يعمل كما هو
+
+5. Open Questions
+
+[!IMPORTANT]هل يجب تحويل خصم العمولة إلى Cloud Function بدلاً من الكود المحلي؟الكود المحلي (client-side) أسهل في التنفيذ ويعمل فوراً مع moveToPastOrder(). لكن Cloud Function أكثر أماناً لأنه يعمل من الخادم. التصميم الحالي يستخدم الكود المحلي مع Firestore Transaction + Security Rules كطبقة حماية.
+
+[!IMPORTANT]هل المطلوب تفعيل خصم العمولة فقط للطلبات عبر التطبيق، أم يشمل أيضاً الطلبات عبر WhatsApp؟
+
+[!IMPORTANT]هل الـ wallet_transactions الحالية (طلبات الشحن) يجب أن تُدمج في wallet_ledger الجديد، أم تبقى منفصلة؟التصميم الحالي يبقيها منفصلة لتجنب كسر الأكواد الحالية، ويُنشئ wallet_ledger كسجل موحد جديد يسجل جميع أنواع الحركات.
+
+6. Execution Prompts
+
+6.1 Prompt — تطبيق الأدمن (bazaar_admin)
+
+[!NOTE]البرومبت التالي مبني على الملفات الفعلية الموجودة في d:\project\bazaar_admin\bazaar_admin\lib\
+
+# Bazaar Admin — Wallet Commission Management Implementation
+
+أنت مطور Flutter + Firebase متخصص. المطلوب تنفيذ نظام إدارة العمولات في تطبيق الأدمن.
+
+## السياق الحالي
+
+التطبيق موجود في: `d:\project\bazaar_admin\bazaar_admin\`
+يستخدم: Flutter + Firestore + Go Router + Provider
+البنية: Feature-based (stores/, services/, router/, etc.)
+
+## المطلوب تنفيذه
+
+### 1. تحديث StoreModel الحالي
+
+**الملف:** `lib/stores/models/store_model.dart`
+
+أضف الحقول التالية للكلاس `StoreModel`:
+
+```dart
+final double commissionRate;
+final String commissionType; // 'fixed' or 'percentage'
+final double creditLimit;
+final double totalCommissionsPaid;
+final DateTime? lastCommissionAt;
+final double? walletBalance; // رصيد صاحب المتجر
+```
+
+حدّث `fromDocument()` و `toMap()` لدعم هذه الحقول مع قيم افتراضية:
+- `commissionRate`: 5.0
+- `commissionType`: 'fixed'
+- `creditLimit`: -50.0
+- `totalCommissionsPaid`: 0.0
+
+### 2. إنشاء CommissionConfigModel
+
+**ملف جديد:** `lib/commission/models/commission_config_model.dart`
+
+```dart
+class CommissionConfigModel {
+  final double defaultCommissionRate;
+  final String defaultCommissionType;
+  final double defaultCreditLimit;
+  final List<double> balanceWarningThresholds;
+  final bool blockOrdersOnCreditExceeded;
+  final DateTime? updatedAt;
+  final String? updatedBy;
+}
+```
+
+مع `fromMap()` و `toMap()`.
+
+### 3. إنشاء WalletLedgerModel
+
+**ملف جديد:** `lib/commission/models/wallet_ledger_model.dart`
+
+```dart
+class WalletLedgerModel {
+  final String id;
+  final String storeId;
+  final String userId;
+  final String type; // 'wallet_recharge', 'subscription_payment', 'order_commission', 'manual_adjustment', 'refund'
+  final double amount;
+  final double balanceBefore;
+  final double balanceAfter;
+  final String? referenceId;
+  final String? referenceType;
+  final String description;
+  final DateTime createdAt;
+  final Map<String, dynamic>? metadata;
+}
+```
+
+### 4. إنشاء CommissionAdminService
+
+**ملف جديد:** `lib/commission/services/commission_admin_service.dart`
+
+الوظائف المطلوبة:
+- `getCommissionConfig()` — جلب إعدادات العمولة العامة من `commission_config/default`
+- `updateCommissionConfig()` — تحديث الإعدادات (super admin فقط)
+- `getStoreCommission(storeId)` — جلب إعدادات عمولة متجر
+- `updateStoreCommission(storeId, rate, type, creditLimit)` — تحديث إعدادات عمولة متجر
+- `getStoreWalletLedger(storeId)` — جلب سجل محفظة متجر من `wallet_ledger`
+- `manualAdjustment(storeId, userId, amount, description)` — تعديل يدوي للرصيد مع إنشاء entry في `wallet_ledger`
+- `getWalletTransactions()` — جلب طلبات الشحن المعلقة من `wallet_transactions`
+- `approveWalletTransaction(txId, userId, amount)` — الموافقة على طلب شحن:
+  1. تحديث `wallet_transactions/{txId}.status = 'approved'`
+  2. إضافة `adminId` و `updatedAt`
+  3. تحديث `users/{userId}.walletBalance` بزيادة المبلغ (FieldValue.increment)
+  4. إنشاء entry في `wallet_ledger` من نوع `wallet_recharge`
+- `rejectWalletTransaction(txId, reason)` — رفض طلب شحن
+- `getCommissionStats()` — إحصائيات العمولة (إجمالي، اليوم، الأسبوع)
+- `getStoresNearCreditLimit()` — المتاجر القريبة من الحد الائتماني
+- `getStoresWithNegativeBalance()` — المتاجر ذات الرصيد السالب
+
+### 5. إنشاء صفحات العمولة
+
+#### 5.1 صفحة إعدادات العمولة العامة
+**ملف جديد:** `lib/commission/pages/commission_settings_page.dart`
+- تعديل العمولة الافتراضية
+- تعديل نوع العمولة
+- تعديل الحد الائتماني الافتراضي
+- تعديل عتبات التنبيه
+
+#### 5.2 صفحة عمولة المتجر
+**ملف جديد:** `lib/commission/pages/store_commission_page.dart`
+- عرض إعدادات عمولة المتجر الخاصة
+- عرض سجل المحفظة الكامل (wallet_ledger)
+- زر تعديل يدوي للرصيد
+- عرض إحصائيات العمولة للمتجر
+- عرض الرصيد الحالي والحد الائتماني
+
+#### 5.3 صفحة إدارة طلبات الشحن
+**ملف جديد:** `lib/commission/pages/wallet_management_page.dart`
+- عرض طلبات الشحن المعلقة (`wallet_transactions` where `status == 'pending'`)
+- موافقة / رفض مع صورة التحويل
+- فلترة حسب الحالة
+
+### 6. تحديث الداشبورد
+
+**الملف:** `lib/services/dashboard_service.dart`
+
+أضف في `getQuickStats()`:
+- `totalCommissions` — إجمالي العمولات المحصلة
+- `pendingDepositRequests` — عدد طلبات الشحن المعلقة
+- `storesNearCreditLimit` — عدد المتاجر القريبة من الحد الائتماني
+- `negativeBalanceStores` — عدد المتاجر بالرصيد السالب
+
+### 7. تحديث المسارات
+
+**الملف:** `lib/router/routes_config/admin_routes.dart`
+
+أضف:
+```dart
+GoRoute(
+  path: '/admin/commission-settings',
+  builder: (context, state) => const CommissionSettingsPage(),
+),
+GoRoute(
+  path: '/admin/wallet-management',
+  builder: (context, state) => const WalletManagementPage(),
+),
+GoRoute(
+  path: '/admin/store-commission/:storeId',
+  builder: (context, state) {
+    return StoreCommissionPage(
+      storeId: state.pathParameters['storeId']!,
+    );
+  },
+),
+```
+
+### 8. تحديث قائمة المتاجر
+
+**الملف:** `lib/stores/stores_list_page.dart`
+
+أضف زر للانتقال لصفحة عمولة المتجر من كل عنصر في قائمة المتاجر.
+
+### ترتيب التنفيذ
+
+1. Models (commission_config, wallet_ledger, store_model update)
+2. Services (commission_admin_service)
+3. Pages (commission_settings, wallet_management, store_commission)
+4. Router updates
+5. Dashboard updates
+6. Stores list update
+
+### الثوابت
+
+- Design: استخدام نفس ألوان التطبيق الحالية (`AppColors`)
+- RTL: كل الصفحات يجب أن تدعم `Directionality.rtl`
+- التطبيق يستخدم `go_router` للتنقل
+- التطبيق يستخدم `Provider` لإدارة الحالة
+
+6.2 Prompt — تطبيق المتاجر (temp_bazar)
+
+[!NOTE]البرومبت التالي مبني على الملفات الفعلية الموجودة في d:\project\bazarsuez\bazar_suez\temp_bazar\lib\
+
+# Bazaar Store App — Wallet Commission System Implementation
+
+أنت مطور Flutter + Firebase متخصص. المطلوب تنفيذ نظام خصم العمولات في تطبيق المتاجر الرئيسي.
+
+## السياق الحالي
+
+التطبيق موجود في: `d:\project\bazarsuez\bazar_suez\temp_bazar\`
+يستخدم: Flutter + Firestore + Go Router
+البنية: Feature-based (markets/wallet/, markets/order_of_markets/, etc.)
+
+## Firestore Schema الجديد
+
+### حقول جديدة في `markets/{storeId}`:
+```json
+{
+  "commissionRate": 5.0,
+  "commissionType": "fixed",
+  "creditLimit": -50.0,
+  "totalCommissionsPaid": 0.0,
+  "lastCommissionAt": null
+}
+```
+
+### حقول جديدة في `orders/{orderId}`:
+```json
+{
+  "commissionDeducted": false,
+  "commissionAmount": null,
+  "commissionDeductedAt": null
+}
+```
+
+### مجموعة جديدة `wallet_ledger/{entryId}`:
+```json
+{
+  "id": "auto",
+  "storeId": "...",
+  "userId": "...",
+  "type": "order_commission",
+  "amount": -5.0,
+  "balanceBefore": 100.0,
+  "balanceAfter": 95.0,
+  "referenceId": "orderId",
+  "referenceType": "order",
+  "description": "عمولة طلب #...",
+  "createdAt": "Timestamp",
+  "metadata": {}
+}
+```
+
+### مجموعة `commission_config/default`:
+```json
+{
+  "defaultCommissionRate": 5.0,
+  "defaultCommissionType": "fixed",
+  "defaultCreditLimit": -50.0,
+  "balanceWarningThresholds": [50, 20, 10, 0]
+}
+```
+
+## المطلوب تنفيذه
+
+### 1. إنشاء WalletLedgerModel
+
+**ملف جديد:** `lib/markets/wallet/models/wallet_ledger_model.dart`
+
+```dart
+class WalletLedgerEntry {
+  final String id;
+  final String storeId;
+  final String userId;
+  final String type; // 'wallet_recharge', 'subscription_payment', 'order_commission', 'manual_adjustment', 'refund', 'auto_renewal'
+  final double amount; // سالب للخصم، موجب للإيداع
+  final double balanceBefore;
+  final double balanceAfter;
+  final String? referenceId;
+  final String? referenceType;
+  final String description;
+  final DateTime createdAt;
+  final Map<String, dynamic>? metadata;
+}
+```
+
+مع `fromJson()`, `toJson()`.
+
+### 2. إنشاء CommissionService
+
+**ملف جديد:** `lib/markets/wallet/services/commission_service.dart`
+
+```dart
+class CommissionService {
+  /// خصم العمولة عند اكتمال الطلب — داخل Firestore Transaction
+  Future<bool> deductOrderCommission({
+    required String orderId,
+    required String storeId,
+    required String ownerId,
+    required double orderTotal,
+  }) async {
+    return _firestore.runTransaction((txn) async {
+      // 1. قراءة الطلب
+      final orderRef = _firestore.collection('orders').doc(orderId);
+      final orderSnap = await txn.get(orderRef);
+      final orderData = orderSnap.data() ?? {};
+      
+      // 2. فحص Idempotency
+      if (orderData['commissionDeducted'] == true) return false;
+      
+      // 3. قراءة إعدادات المتجر
+      final storeRef = _firestore.collection('markets').doc(storeId);
+      final storeSnap = await txn.get(storeRef);
+      final storeData = storeSnap.data() ?? {};
+      
+      // 4. قراءة رصيد المستخدم
+      final userRef = _firestore.collection('users').doc(ownerId);
+      final userSnap = await txn.get(userRef);
+      final currentBalance = (userSnap.data()?['walletBalance'] ?? 0.0).toDouble();
+      
+      // 5. حساب العمولة
+      final rate = (storeData['commissionRate'] ?? 5.0).toDouble();
+      final type = storeData['commissionType'] ?? 'fixed';
+      double commission;
+      if (type == 'percentage') {
+        commission = orderTotal * (rate / 100);
+      } else {
+        commission = rate;
+      }
+      
+      if (commission <= 0) return false;
+      
+      // 6. الخصم (يُسمح بالسالب)
+      final newBalance = currentBalance - commission;
+      
+      // 7. كتابة التحديثات
+      txn.update(orderRef, {
+        'commissionDeducted': true,
+        'commissionAmount': commission,
+        'commissionDeductedAt': FieldValue.serverTimestamp(),
+      });
+      
+      txn.update(userRef, {
+        'walletBalance': newBalance,
+      });
+      
+      txn.update(storeRef, {
+        'totalCommissionsPaid': FieldValue.increment(commission),
+        'lastCommissionAt': FieldValue.serverTimestamp(),
+      });
+      
+      // 8. إنشاء سجل المحفظة
+      final ledgerRef = _firestore.collection('wallet_ledger').doc();
+      txn.set(ledgerRef, {
+        'id': ledgerRef.id,
+        'storeId': storeId,
+        'userId': ownerId,
+        'type': 'order_commission',
+        'amount': -commission,
+        'balanceBefore': currentBalance,
+        'balanceAfter': newBalance,
+        'referenceId': orderId,
+        'referenceType': 'order',
+        'description': 'عمولة طلب',
+        'createdAt': FieldValue.serverTimestamp(),
+        'metadata': {
+          'orderId': orderId,
+          'commissionType': type,
+          'commissionRate': rate,
+          'orderTotal': orderTotal,
+        },
+      });
+      
+      return true;
+    });
+  }
+  
+  /// فحص هل المتجر يمكنه استقبال طلبات جديدة
+  Future<bool> canStoreReceiveNewOrders(String storeId) async {
+    // ... implementation
+  }
+  
+  /// جلب إعدادات العمولة العامة
+  Future<Map<String, dynamic>> getCommissionConfig() async {
+    // ... from commission_config/default
+  }
+}
+```
+
+### 3. إنشاء WalletNotificationService
+
+**ملف جديد:** `lib/markets/wallet/services/wallet_notification_service.dart`
+
+```dart
+class WalletNotificationService {
+  static final Map<String, bool> _shownNotifications = {};
+  
+  /// تفحص الرصيد بعد كل عملية وترسل التنبيه المناسب
+  static String? checkBalanceAndNotify(double balance, double creditLimit) {
+    if (balance <= creditLimit) {
+      return _showOnce('credit_exceeded', 'تم تجاوز الحد الائتماني! لن يتم استقبال طلبات جديدة.');
+    }
+    if (balance < 0) {
+      return _showOnce('negative', 'تنبيه: رصيد محفظتك سالب (${balance.toStringAsFixed(2)} جنيه)');
+    }
+    if (balance < 10) {
+      return _showOnce('below_10', 'تنبيه: رصيدك أقل من 10 جنيه');
+    }
+    if (balance < 20) {
+      return _showOnce('below_20', 'تنبيه: رصيدك أقل من 20 جنيه');
+    }
+    if (balance < 50) {
+      return _showOnce('below_50', 'تنبيه: رصيدك أقل من 50 جنيه');
+    }
+    return null;
+  }
+  
+  static String? _showOnce(String key, String message) {
+    if (_shownNotifications[key] == true) return null;
+    _shownNotifications[key] = true;
+    return message;
+  }
+  
+  static void resetForNewBalance() {
+    _shownNotifications.clear();
+  }
+}
+```
+
+### 4. تعديل OrderService — الملف الأهم
+
+**الملف:** `lib/markets/order_of_markets/services/OrderService.dart`
+
+في دالة `moveToPastOrder()`, بعد تحديث `isActive: false` وقبل `_updateStoreStatistics()`, أضف:
+
+```dart
+// خصم العمولة عند التسليم الناجح فقط
+if (newStatus == 'تم التسليم للطيار' || newStatus == 'التسليم الذاتي') {
+  try {
+    final storeDoc = await FirebaseFirestore.instance
+        .collection('markets').doc(marketId).get();
+    final ownerId = storeDoc.data()?['ownerId'] as String?;
+    
+    if (ownerId != null) {
+      final totalAmount = (orderData['totalAmount'] as num?)?.toDouble() ?? 0;
+      
+      await CommissionService().deductOrderCommission(
+        orderId: documentId,
+        storeId: marketId,
+        ownerId: ownerId,
+        orderTotal: totalAmount,
+      );
+    }
+  } catch (e) {
+    // Best-effort: لا نمنع إكمال الطلب بسبب فشل خصم العمولة
+    print('Failed to deduct commission for order $documentId: $e');
+  }
+}
+```
+
+**مهم جداً:** لا تعدل منطق `moveToPastOrder()` الأصلي. فقط أضف كود العمولة كخطوة إضافية.
+
+### 5. تعديل WalletService
+
+**الملف:** `lib/markets/wallet/services/wallet_service.dart`
+
+أضف:
+```dart
+/// جلب سجل المحفظة الموحد
+Stream<List<WalletLedgerEntry>> getWalletLedger(String userId) {
+  return _firestore
+    .collection('wallet_ledger')
+    .where('userId', isEqualTo: userId)
+    .orderBy('createdAt', descending: true)
+    .limit(50)
+    .snapshots()
+    .map((snapshot) => snapshot.docs
+      .map((doc) => WalletLedgerEntry.fromJson({...doc.data(), 'id': doc.id}))
+      .toList());
+}
+```
+
+### 6. تعديل صفحة المحفظة
+
+**الملف:** `lib/markets/wallet/pages/wallet_page.dart`
+
+**التعديلات:**
+1. إضافة tab أو toggle للتبديل بين "طلبات الشحن" و "سجل المحفظة الكامل"
+2. عرض `wallet_ledger` entries مع أيقونات مختلفة لكل نوع:
+   - `wallet_recharge` → أيقونة شحن (أخضر)
+   - `order_commission` → أيقونة عمولة (أحمر)
+   - `subscription_payment` → أيقونة اشتراك (أزرق)
+   - `manual_adjustment` → أيقونة تعديل (برتقالي)
+   - `refund` → أيقونة استرداد (أخضر)
+3. عرض تنبيه في أعلى الصفحة إذا كان الرصيد قريباً من الحد الائتماني
+4. عرض الحد الائتماني في بطاقة الرصيد
+
+### 7. تعديل داشبورد المتجر
+
+**الملف:** `lib/markets/dashboard_market/models/dashboard_market_model.dart`
+
+أضف:
+```dart
+final double totalCommissionsPaid;
+final double creditLimit;
+final bool isNearCreditLimit;
+```
+
+**الملف:** `lib/markets/dashboard_market/services/dashboard_market_service.dart`
+
+أضف جلب `totalCommissionsPaid` و `creditLimit` من `markets/{storeId}`.
+
+### 8. فحص الحد الائتماني عند إنشاء الطلب
+
+ابحث عن المكان الذي يتم فيه إنشاء الطلب (العميل يضع طلباً) وأضف فحص:
+
+```dart
+// قبل إنشاء الطلب
+final canOrder = await CommissionService().canStoreReceiveNewOrders(storeId);
+if (!canOrder) {
+  // أظهر رسالة: "المتجر لا يستقبل طلبات حالياً"
+}
+```
+
+### 9. تحديث Firestore Security Rules
+
+**الملف:** `firestore.rules`
+
+أضف بعد `support_conversations`:
+
+```javascript
+// wallet_ledger — سجل المحفظة الموحد (Immutable)
+match /wallet_ledger/{entryId} {
+  allow read: if isAuthenticated() && (
+    resource.data.userId == request.auth.uid || isAdmin()
+  );
+  allow create: if isAuthenticated();
+  allow update, delete: if false;
+}
+
+// commission_config — إعدادات العمولة
+match /commission_config/{configId} {
+  allow read: if true;
+  allow write: if isSuperAdmin();
+}
+
+// wallet_transactions — تحديث القواعد لدعم الأدمن
+match /wallet_transactions/{txId} {
+  allow read: if isAuthenticated() && (
+    resource.data.userId == request.auth.uid || isAdmin()
+  );
+  allow create: if isAuthenticated() && 
+    request.resource.data.userId == request.auth.uid;
+  allow update: if isAdmin();
+  allow delete: if false;
+}
+```
+
+**تحديث** `canStoreReceiveOrders` function في rules:
+
+```javascript
+function canStoreReceiveOrders(storeId) {
+  let store = get(/databases/$(database)/documents/markets/$(storeId));
+  let ownerId = store.data.ownerId;
+  let owner = get(/databases/$(database)/documents/users/$(ownerId));
+  let balance = owner.data.walletBalance;
+  let creditLimit = store.data.get('creditLimit', -50);
+  return store.data.canReceiveOrders == true && 
+         isStoreActive(storeId) &&
+         balance > creditLimit;
+}
+```
+
+### 10. تحديث Firestore Indexes
+
+**الملف:** `firestore.indexes.json`
+
+أضف:
+```json
+{
+  "collectionGroup": "wallet_ledger",
+  "queryScope": "COLLECTION",
+  "fields": [
+    { "fieldPath": "userId", "order": "ASCENDING" },
+    { "fieldPath": "createdAt", "order": "DESCENDING" }
+  ]
+},
+{
+  "collectionGroup": "wallet_ledger",
+  "queryScope": "COLLECTION",
+  "fields": [
+    { "fieldPath": "storeId", "order": "ASCENDING" },
+    { "fieldPath": "createdAt", "order": "DESCENDING" }
+  ]
+},
+{
+  "collectionGroup": "wallet_ledger",
+  "queryScope": "COLLECTION",
+  "fields": [
+    { "fieldPath": "type", "order": "ASCENDING" },
+    { "fieldPath": "createdAt", "order": "DESCENDING" }
+  ]
+}
+```
+
+### ترتيب التنفيذ
+
+1. Models: `wallet_ledger_model.dart` (جديد)
+2. Services: `commission_service.dart` (جديد)
+3. Services: `wallet_notification_service.dart` (جديد)
+4. **Critical:** تعديل `OrderService.dart` لاستدعاء خصم العمولة
+5. Services: تعديل `wallet_service.dart` لإضافة `getWalletLedger()`
+6. Pages: تعديل `wallet_page.dart` لعرض السجل الموحد
+7. Models/Services: تعديل dashboard model/service
+8. Rules: تحديث `firestore.rules`
+9. Indexes: تحديث `firestore.indexes.json`
+
+### قواعد مهمة
+
+- **لا تعدل** أي كود موجود في `pending_payment_service.dart` أو `license_service.dart`
+- **لا تعدل** منطق `moveToPastOrder()` الأصلي — فقط أضف كود العمولة كخطوة إضافية
+- **لا تعدل** نظام الإشعارات الموجود (`sendStatusNotification.ts`)
+- استخدم **Firestore Transaction** لخصم العمولة
+- استخدم **`commissionDeducted` flag** للحماية من الخصم المكرر
+- اسمح بالرصيد السالب — فقط امنع طلبات جديدة عند تجاوز الحد
+- التطبيق يستخدم RTL (عربي) — كل النصوص بالعربية
+- استخدم `AppColors.mainColor` للألوان
+- استخدم `go_router` للتنقل
+
+7. ملخص المخرجات
+
+العنصر
+
+الحالة
+
+تحليل قاعدة البيانات
+
+✅
+
+تحليل المحفظة
+
+✅
+
+تحليل الاشتراكات
+
+✅
+
+تحليل الطلبات
+
+✅
+
+تحليل الإشعارات
+
+✅
+
+تحليل الأدمن
+
+✅
+
+تحليل المتاجر
+
+✅
+
+Architecture Design
+
+✅
+
+Firestore Changes
+
+✅
+
+Models Changes
+
+✅
+
+Services Changes
+
+✅
+
+Notification Strategy
+
+✅
+
+Security Rules Changes
+
+✅
+
+Transaction Strategy
+
+✅
+
+Rollback Strategy
+
+✅
+
+Migration Strategy
+
+✅
+
+Edge Cases
+
+✅
+
+Failure Scenarios
+
+✅
+
+Scalability Considerations
+
+✅
+
+Performance Considerations
+
+✅
+
+Admin Prompt
+
+✅
+
+Store Prompt

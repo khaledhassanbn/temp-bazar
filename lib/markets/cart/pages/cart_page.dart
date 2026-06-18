@@ -52,6 +52,7 @@ String generateOrderId(String marketId) {
 class _CartPageState extends State<CartPage> {
   String? _marketName;
   String? _marketLogo;
+
   /// يُحدَّث بعد جلب المستند؛ يُستخدم لإعادة حساب الرسوم عند تغيير عنوان التوصيل.
   Map<String, dynamic>? _cachedMarketDocData;
   final TextEditingController _notesController = TextEditingController();
@@ -114,8 +115,10 @@ class _CartPageState extends State<CartPage> {
   GeoPoint? _deliveryGeoPointFromCartUi() {
     final uiLoc = _userInfoKey.currentState?.selectedLocationValue;
     if (uiLoc != null) return uiLoc;
-    final locationVm =
-        Provider.of<SavedLocationsViewModel>(context, listen: false);
+    final locationVm = Provider.of<SavedLocationsViewModel>(
+      context,
+      listen: false,
+    );
     return locationVm.activeLocation;
   }
 
@@ -147,8 +150,7 @@ class _CartPageState extends State<CartPage> {
       final settings = await deliveryFeeService.getSettings();
 
       // موقع التوصيل: ما اختاره المستخدم في السلة أولاً، ثم نموذج المواقع.
-      final userLocation =
-          userLocationOverride ?? locationVm.activeLocation;
+      final userLocation = userLocationOverride ?? locationVm.activeLocation;
 
       // جلب موقع المتجر
       GeoPoint? storeLocation;
@@ -526,18 +528,22 @@ class _CartPageState extends State<CartPage> {
         useRootNavigator: true,
         builder: (context) => const Center(child: CircularProgressIndicator()),
       );
-      
-      final canReceive = await CommissionService().canStoreReceiveNewOrders(marketId);
-      
+
+      final canReceive = await CommissionService().canStoreReceiveNewOrders(
+        marketId,
+      );
+
       if (mounted) {
         Navigator.of(context, rootNavigator: true).pop(); // إغلاق مؤشر التحميل
       }
-      
+
       if (!canReceive) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text('عذراً، هذا المتجر لا يستقبل طلبات جديدة حالياً لتجاوز الحد الائتماني للمحفظة.'),
+              content: Text(
+                'عذراً، هذا المتجر لا يستقبل طلبات جديدة حالياً لتجاوز الحد الائتماني للمحفظة.',
+              ),
               backgroundColor: Colors.red,
               duration: Duration(seconds: 4),
             ),
@@ -625,9 +631,7 @@ class _CartPageState extends State<CartPage> {
 
       // جلب معرف صاحب المتجر للأمان
       final storeOwnerId = marketData['ownerId'] as String?;
-      final accessMap = <String, bool>{
-        currentUser?.uid ?? '': true,
-      };
+      final accessMap = <String, bool>{currentUser?.uid ?? '': true};
       if (storeOwnerId != null && storeOwnerId.isNotEmpty) {
         accessMap[storeOwnerId] = true;
       }
@@ -635,7 +639,8 @@ class _CartPageState extends State<CartPage> {
       // إعداد بيانات الطلب
       final orderData = {
         'orderId': orderId,
-        'userId': currentUser?.uid ?? '', // إضافة معرف المستخدم في المستوى العلوي
+        'userId':
+            currentUser?.uid ?? '', // إضافة معرف المستخدم في المستوى العلوي
         'storeId': marketId, // معرف المتجر للتقييم
         'storeName': _marketName ?? 'متجر', // اسم المتجر للعرض
         'storeLogo': _marketLogo, // شعار المتجر للعرض
@@ -645,10 +650,7 @@ class _CartPageState extends State<CartPage> {
         'isActive': true, // الطلب نشط وحالي
         'access': accessMap,
         'statusHistory': [
-          {
-            'status': 'قيد المراجعة',
-            'time': Timestamp.now(),
-          }
+          {'status': 'قيد المراجعة', 'time': Timestamp.now()},
         ],
         'customerInfo': {
           'userId': currentUser?.uid ?? '',

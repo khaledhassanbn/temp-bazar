@@ -11,20 +11,20 @@ class CartViewModel extends ChangeNotifier {
   List<CartItemModel> _cartItems = [];
   bool _isLoading = false;
   String? _error;
-  
+
   /// رسوم التوصيل المحسوبة ديناميكياً
   double _deliveryFee = 30.0; // القيمة الافتراضية
-  
+
   /// Flag to track if this ChangeNotifier has been disposed
   bool _isDisposed = false;
-  
+
   /// Safe wrapper for notifyListeners that checks disposal state
   void _safeNotifyListeners() {
     if (!_isDisposed) {
       notifyListeners();
     }
   }
-  
+
   @override
   void dispose() {
     _isDisposed = true;
@@ -54,7 +54,7 @@ class CartViewModel extends ChangeNotifier {
 
   /// Getter for delivery fee (calculated dynamically based on distance)
   double get deliveryFee => _deliveryFee;
-  
+
   /// Setter for delivery fee (called from CartPage with calculated value)
   set deliveryFee(double value) {
     if (_deliveryFee != value) {
@@ -62,7 +62,7 @@ class CartViewModel extends ChangeNotifier {
       _safeNotifyListeners();
     }
   }
-  
+
   /// تعيين رسوم التوصيل
   void setDeliveryFee(double fee) {
     deliveryFee = fee;
@@ -286,8 +286,6 @@ class CartViewModel extends ChangeNotifier {
   Future<void> refreshCart() async {
     await _loadCartItems();
   }
-
-
 
   /// Create a cart item from product details
   static CartItemModel createCartItem({

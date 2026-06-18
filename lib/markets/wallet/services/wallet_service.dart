@@ -149,8 +149,13 @@ class WalletService {
         .orderBy('createdAt', descending: true)
         .limit(50)
         .snapshots()
-        .map((snapshot) => snapshot.docs
-            .map((doc) => WalletLedgerEntry.fromJson({...doc.data(), 'id': doc.id}))
-            .toList());
+        .map(
+          (snapshot) => snapshot.docs
+              .map(
+                (doc) =>
+                    WalletLedgerEntry.fromJson({...doc.data(), 'id': doc.id}),
+              )
+              .toList(),
+        );
   }
 }

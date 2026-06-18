@@ -26,10 +26,13 @@ class CommissionService {
         }
 
         // 3. قراءة الإعدادات الافتراضية
-        final configRef = _firestore.collection('commission_config').doc('default');
+        final configRef = _firestore
+            .collection('commission_config')
+            .doc('default');
         final configSnap = await txn.get(configRef);
         final configData = configSnap.data() ?? {};
-        final defaultRate = (configData['defaultCommissionRate'] ?? 5.0).toDouble();
+        final defaultRate = (configData['defaultCommissionRate'] ?? 5.0)
+            .toDouble();
         final defaultType = configData['defaultCommissionType'] ?? 'fixed';
 
         // 4. قراءة إعدادات المتجر
@@ -40,7 +43,8 @@ class CommissionService {
         // 5. قراءة رصيد المستخدم
         final userRef = _firestore.collection('users').doc(ownerId);
         final userSnap = await txn.get(userRef);
-        final currentBalance = (userSnap.data()?['walletBalance'] ?? 0.0).toDouble();
+        final currentBalance = (userSnap.data()?['walletBalance'] ?? 0.0)
+            .toDouble();
 
         // 6. حساب العمولة
         final rate = (storeData['commissionRate'] ?? defaultRate).toDouble();
@@ -66,12 +70,11 @@ class CommissionService {
           'commissionDeductedAt': FieldValue.serverTimestamp(),
         });
 
-        txn.update(userRef, {
-          'walletBalance': newBalance,
-        });
+        txn.update(userRef, {'walletBalance': newBalance});
 
         txn.update(storeRef, {
-          'totalCommissionsPaid': (storeData['totalCommissionsPaid'] ?? 0.0) + commission,
+          'totalCommissionsPaid':
+              (storeData['totalCommissionsPaid'] ?? 0.0) + commission,
           'lastCommissionAt': FieldValue.serverTimestamp(),
         });
 
@@ -108,9 +111,12 @@ class CommissionService {
   /// فحص هل المتجر يمكنه استقبال طلبات جديدة بناءً على الحد الائتماني
   Future<bool> canStoreReceiveNewOrders(String storeId) async {
     try {
-      final storeDoc = await _firestore.collection('markets').doc(storeId).get();
+      final storeDoc = await _firestore
+          .collection('markets')
+          .doc(storeId)
+          .get();
       if (!storeDoc.exists) return false;
-      
+
       final storeData = storeDoc.data() ?? {};
       final ownerId = storeData['ownerId'] as String?;
       if (ownerId == null) return false;
@@ -122,9 +128,13 @@ class CommissionService {
       // قراءة الإعدادات الافتراضية
       double creditLimit = -50.0;
       try {
-        final configDoc = await _firestore.collection('commission_config').doc('default').get();
+        final configDoc = await _firestore
+            .collection('commission_config')
+            .doc('default')
+            .get();
         if (configDoc.exists) {
-          creditLimit = (configDoc.data()?['defaultCreditLimit'] ?? -50.0).toDouble();
+          creditLimit = (configDoc.data()?['defaultCreditLimit'] ?? -50.0)
+              .toDouble();
         }
       } catch (_) {}
 
@@ -136,8 +146,9 @@ class CommissionService {
       // قراءة رصيد محفظة صاحب المتجر
       final userDoc = await _firestore.collection('users').doc(ownerId).get();
       if (!userDoc.exists) return false;
-      
-      final walletBalance = (userDoc.data()?['walletBalance'] ?? 0.0).toDouble();
+
+      final walletBalance = (userDoc.data()?['walletBalance'] ?? 0.0)
+          .toDouble();
 
       return walletBalance > creditLimit;
     } catch (e) {
@@ -149,7 +160,10 @@ class CommissionService {
   /// جلب إعدادات العمولة العامة
   Future<Map<String, dynamic>> getCommissionConfig() async {
     try {
-      final doc = await _firestore.collection('commission_config').doc('default').get();
+      final doc = await _firestore
+          .collection('commission_config')
+          .doc('default')
+          .get();
       return doc.data() ?? {};
     } catch (e) {
       print('Error getting commission config: $e');

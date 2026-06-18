@@ -62,7 +62,10 @@ class _WalletPageState extends State<WalletPage> {
         } catch (_) {}
       }
 
-      final alertMessage = WalletNotificationService.checkBalanceAndNotify(balance, creditLimit);
+      final alertMessage = WalletNotificationService.checkBalanceAndNotify(
+        balance,
+        creditLimit,
+      );
 
       setState(() {
         _balance = balance;
@@ -132,7 +135,9 @@ class _WalletPageState extends State<WalletPage> {
                 const SizedBox(height: 24),
                 // Title
                 Text(
-                  _showLedger ? 'سجل العمليات الموحد' : 'طلبات الشحن المعلقة والسابقة',
+                  _showLedger
+                      ? 'سجل العمليات الموحد'
+                      : 'طلبات الشحن المعلقة والسابقة',
                   style: const TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.bold,
@@ -157,9 +162,13 @@ class _WalletPageState extends State<WalletPage> {
 
     final isExceeded = _balance <= _creditLimit;
     final bannerColor = isExceeded ? Colors.red.shade50 : Colors.orange.shade50;
-    final borderColor = isExceeded ? Colors.red.shade200 : Colors.orange.shade200;
+    final borderColor = isExceeded
+        ? Colors.red.shade200
+        : Colors.orange.shade200;
     final textColor = isExceeded ? Colors.red.shade800 : Colors.orange.shade800;
-    final icon = isExceeded ? Icons.error_outline : Icons.warning_amber_outlined;
+    final icon = isExceeded
+        ? Icons.error_outline
+        : Icons.warning_amber_outlined;
 
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
@@ -238,14 +247,18 @@ class _WalletPageState extends State<WalletPage> {
               child: Container(
                 padding: const EdgeInsets.symmetric(vertical: 10),
                 decoration: BoxDecoration(
-                  color: !_showLedger ? AppColors.mainColor : Colors.transparent,
+                  color: !_showLedger
+                      ? AppColors.mainColor
+                      : Colors.transparent,
                   borderRadius: BorderRadius.circular(10),
                 ),
                 child: Text(
                   'طلبات الشحن',
                   textAlign: TextAlign.center,
                   style: TextStyle(
-                    color: !_showLedger ? Colors.white : const Color(0xFF6B7280),
+                    color: !_showLedger
+                        ? Colors.white
+                        : const Color(0xFF6B7280),
                     fontWeight: FontWeight.bold,
                   ),
                 ),
@@ -403,7 +416,8 @@ class _WalletPageState extends State<WalletPage> {
     }
 
     final isDebit = entry.amount < 0;
-    final amountText = '${isDebit ? "" : "+"}${entry.amount.toStringAsFixed(2)} جنيه';
+    final amountText =
+        '${isDebit ? "" : "+"}${entry.amount.toStringAsFixed(2)} جنيه';
 
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
@@ -472,10 +486,7 @@ class _WalletPageState extends State<WalletPage> {
               const SizedBox(height: 4),
               Text(
                 'الرصيد: ${entry.balanceAfter.toStringAsFixed(2)}',
-                style: const TextStyle(
-                  fontSize: 11,
-                  color: Color(0xFF9CA3AF),
-                ),
+                style: const TextStyle(fontSize: 11, color: Color(0xFF9CA3AF)),
               ),
             ],
           ),
