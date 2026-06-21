@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:ui' as ui;
 
 import 'package:bazar_suez/markets/wallet/models/wallet_transaction_model.dart';
@@ -32,6 +33,12 @@ class _WalletPageState extends State<WalletPage> {
   String? _marketId;
   bool _showLedger = true;
 
+  // اشتراك لحظي على مستند المتجر (لتحديث الحد الائتماني والترخيص تلقائياً)
+  StreamSubscription<DocumentSnapshot<Map<String, dynamic>>>? _marketSub;
+  // منع الضغط المتكرر على زر التجديد التلقائي + تحديث متفائل
+  bool _isTogglingAutoRenew = false;
+  bool? _autoRenewOptimistic;
+
   @override
   void initState() {
     super.initState();
@@ -39,42 +46,139 @@ class _WalletPageState extends State<WalletPage> {
     _loadData();
   }
 
+  @override
+  void dispose() {
+    _marketSub?.cancel();
+    super.dispose();
+  }
+
   Future<void> _loadData() async {
     final user = _auth.currentUser;
-    if (user != null) {
-      final balance = await _walletService.getWalletBalance(user.uid);
-      final marketId = await _licenseService.resolveCurrentUserMarketId();
-      LicenseStatus? license;
-      double creditLimit = -50.0;
-      if (marketId != null) {
-        try {
-          license = await _licenseService.fetchStatus(marketId);
-          final storeDoc = await FirebaseFirestore.instance
-              .collection('markets')
-              .doc(marketId)
-              .get();
-          if (storeDoc.exists) {
-            final data = storeDoc.data();
-            if (data != null && data['creditLimit'] != null) {
-              creditLimit = (data['creditLimit'] as num).toDouble();
-            }
-          }
-        } catch (_) {}
-      }
+    if (user == null) return;
 
-      final alertMessage = WalletNotificationService.checkBalanceAndNotify(
+    final balance = await _walletService.getWalletBalance(user.uid);
+    final marketId = await _licenseService.resolveCurrentUserMarketId();
+    if (!mounted) return;
+
+    setState(() {
+      _balance = balance;
+      _marketId = marketId;
+      _isLoading = false;
+      _alertMessage = WalletNotificationService.checkBalanceAndNotify(
         balance,
-        creditLimit,
+        _creditLimit,
       );
+    });
+
+    if (marketId != null) {
+      _subscribeToMarket(marketId);
+    }
+  }
+
+  /// اشتراك لحظي على مستند المتجر: الحد الائتماني + حالة الترخيص يتحدثان فور
+  /// أي تعديل من تطبيق الأدمن.
+  void _subscribeToMarket(String marketId) {
+    _marketSub?.cancel();
+    _marketSub = FirebaseFirestore.instance
+        .collection('markets')
+        .doc(marketId)
+        .snapshots()
+        .listen((doc) {
+      if (!mounted || !doc.exists) return;
+      final data = doc.data();
+      if (data == null) return;
+
+      double creditLimit = _creditLimit;
+      if (data['creditLimit'] != null) {
+        creditLimit = (data['creditLimit'] as num).toDouble();
+      }
+      final license = LicenseStatus.fromDoc(marketId, data);
 
       setState(() {
-        _balance = balance;
         _creditLimit = creditLimit;
-        _alertMessage = alertMessage;
-        _isLoading = false;
         _licenseStatus = license;
-        _marketId = marketId;
+        // إلغاء التحديث المتفائل بمجرد تأكيد القيمة من المصدر
+        if (_autoRenewOptimistic != null &&
+            _autoRenewOptimistic == license.autoRenewEnabled) {
+          _autoRenewOptimistic = null;
+        }
       });
+    });
+  }
+
+  void _showCreditLimitInfo() {
+    showDialog(
+      context: context,
+      builder: (context) => Directionality(
+        textDirection: ui.TextDirection.rtl,
+        child: AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          title: Row(
+            children: const [
+              Icon(Icons.info_outline, color: AppColors.mainColor),
+              SizedBox(width: 8),
+              Text('ما هو الحد الائتماني؟'),
+            ],
+          ),
+          content: const Text(
+            'الحد الائتماني هو المبلغ المسموح للتاجر أن يكون مديناً به للنظام '
+            'قبل إيقاف بعض الخدمات أو منع استقبال طلبات جديدة حسب سياسة التطبيق.\n\n'
+            'مثال: إذا كان الحد الائتماني -50 جنيه، يمكن أن يصل رصيدك إلى -50 '
+            'جنيه قبل أن يتوقف استقبال الطلبات الجديدة. يُرجى شحن المحفظة قبل '
+            'الوصول إلى الحد لتجنّب توقف الخدمة.',
+            style: TextStyle(height: 1.6, color: Color(0xFF374151)),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('حسناً'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// تبديل التجديد التلقائي: يمنع الضغط المتكرر، يحدّث الحالة فوراً (متفائل)،
+  /// ويكتفي باستدعاء toggleAutoRenew دون إعادة تحميل كاملة (الـ stream يؤكد القيمة).
+  Future<void> _onToggleAutoRenew(bool value) async {
+    if (_isTogglingAutoRenew || _marketId == null) return;
+
+    setState(() {
+      _isTogglingAutoRenew = true;
+      _autoRenewOptimistic = value;
+    });
+
+    try {
+      await _licenseService.toggleAutoRenew(
+        marketId: _marketId!,
+        enabled: value,
+      );
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            value ? 'تم تفعيل التجديد التلقائي' : 'تم إيقاف التجديد التلقائي',
+          ),
+          duration: const Duration(seconds: 2),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      // التراجع عند الفشل
+      setState(() => _autoRenewOptimistic = null);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('تعذّر تحديث التجديد التلقائي: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _isTogglingAutoRenew = false);
+      }
     }
   }
 
@@ -312,13 +416,27 @@ class _WalletPageState extends State<WalletPage> {
               ),
             ),
             const SizedBox(height: 8),
-            Text(
-              'الحد الائتماني: ${_creditLimit.toStringAsFixed(2)} جنيه',
-              style: TextStyle(
-                color: Colors.white.withOpacity(0.9),
-                fontSize: 13,
-                fontWeight: FontWeight.w500,
-              ),
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                GestureDetector(
+                  onTap: _showCreditLimitInfo,
+                  child: Icon(
+                    Icons.info_outline,
+                    size: 16,
+                    color: Colors.white.withOpacity(0.9),
+                  ),
+                ),
+                const SizedBox(width: 4),
+                Text(
+                  'الحد الائتماني: ${_creditLimit.toStringAsFixed(2)} جنيه',
+                  style: TextStyle(
+                    color: Colors.white.withOpacity(0.9),
+                    fontSize: 13,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ],
             ),
           ],
         ],
@@ -485,7 +603,11 @@ class _WalletPageState extends State<WalletPage> {
               ),
               const SizedBox(height: 4),
               Text(
-                'الرصيد: ${entry.balanceAfter.toStringAsFixed(2)}',
+                'قبل: ${entry.balanceBefore.toStringAsFixed(2)}',
+                style: const TextStyle(fontSize: 11, color: Color(0xFF9CA3AF)),
+              ),
+              Text(
+                'بعد: ${entry.balanceAfter.toStringAsFixed(2)}',
                 style: const TextStyle(fontSize: 11, color: Color(0xFF9CA3AF)),
               ),
             ],
@@ -568,15 +690,18 @@ class _WalletPageState extends State<WalletPage> {
             SwitchListTile(
               contentPadding: EdgeInsets.zero,
               title: const Text('التجديد التلقائي'),
-              value: _licenseStatus!.autoRenewEnabled,
+              secondary: _isTogglingAutoRenew
+                  ? const SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : null,
+              value: _autoRenewOptimistic ?? _licenseStatus!.autoRenewEnabled,
               activeColor: AppColors.mainColor,
-              onChanged: (value) async {
-                await _licenseService.toggleAutoRenew(
-                  marketId: _marketId!,
-                  enabled: value,
-                );
-                await _loadData();
-              },
+              onChanged: _isTogglingAutoRenew
+                  ? null
+                  : (value) => _onToggleAutoRenew(value),
             ),
           ],
         ],

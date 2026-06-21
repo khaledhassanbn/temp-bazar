@@ -53,7 +53,7 @@ async function autoRenewSubscriptions(event) {
         let query = db
             .collection("markets")
             .where("licenseAutoRenew", "==", true)
-            .where("expiryDate", "<=", in24h)
+            .where("licenseEndAt", "<=", in24h)
             .limit(BATCH_SIZE);
         if (lastDoc)
             query = query.startAfter(lastDoc);
@@ -87,10 +87,11 @@ async function autoRenewSubscriptions(event) {
                     const pkg = pkgSnap.data();
                     const price = pkg.price ?? 0;
                     const days = pkg.days ?? 0;
-                    const walletBalance = (userSnap.data()?.walletBalance ?? 0);
-                    if (walletBalance < price) {
+                    const balanceBefore = (userSnap.data()?.walletBalance ?? 0);
+                    if (balanceBefore < price) {
                         throw new Error("insufficient_balance");
                     }
+                    const balanceAfter = balanceBefore - price;
                     const storeData = storeSnap.data() ?? {};
                     const nowTs = firestore_1.Timestamp.now();
                     const currentEnd = storeData.licenseEndAt ??
@@ -101,7 +102,7 @@ async function autoRenewSubscriptions(event) {
                         : new Date();
                     const newEnd = firestore_1.Timestamp.fromDate(new Date(baseDate.getTime() + days * 24 * 60 * 60 * 1000));
                     txn.update(userRef, {
-                        walletBalance: firestore_1.FieldValue.increment(-price),
+                        walletBalance: balanceAfter,
                     });
                     txn.update(doc.ref, {
                         licenseEndAt: newEnd,
@@ -121,6 +122,27 @@ async function autoRenewSubscriptions(event) {
                         canAddProducts: true,
                         canReceiveOrders: true,
                         status: "active",
+                    });
+                    // كتابة سجل العملية المالية (تجديد تلقائي)
+                    const ledgerRef = db.collection("wallet_ledger").doc();
+                    txn.set(ledgerRef, {
+                        id: ledgerRef.id,
+                        storeId: doc.id,
+                        userId: ownerId,
+                        type: "auto_renewal",
+                        amount: -price,
+                        balanceBefore,
+                        balanceAfter,
+                        referenceId: packageId,
+                        referenceType: "subscription",
+                        description: `تجديد تلقائي - ${pkg.name ?? ""}`,
+                        createdAt: firestore_1.FieldValue.serverTimestamp(),
+                        metadata: {
+                            packageId,
+                            packageName: pkg.name,
+                            durationDays: days,
+                            auto: true,
+                        },
                     });
                 });
                 renewed++;

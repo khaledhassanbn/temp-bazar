@@ -3,6 +3,46 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 class CommissionService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
+  static const double fallbackCommissionRate = 5.0;
+  static const String fallbackCommissionType = 'fixed';
+
+  /// حساب رسوم الخدمة (= العمولة) المعروضة للعميل في الفاتورة
+  Future<double> calculateServiceFee({
+    required String storeId,
+    required double subtotal,
+  }) async {
+    try {
+      final config = await getCommissionConfig();
+      final defaultRate =
+          (config['defaultCommissionRate'] ?? fallbackCommissionRate).toDouble();
+      final defaultType =
+          config['defaultCommissionType'] ?? fallbackCommissionType;
+
+      final storeDoc =
+          await _firestore.collection('markets').doc(storeId).get();
+      final storeData = storeDoc.data() ?? {};
+      final rate = (storeData['commissionRate'] ?? defaultRate).toDouble();
+      final type = storeData['commissionType'] ?? defaultType;
+
+      return computeCommissionAmount(rate: rate, type: type, subtotal: subtotal);
+    } catch (e) {
+      print('Error calculating service fee: $e');
+      return fallbackCommissionRate;
+    }
+  }
+
+  /// نفس منطق العمولة — رسوم الخدمة والعمولة قيمة واحدة
+  static double computeCommissionAmount({
+    required double rate,
+    required String type,
+    required double subtotal,
+  }) {
+    if (type == 'percentage') {
+      return subtotal * (rate / 100);
+    }
+    return rate;
+  }
+
   /// خصم العمولة عند اكتمال الطلب — داخل Firestore Transaction
   Future<bool> deductOrderCommission({
     required String orderId,
@@ -46,19 +86,30 @@ class CommissionService {
         final currentBalance = (userSnap.data()?['walletBalance'] ?? 0.0)
             .toDouble();
 
-        // 6. حساب العمولة
-        final rate = (storeData['commissionRate'] ?? defaultRate).toDouble();
-        final type = storeData['commissionType'] ?? defaultType;
+        // 6. العمولة = serviceFee المحفوظ في الطلب (نفس ما دفعه الزبون)
+        final savedServiceFee = (orderData['serviceFee'] as num?)?.toDouble();
         double commission;
-        if (type == 'percentage') {
-          commission = orderTotal * (rate / 100);
+        if (savedServiceFee != null && savedServiceFee > 0) {
+          commission = savedServiceFee;
         } else {
-          commission = rate;
+          // طلبات قديمة بدون serviceFee — إعادة حساب من الإعدادات
+          final rate = (storeData['commissionRate'] ?? defaultRate).toDouble();
+          final type = storeData['commissionType'] ?? defaultType;
+          final subtotal =
+              (orderData['subtotal'] as num?)?.toDouble() ?? orderTotal;
+          commission = computeCommissionAmount(
+            rate: rate,
+            type: type,
+            subtotal: subtotal,
+          );
         }
 
         if (commission <= 0) {
           return false;
         }
+
+        final rate = (storeData['commissionRate'] ?? defaultRate).toDouble();
+        final type = storeData['commissionType'] ?? defaultType;
 
         // 7. الخصم (يُسمح بالسالب)
         final newBalance = currentBalance - commission;
@@ -96,6 +147,7 @@ class CommissionService {
             'orderId': orderId,
             'commissionType': type,
             'commissionRate': rate,
+            'serviceFee': commission,
             'orderTotal': orderTotal,
           },
         });

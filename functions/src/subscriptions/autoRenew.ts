@@ -27,7 +27,7 @@ export async function autoRenewSubscriptions(
     let query = db
       .collection("markets")
       .where("licenseAutoRenew", "==", true)
-      .where("expiryDate", "<=", in24h)
+      .where("licenseEndAt", "<=", in24h)
       .limit(BATCH_SIZE);
 
     if (lastDoc) query = query.startAfter(lastDoc);
@@ -67,11 +67,12 @@ export async function autoRenewSubscriptions(
           const price = (pkg.price as number) ?? 0;
           const days = (pkg.days as number) ?? 0;
 
-          const walletBalance =
+          const balanceBefore =
             ((userSnap.data()?.walletBalance as number) ?? 0) as number;
-          if (walletBalance < price) {
+          if (balanceBefore < price) {
             throw new Error("insufficient_balance");
           }
+          const balanceAfter = balanceBefore - price;
 
           const storeData = storeSnap.data() ?? {};
           const nowTs = Timestamp.now();
@@ -87,7 +88,7 @@ export async function autoRenewSubscriptions(
           );
 
           txn.update(userRef, {
-            walletBalance: FieldValue.increment(-price),
+            walletBalance: balanceAfter,
           });
 
           txn.update(doc.ref, {
@@ -108,6 +109,28 @@ export async function autoRenewSubscriptions(
             canAddProducts: true,
             canReceiveOrders: true,
             status: "active",
+          });
+
+          // كتابة سجل العملية المالية (تجديد تلقائي)
+          const ledgerRef = db.collection("wallet_ledger").doc();
+          txn.set(ledgerRef, {
+            id: ledgerRef.id,
+            storeId: doc.id,
+            userId: ownerId,
+            type: "auto_renewal",
+            amount: -price,
+            balanceBefore,
+            balanceAfter,
+            referenceId: packageId,
+            referenceType: "subscription",
+            description: `تجديد تلقائي - ${pkg.name ?? ""}`,
+            createdAt: FieldValue.serverTimestamp(),
+            metadata: {
+              packageId,
+              packageName: pkg.name,
+              durationDays: days,
+              auto: true,
+            },
           });
         });
 

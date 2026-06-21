@@ -71,31 +71,45 @@ class LicenseService {
     required Package package,
     required String userId,
   }) async {
-    final ok = await _walletService.deductFromWallet(userId, package.price);
-    if (!ok) {
-      throw Exception('رصيدك غير كافٍ');
-    }
-
+    // كل العملية داخل Transaction واحدة: خصم الرصيد + تمديد الترخيص + كتابة سجل
+    // wallet_ledger من النوع subscription_payment (رصيد قبل/بعد).
     await _firestore.runTransaction((txn) async {
-      final ref = _firestore.collection('markets').doc(marketId);
-      final snap = await txn.get(ref);
-      final data = snap.data() ?? {};
+      final marketRef = _firestore.collection('markets').doc(marketId);
+      final userRef = _firestore.collection('users').doc(userId);
+
+      final marketSnap = await txn.get(marketRef);
+      final userSnap = await txn.get(userRef);
+
+      final data = marketSnap.data() ?? {};
       final now = DateTime.now();
 
-      DateTime _readDate(dynamic v) {
+      final balanceBefore =
+          ((userSnap.data()?['walletBalance'] ?? 0.0) as num).toDouble();
+      if (balanceBefore < package.price) {
+        throw Exception('رصيدك غير كافٍ');
+      }
+      final balanceAfter = balanceBefore - package.price;
+
+      DateTime readDate(dynamic v) {
         if (v is Timestamp) return v.toDate();
         if (v is DateTime) return v;
         return now;
       }
 
-      final currentEnd = _readDate(data['licenseEndAt']);
+      final currentEnd = readDate(data['licenseEndAt']);
       final base = currentEnd.isAfter(now) ? currentEnd : now;
       final newEnd = base.add(Duration(days: package.days));
+      final newEndTs = Timestamp.fromDate(newEnd);
 
-      txn.update(ref, {
+      // خصم الرصيد
+      txn.update(userRef, {'walletBalance': balanceAfter});
+
+      txn.update(marketRef, {
         // الحقول الرئيسية للترخيص فقط
         'licenseStartAt': Timestamp.fromDate(now),
-        'licenseEndAt': Timestamp.fromDate(newEnd),
+        'licenseEndAt': newEndTs,
+        // ضبط expiryDate لمواءمة التجديد التلقائي (Cloud Function)
+        'expiryDate': newEndTs,
         'licenseDurationDays': package.days,
         'licenseAutoRenew': data['licenseAutoRenew'] ?? false,
         // معلومات الباقة
@@ -106,6 +120,27 @@ class LicenseService {
         'canAddProducts': true,
         'canReceiveOrders': true,
         'status': 'active',
+      });
+
+      // كتابة سجل العملية المالية
+      final ledgerRef = _firestore.collection('wallet_ledger').doc();
+      txn.set(ledgerRef, {
+        'id': ledgerRef.id,
+        'storeId': marketId,
+        'userId': userId,
+        'type': 'subscription_payment',
+        'amount': -package.price,
+        'balanceBefore': balanceBefore,
+        'balanceAfter': balanceAfter,
+        'referenceId': package.id,
+        'referenceType': 'subscription',
+        'description': 'تجديد اشتراك - ${package.name}',
+        'createdAt': FieldValue.serverTimestamp(),
+        'metadata': {
+          'packageId': package.id,
+          'packageName': package.name,
+          'durationDays': package.days,
+        },
       });
     });
 

@@ -41,15 +41,153 @@ class DashboardMarketService {
         .get();
     final marketData = marketDoc.data() ?? <String, dynamic>{};
 
-    final status = await _licenseService.fetchStatus(resolvedMarketId);
-    final walletBalance = await _licenseService.fetchBalance(user.uid);
-    final availablePackages = await _pricingService.getPackages();
+    final now = DateTime.now();
+    final String currentYear = now.year.toString();
+    final bool crossesYear = now.month == 1 && now.day <= 7;
+    final String previousYear = (now.year - 1).toString();
 
-    final totalProducts = await _fetchProductsCount(resolvedMarketId);
-    final weeklySalesCount = await _fetchWeeklySalesCount(resolvedMarketId);
-    final monthlyRevenue = await _fetchMonthlyRevenue(resolvedMarketId);
-    final topProducts = await _fetchTopProducts(resolvedMarketId);
-    final rating = await _fetchRating(resolvedMarketId, marketData);
+    // حالة الترخيص تُشتق مباشرة من مستند المتجر المُحمّل (بدل قراءة إضافية)
+    final status = LicenseStatus.fromDoc(resolvedMarketId, marketData);
+
+    // Prepare all queries to run in parallel
+    final walletBalanceFuture = _licenseService.fetchBalance(user.uid);
+    final availablePackagesFuture = _pricingService.getPackages();
+    final totalProductsFuture = _fetchProductsCount(resolvedMarketId);
+    final ratingFuture = _fetchRating(resolvedMarketId, marketData);
+
+    final statsDocFuture = _firestore
+        .collection('markets')
+        .doc(resolvedMarketId)
+        .collection('statistics')
+        .doc(currentYear)
+        .get();
+
+    final prevStatsDocFuture = crossesYear
+        ? _firestore
+            .collection('markets')
+            .doc(resolvedMarketId)
+            .collection('statistics')
+            .doc(previousYear)
+            .get()
+        : Future.value(null);
+
+    final productSalesDocFuture = _firestore
+        .collection('markets')
+        .doc(resolvedMarketId)
+        .collection('statistics')
+        .doc('product_sales')
+        .get();
+
+    // قراءة إعدادات العمولة ضمن نفس الدفعة المتوازية (كانت تسلسلية)
+    final configDocFuture =
+        _firestore.collection('commission_config').doc('default').get();
+
+    // Fetch all concurrently
+    final results = await Future.wait([
+      walletBalanceFuture,
+      availablePackagesFuture,
+      totalProductsFuture,
+      ratingFuture,
+      statsDocFuture,
+      prevStatsDocFuture,
+      productSalesDocFuture,
+      configDocFuture,
+    ]);
+
+    final walletBalance = results[0] as double;
+    final availablePackages = results[1] as List<Package>;
+    final totalProducts = results[2] as int;
+    final rating = results[3] as double;
+    final statsDoc = results[4] as DocumentSnapshot<Map<String, dynamic>>;
+    final prevStatsDoc = results[5] as DocumentSnapshot<Map<String, dynamic>>?;
+    final productSalesDoc = results[6] as DocumentSnapshot<Map<String, dynamic>>;
+    final configDoc = results[7] as DocumentSnapshot<Map<String, dynamic>>;
+
+    // 1. Calculate Monthly Revenue
+    final String currentMonth = now.month.toString().padLeft(2, '0');
+    double monthlyRevenue = 0.0;
+    if (statsDoc.exists) {
+      final monthsMap = statsDoc.data()?['months'] as Map<String, dynamic>?;
+      if (monthsMap != null && monthsMap[currentMonth] != null) {
+        final rawRevenue = monthsMap[currentMonth]['totalSales'];
+        monthlyRevenue = rawRevenue is num
+            ? rawRevenue.toDouble()
+            : double.tryParse('$rawRevenue') ?? 0.0;
+      }
+    }
+
+    // 2. Calculate Weekly Sales Count
+    int weeklySalesCount = 0;
+    final Map<String, dynamic> currentDaysMap =
+        statsDoc.data()?['days'] as Map<String, dynamic>? ?? {};
+    final Map<String, dynamic> prevDaysMap =
+        prevStatsDoc?.data()?['days'] as Map<String, dynamic>? ?? {};
+
+    for (int i = 0; i < 7; i++) {
+      final day = now.subtract(Duration(days: i));
+      final dayKey =
+          '${day.year.toString().padLeft(4, '0')}-${day.month.toString().padLeft(2, '0')}-${day.day.toString().padLeft(2, '0')}';
+
+      Map<String, dynamic>? dayData;
+      if (day.year == now.year) {
+        dayData = currentDaysMap[dayKey] as Map<String, dynamic>?;
+      } else {
+        dayData = prevDaysMap[dayKey] as Map<String, dynamic>?;
+      }
+
+      if (dayData != null) {
+        final count = dayData['totalOrders'];
+        weeklySalesCount += (count is num ? count.toInt() : 0);
+      }
+    }
+
+    // 3. Extract Top Products
+    List<ProductSalesPoint> topProducts = [];
+    if (productSalesDoc.exists) {
+      final salesMap =
+          productSalesDoc.data()?['sales'] as Map<String, dynamic>? ?? {};
+      final points = salesMap.entries.map((e) {
+        final rawName = e.key.replaceAll('_', '.');
+        final qty = e.value is num ? (e.value as num).toInt() : 0;
+        return ProductSalesPoint(productName: rawName, quantity: qty);
+      }).toList();
+
+      points.sort((a, b) => b.quantity.compareTo(a.quantity));
+      topProducts = points.take(5).toList();
+    }
+
+    // Fallback: If precomputed top products document is empty, query last 50 completed orders to compile it
+    if (topProducts.isEmpty) {
+      try {
+        final fallbackOrders = await _firestore
+            .collection('orders')
+            .where('storeId', isEqualTo: resolvedMarketId)
+            .where('isActive', isEqualTo: false)
+            .limit(50)
+            .get();
+
+        final Map<String, int> fallbackQuantities = {};
+        for (final doc in fallbackOrders.docs) {
+          final data = doc.data();
+          if (data['status'] == 'تم التسليم للطيار' ||
+              data['status']?.toString().toLowerCase() == 'delivered') {
+            final items = data['items'] as List<dynamic>? ?? const [];
+            for (final item in items) {
+              if (item is! Map<String, dynamic>) continue;
+              final productName = (item['productName'] ?? 'منتج').toString().trim();
+              final rawQty = item['quantity'];
+              final qty = rawQty is num ? rawQty.toInt() : int.tryParse('$rawQty') ?? 0;
+              fallbackQuantities[productName] = (fallbackQuantities[productName] ?? 0) + qty;
+            }
+          }
+        }
+        final points = fallbackQuantities.entries
+            .map((e) => ProductSalesPoint(productName: e.key, quantity: e.value))
+            .toList();
+        points.sort((a, b) => b.quantity.compareTo(a.quantity));
+        topProducts = points.take(5).toList();
+      } catch (_) {}
+    }
 
     final progress = _computeProgress(status);
     final isActive =
@@ -59,12 +197,10 @@ class DashboardMarketService {
     final totalCommissionsPaid = (marketData['totalCommissionsPaid'] ?? 0.0).toDouble();
 
     double creditLimit = -50.0;
-    try {
-      final configDoc = await _firestore.collection('commission_config').doc('default').get();
-      if (configDoc.exists) {
-        creditLimit = (configDoc.data()?['defaultCreditLimit'] ?? -50.0).toDouble();
-      }
-    } catch (_) {}
+    if (configDoc.exists) {
+      creditLimit =
+          (configDoc.data()?['defaultCreditLimit'] ?? -50.0).toDouble();
+    }
     if (marketData['creditLimit'] != null) {
       creditLimit = (marketData['creditLimit'] as num).toDouble();
     }
@@ -93,83 +229,13 @@ class DashboardMarketService {
   }
 
   Future<int> _fetchProductsCount(String marketId) async {
-    final products = await _firestore
+    final countSnap = await _firestore
         .collection('markets')
         .doc(marketId)
         .collection('products')
+        .count()
         .get();
-    return products.docs.length;
-  }
-
-  Future<int> _fetchWeeklySalesCount(String marketId) async {
-    final from = DateTime.now().subtract(const Duration(days: 7));
-    final docs = await _firestore
-        .collection('markets')
-        .doc(marketId)
-        .collection('past_order')
-        .where('createdAt', isGreaterThanOrEqualTo: Timestamp.fromDate(from))
-        .get();
-
-    return docs.docs.where(_isDeliveredOrder).length;
-  }
-
-  Future<double> _fetchMonthlyRevenue(String marketId) async {
-    final now = DateTime.now();
-    final start = DateTime(now.year, now.month, 1);
-    final end = now.month == 12
-        ? DateTime(now.year + 1, 1, 1)
-        : DateTime(now.year, now.month + 1, 1);
-
-    final docs = await _firestore
-        .collection('markets')
-        .doc(marketId)
-        .collection('past_order')
-        .where('createdAt', isGreaterThanOrEqualTo: Timestamp.fromDate(start))
-        .where('createdAt', isLessThan: Timestamp.fromDate(end))
-        .get();
-
-    double total = 0;
-    for (final doc in docs.docs) {
-      final data = doc.data();
-      if (!_isDeliveredOrderDoc(data)) continue;
-      final raw = data['totalAmount'];
-      total += raw is num ? raw.toDouble() : double.tryParse('$raw') ?? 0;
-    }
-    return total;
-  }
-
-  Future<List<ProductSalesPoint>> _fetchTopProducts(String marketId) async {
-    final docs = await _firestore
-        .collection('markets')
-        .doc(marketId)
-        .collection('past_order')
-        .get();
-
-    final Map<String, int> quantities = {};
-    for (final doc in docs.docs) {
-      final data = doc.data();
-      if (!_isDeliveredOrderDoc(data)) continue;
-      final items = data['items'] as List<dynamic>? ?? const [];
-      for (final item in items) {
-        if (item is! Map<String, dynamic>) continue;
-        final productName = (item['productName'] ?? 'منتج').toString().trim();
-        final rawQty = item['quantity'];
-        final qty = rawQty is num
-            ? rawQty.toInt()
-            : int.tryParse('$rawQty') ?? 0;
-        quantities[productName] = (quantities[productName] ?? 0) + qty;
-      }
-    }
-
-    final points =
-        quantities.entries
-            .map(
-              (e) => ProductSalesPoint(productName: e.key, quantity: e.value),
-            )
-            .toList()
-          ..sort((a, b) => b.quantity.compareTo(a.quantity));
-
-    return points.take(5).toList();
+    return countSnap.count ?? 0;
   }
 
   Future<double> _fetchRating(
@@ -205,14 +271,5 @@ class DashboardMarketService {
     final elapsed = DateTime.now().difference(start).inSeconds;
     final percent = elapsed / total;
     return percent.clamp(0, 1).toDouble();
-  }
-
-  bool _isDeliveredOrder(QueryDocumentSnapshot<Map<String, dynamic>> doc) {
-    return _isDeliveredOrderDoc(doc.data());
-  }
-
-  bool _isDeliveredOrderDoc(Map<String, dynamic> data) {
-    final status = (data['status'] ?? '').toString();
-    return status == 'تم التسليم للطيار' || status.toLowerCase() == 'delivered';
   }
 }

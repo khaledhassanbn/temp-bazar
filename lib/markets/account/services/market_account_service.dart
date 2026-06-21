@@ -9,6 +9,7 @@ class AccountSummary {
   final String? avatarUrl;
   final int loyaltyPoints;
   final MarketSummary? market;
+  final bool hasCraftsmanProfile;
 
   const AccountSummary({
     required this.uid,
@@ -18,6 +19,7 @@ class AccountSummary {
     required this.avatarUrl,
     required this.loyaltyPoints,
     required this.market,
+    required this.hasCraftsmanProfile,
   });
 
   bool get isMarketOwner => status == 'market_owner';
@@ -62,14 +64,28 @@ class MarketAccountService {
   final _auth = FirebaseAuth.instance;
   final _firestore = FirebaseFirestore.instance;
 
-  Future<AccountSummary> loadAccountSummary() async {
+  Future<AccountSummary> loadAccountSummary({String? marketId}) async {
     final user = _auth.currentUser;
     if (user == null) {
       throw Exception('لا يوجد مستخدم مسجل دخول');
     }
 
-    final doc = await _firestore.collection('users').doc(user.uid).get();
-    final data = doc.data() ?? <String, dynamic>{};
+    DocumentSnapshot<Map<String, dynamic>> userDoc;
+    DocumentSnapshot<Map<String, dynamic>>? marketSnap;
+
+    if (marketId != null && marketId.isNotEmpty) {
+      // Fetch user and market documents in parallel
+      final results = await Future.wait([
+        _firestore.collection('users').doc(user.uid).get(),
+        _firestore.collection('markets').doc(marketId).get(),
+      ]);
+      userDoc = results[0];
+      marketSnap = results[1];
+    } else {
+      userDoc = await _firestore.collection('users').doc(user.uid).get();
+    }
+
+    final data = userDoc.data() ?? <String, dynamic>{};
 
     final status = (data['status'] as String?) ?? 'user';
     final firstName = (data['firstName'] as String?)?.trim() ?? '';
@@ -94,13 +110,15 @@ class MarketAccountService {
     final pointsValue = data['points'];
     final points = pointsValue is num ? pointsValue.toInt() : 0;
 
-    final marketId = _resolveMarketId(data);
+    final resolvedMarketId = marketId ?? _resolveMarketId(data);
     MarketSummary? marketSummary;
-    if (marketId != null) {
-      final marketSnap = await _firestore
-          .collection('markets')
-          .doc(marketId)
-          .get();
+    if (resolvedMarketId != null) {
+      if (marketSnap == null) {
+        marketSnap = await _firestore
+            .collection('markets')
+            .doc(resolvedMarketId)
+            .get();
+      }
       if (marketSnap.exists) {
         final marketData = marketSnap.data();
         if (marketData != null) {
@@ -113,6 +131,9 @@ class MarketAccountService {
       }
     }
 
+    final hasCraftsmanProfile =
+        (data['craftsmanProfileActive'] == true) || (status == 'craftsman');
+
     return AccountSummary(
       uid: user.uid,
       email: emailHandle,
@@ -121,6 +142,7 @@ class MarketAccountService {
       avatarUrl: avatarUrl,
       loyaltyPoints: points,
       market: marketSummary,
+      hasCraftsmanProfile: hasCraftsmanProfile,
     );
   }
 

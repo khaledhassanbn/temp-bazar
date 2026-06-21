@@ -139,6 +139,36 @@ dashboard_market_service.dart — لوحة تحكم المتجر (تعرض walle
 
 2. التصميم المعماري المقترح (Proposed Architecture)
 
+2.0 مبدأ توحيد رسوم الخدمة والعمولة (Service Fee = Commission)
+
+[!IMPORTANT]رسوم الخدمة الظاهرة في فاتورة الزبون والعمولة المخصومة من محفظة التاجر هما نفس المبلغ — ليسا نظامين منفصلين.
+
+التدفق الموحد:
+
+```
+commissionRate (أو defaultCommissionRate من commission_config/default)
+        ↓
+serviceFee في السلة والفاتورة  ←  orders.serviceFee  (مثال: 5.0 جنيه)
+        ↓
+commissionAmount عند التسليم  (= نفس orders.serviceFee بالضبط)
+        ↓
+خصم من users/{ownerId}.walletBalance  (محفظة التاجر — نفس محفظة تجديد الاشتراك)
+```
+
+| المرحلة | المكان | الحقل | الوصف |
+|---------|--------|-------|-------|
+| التحكم (أدمن) | `commission_config/default` | `defaultCommissionRate` | عمولة افتراضية لكل المتاجر (5.0 جنيه) |
+| التحكم (أدمن) | `markets/{storeId}` | `commissionRate` | عمولة خاصة بمتجر معين (تتجاوز الافتراضي) |
+| عرض للزبون | السلة + الفاتورة | `serviceFee` | نفس قيمة العمولة — يُحسب عند فتح السلة |
+| حفظ في الطلب | `orders/{orderId}` | `serviceFee` | يُثبَّت وقت إنشاء الطلب |
+| خصم من التاجر | عند التسليم | `commissionAmount` | = `orders.serviceFee` (لا إعادة حساب منفصلة) |
+
+قواعد الحساب:
+- `fixed`: serviceFee = commissionRate (مثال: 5.0 جنيه ثابت لكل طلب)
+- `percentage`: serviceFee = subtotal × (commissionRate / 100) — على المجموع الفرعي فقط (بدون رسوم التوصيل)
+
+رسوم التوصيل (`deliveryFee`) نظام منفصل تماماً — لا علاقة له بالعمولة.
+
 2.1 تغييرات Firestore
 
 حقول جديدة في markets/{storeId}
@@ -161,7 +191,7 @@ commissionRate
 
 double
 
-قيمة العمولة (5 جنيه افتراضياً)
+قيمة العمولة ورسوم الخدمة معاً (5 جنيه افتراضياً) — ما يدفعه الزبون = ما يُخصم من التاجر
 
 commissionType
 
@@ -190,6 +220,10 @@ Timestamp?
 حقول جديدة في orders/{orderId}
 
 {
+  "subtotal": 100.0,
+  "deliveryFee": 30.0,
+  "serviceFee": 5.0,
+  "totalAmount": 135.0,
   "commissionDeducted": false,
   "commissionAmount": null,
   "commissionDeductedAt": null
@@ -201,6 +235,30 @@ Timestamp?
 
 الوصف
 
+serviceFee
+
+double
+
+رسوم الخدمة في فاتورة الزبون (= العمولة) — تُحسب من commissionRate وتُثبَّت عند إنشاء الطلب
+
+subtotal
+
+double
+
+مجموع المنتجات — يُستخدم لحساب العمولة بنسبة مئوية
+
+deliveryFee
+
+double
+
+رسوم التوصيل — منفصلة عن العمولة
+
+totalAmount
+
+double
+
+subtotal + deliveryFee + serviceFee
+
 commissionDeducted
 
 bool
@@ -211,7 +269,7 @@ commissionAmount
 
 double?
 
-قيمة العمولة المخصومة
+قيمة العمولة المخصومة (= orders.serviceFee المحفوظ)
 
 commissionDeductedAt
 
@@ -281,16 +339,14 @@ Idempotency Protection (حماية من الخصم المكرر)
 // Inside Firestore Transaction:
 1. قراءة order document
 2. التحقق: if (orderData['commissionDeducted'] == true) → SKIP
-3. قراءة market document → الحصول على commissionRate
-4. قراءة user document → الحصول على walletBalance الحالي
-5. حساب العمولة: 
-   - fixed: commissionRate
-   - percentage: totalAmount * (commissionRate / 100)
-6. خصم: walletBalance -= commissionAmount (يُسمح بالسالب)
-7. تحديث order: commissionDeducted = true, commissionAmount, commissionDeductedAt
-8. تحديث user: walletBalance
-9. تحديث market: totalCommissionsPaid += commissionAmount
-10. إنشاء wallet_ledger entry
+3. قراءة user document → الحصول على walletBalance الحالي
+4. تحديد العمولة: commissionAmount = orderData['serviceFee'] (المحفوظ وقت الطلب)
+   - fallback للطلبات القديمة: إعادة حساب من commissionRate + subtotal
+5. خصم: walletBalance -= commissionAmount (يُسمح بالسالب)
+6. تحديث order: commissionDeducted = true, commissionAmount, commissionDeductedAt
+7. تحديث user: walletBalance
+8. تحديث market: totalCommissionsPaid += commissionAmount
+9. إنشاء wallet_ledger entry
 
 [!IMPORTANT]كل هذه العمليات يجب أن تتم داخل runTransaction واحد لضمان الـ Atomicity وحماية من Race Conditions.
 
@@ -449,9 +505,11 @@ match /commission_config/{configId} {
 │  CHECK: commissionDeducted != true                      │
 │  CHECK: isDelivered(orderData) == true                  │
 │                                                          │
-│  CALC:  commissionAmount = calculateCommission(...)     │
+│  READ:  commissionAmount = orderData['serviceFee']      │
+│         (fallback: calculate from commissionRate)       │
 │                                                          │
 │  WRITE: orders/{orderId}.commissionDeducted = true      │
+│  WRITE: orders/{orderId}.commissionAmount = serviceFee  │
 │  WRITE: users/{ownerId}.walletBalance -= commission     │
 │  WRITE: markets/{storeId}.totalCommissionsPaid += comm  │
 │  WRITE: wallet_ledger/{newId} = new entry               │
@@ -578,7 +636,7 @@ Pagination لسجل المحفظة (50 entry per page)
 
 Batch operations في حالة migration
 
-Cloud Function بدل client-side commission deduction مستقبلاً (الأفضل أمنياً)
+Cloud Function بدل client-side commission deduction — **ملغي** (تكلفة إضافية لكل طلب). الخصم يبقى محلياً فقط.
 
 2.12 Performance Considerations
 
@@ -622,7 +680,19 @@ lib/markets/wallet/services/commission_service.dart
 
 جديد
 
-خدمة العمولات: حساب، خصم، فحص الحد الائتماني
+خدمة العمولات: calculateServiceFee() + خصم من orders.serviceFee + فحص الحد الائتماني
+
+lib/markets/cart/viewmodels/cart_view_model.dart
+
+تعديل
+
+استبدال serviceFee الثابت (3.99) بحساب ديناميكي من commissionRate (افتراضي 5.0)
+
+lib/markets/cart/pages/cart_page.dart
+
+تعديل
+
+استدعاء calculateServiceFee() عند فتح السلة وتغيير الكميات
 
 lib/markets/wallet/services/wallet_notification_service.dart
 
@@ -770,7 +840,9 @@ Idempotency: محاولة خصم نفس الطلب مرتين → العمولة
 
 5. Open Questions
 
-[!IMPORTANT]هل يجب تحويل خصم العمولة إلى Cloud Function بدلاً من الكود المحلي؟الكود المحلي (client-side) أسهل في التنفيذ ويعمل فوراً مع moveToPastOrder(). لكن Cloud Function أكثر أماناً لأنه يعمل من الخادم. التصميم الحالي يستخدم الكود المحلي مع Firestore Transaction + Security Rules كطبقة حماية.
+[!IMPORTANT]خصم العمولة: **لا Cloud Function** — القرار النهائي استخدام الكود المحلي داخل `moveToPastOrder()` مع Firestore Transaction لتقليل تكلفة Firebase (لا دفع لكل طلب على Functions). الحماية عبر `commissionDeducted` + Security Rules.
+
+[!IMPORTANT]إعدادات الأدمن: صفحة واحدة «عمولة التطبيق» — زر حفظ واحد يحدّث `commission_config/default` ويطبّق على كل `markets`. التعديل لمتجر معين من `StoreCommissionPage` فقط.
 
 [!IMPORTANT]هل المطلوب تفعيل خصم العمولة فقط للطلبات عبر التطبيق، أم يشمل أيضاً الطلبات عبر WhatsApp؟
 
@@ -785,6 +857,18 @@ Idempotency: محاولة خصم نفس الطلب مرتين → العمولة
 # Bazaar Admin — Wallet Commission Management Implementation
 
 أنت مطور Flutter + Firebase متخصص. المطلوب تنفيذ نظام إدارة العمولات في تطبيق الأدمن.
+
+## مبدأ أساسي: رسوم الخدمة = العمولة
+
+تعديل `commissionRate` من الأدمن يغيّر **نفس المبلغ** الذي:
+1. يظهر للزبون في السلة كـ **رسوم الخدمة** (`serviceFee`)
+2. يُخصم من محفظة التاجر عند تسليم الطلب (`commissionAmount`)
+
+محفظة التاجر = `users/{ownerId}.walletBalance` (وليس على مستند المتجر).
+
+مستويان للتحكم:
+- **عام لكل المتاجر:** `commission_config/default` → `defaultCommissionRate` (افتراضي 5.0 جنيه)
+- **خاص بكل متجر:** `markets/{storeId}` → `commissionRate` (يتجاوز الافتراضي)
 
 ## السياق الحالي
 
@@ -806,7 +890,7 @@ final String commissionType; // 'fixed' or 'percentage'
 final double creditLimit;
 final double totalCommissionsPaid;
 final DateTime? lastCommissionAt;
-final double? walletBalance; // رصيد صاحب المتجر
+// لا تضف walletBalance هنا — الرصيد في users/{ownerId}.walletBalance
 ```
 
 حدّث `fromDocument()` و `toMap()` لدعم هذه الحقول مع قيم افتراضية:
@@ -861,8 +945,10 @@ class WalletLedgerModel {
 الوظائف المطلوبة:
 - `getCommissionConfig()` — جلب إعدادات العمولة العامة من `commission_config/default`
 - `updateCommissionConfig()` — تحديث الإعدادات (super admin فقط)
+- `applyCommissionToAllStores(rate, type)` — تطبيق عمولة على **كل المتاجر** دفعة واحدة
 - `getStoreCommission(storeId)` — جلب إعدادات عمولة متجر
-- `updateStoreCommission(storeId, rate, type, creditLimit)` — تحديث إعدادات عمولة متجر
+- `updateStoreCommission(storeId, rate, type, creditLimit)` — تحديث إعدادات عمولة متجر واحد
+- `resetStoreToDefaultCommission(storeId)` — إعادة متجر للإعداد الافتراضي
 - `getStoreWalletLedger(storeId)` — جلب سجل محفظة متجر من `wallet_ledger`
 - `manualAdjustment(storeId, userId, amount, description)` — تعديل يدوي للرصيد مع إنشاء entry في `wallet_ledger`
 - `getWalletTransactions()` — جلب طلبات الشحن المعلقة من `wallet_transactions`
@@ -880,10 +966,12 @@ class WalletLedgerModel {
 
 #### 5.1 صفحة إعدادات العمولة العامة
 **ملف جديد:** `lib/commission/pages/commission_settings_page.dart`
-- تعديل العمولة الافتراضية
-- تعديل نوع العمولة
+- تعديل العمولة الافتراضية (تنعكس كـ serviceFee لكل المتاجر بدون إعداد خاص)
+- زر «تطبيق على كل المتاجر» — يحدّث `commissionRate` لجميع `markets`
+- تعديل نوع العمولة (fixed / percentage)
 - تعديل الحد الائتماني الافتراضي
 - تعديل عتبات التنبيه
+- توضيح للأدمن: «تغيير العمولة = تغيير رسوم الخدمة في فاتورة الزبون»
 
 #### 5.2 صفحة عمولة المتجر
 **ملف جديد:** `lib/commission/pages/store_commission_page.dart`
@@ -963,6 +1051,13 @@ GoRoute(
 
 أنت مطور Flutter + Firebase متخصص. المطلوب تنفيذ نظام خصم العمولات في تطبيق المتاجر الرئيسي.
 
+## مبدأ أساسي: رسوم الخدمة = العمولة
+
+- الزبون يرى **رسوم الخدمة** في فاتورة السلة (`serviceFee`)
+- التاجر يُخصم منه **نفس المبلغ** من `users/{ownerId}.walletBalance` عند التسليم
+- القيمة الافتراضية: **5.0 جنيه** (`fixed`)
+- لا تستخدم رقماً ثابتاً في الكود (مثل 3.99) — احسب دائماً من `commissionRate`
+
 ## السياق الحالي
 
 التطبيق موجود في: `d:\project\bazarsuez\bazar_suez\temp_bazar\`
@@ -985,11 +1080,17 @@ GoRoute(
 ### حقول جديدة في `orders/{orderId}`:
 ```json
 {
+  "subtotal": 100.0,
+  "deliveryFee": 30.0,
+  "serviceFee": 5.0,
+  "totalAmount": 135.0,
   "commissionDeducted": false,
   "commissionAmount": null,
   "commissionDeductedAt": null
 }
 ```
+
+`serviceFee` = العمولة المعروضة للزبون. `commissionAmount` عند التسليم = نفس `serviceFee`.
 
 ### مجموعة جديدة `wallet_ledger/{entryId}`:
 ```json
@@ -1050,6 +1151,20 @@ class WalletLedgerEntry {
 
 ```dart
 class CommissionService {
+  static const double fallbackCommissionRate = 5.0;
+
+  /// حساب رسوم الخدمة (= العمولة) للعرض في السلة
+  Future<double> calculateServiceFee({
+    required String storeId,
+    required double subtotal,
+  }) async { /* من commissionRate أو defaultCommissionRate */ }
+
+  static double computeCommissionAmount({
+    required double rate,
+    required String type,
+    required double subtotal,
+  }) { /* fixed: rate | percentage: subtotal * rate/100 */ }
+
   /// خصم العمولة عند اكتمال الطلب — داخل Firestore Transaction
   Future<bool> deductOrderCommission({
     required String orderId,
@@ -1066,32 +1181,20 @@ class CommissionService {
       // 2. فحص Idempotency
       if (orderData['commissionDeducted'] == true) return false;
       
-      // 3. قراءة إعدادات المتجر
-      final storeRef = _firestore.collection('markets').doc(storeId);
-      final storeSnap = await txn.get(storeRef);
-      final storeData = storeSnap.data() ?? {};
+      // 3. العمولة = serviceFee المحفوظ (ما دفعه الزبون)
+      final savedServiceFee = (orderData['serviceFee'] as num?)?.toDouble();
+      double commission = savedServiceFee ?? /* fallback من commissionRate */;
+      if (commission <= 0) return false;
       
       // 4. قراءة رصيد المستخدم
       final userRef = _firestore.collection('users').doc(ownerId);
       final userSnap = await txn.get(userRef);
       final currentBalance = (userSnap.data()?['walletBalance'] ?? 0.0).toDouble();
       
-      // 5. حساب العمولة
-      final rate = (storeData['commissionRate'] ?? 5.0).toDouble();
-      final type = storeData['commissionType'] ?? 'fixed';
-      double commission;
-      if (type == 'percentage') {
-        commission = orderTotal * (rate / 100);
-      } else {
-        commission = rate;
-      }
-      
-      if (commission <= 0) return false;
-      
-      // 6. الخصم (يُسمح بالسالب)
+      // 5. الخصم (يُسمح بالسالب)
       final newBalance = currentBalance - commission;
       
-      // 7. كتابة التحديثات
+      // 6. كتابة التحديثات
       txn.update(orderRef, {
         'commissionDeducted': true,
         'commissionAmount': commission,
@@ -1107,43 +1210,23 @@ class CommissionService {
         'lastCommissionAt': FieldValue.serverTimestamp(),
       });
       
-      // 8. إنشاء سجل المحفظة
-      final ledgerRef = _firestore.collection('wallet_ledger').doc();
-      txn.set(ledgerRef, {
-        'id': ledgerRef.id,
-        'storeId': storeId,
-        'userId': ownerId,
-        'type': 'order_commission',
-        'amount': -commission,
-        'balanceBefore': currentBalance,
-        'balanceAfter': newBalance,
-        'referenceId': orderId,
-        'referenceType': 'order',
-        'description': 'عمولة طلب',
-        'createdAt': FieldValue.serverTimestamp(),
-        'metadata': {
-          'orderId': orderId,
-          'commissionType': type,
-          'commissionRate': rate,
-          'orderTotal': orderTotal,
-        },
-      });
+      // 7. إنشاء سجل المحفظة
+      // ...
       
       return true;
     });
   }
-  
-  /// فحص هل المتجر يمكنه استقبال طلبات جديدة
-  Future<bool> canStoreReceiveNewOrders(String storeId) async {
-    // ... implementation
-  }
-  
-  /// جلب إعدادات العمولة العامة
-  Future<Map<String, dynamic>> getCommissionConfig() async {
-    // ... from commission_config/default
-  }
 }
 ```
+
+### 2.1 تعديل CartViewModel و CartPage
+
+**الملفات:** `lib/markets/cart/viewmodels/cart_view_model.dart`, `lib/markets/cart/pages/cart_page.dart`
+
+- استبدل `serviceFee => 3.99` الثابت بـ `_serviceFee` قابل للتحديث (افتراضي 5.0)
+- عند فتح السلة وتغيير الكميات: استدعِ `CommissionService().calculateServiceFee(storeId, subtotal)`
+- احفظ النتيجة في `cartViewModel.setServiceFee(fee)`
+- عند إنشاء الطلب: `'serviceFee': cartViewModel.serviceFee` و `'totalAmount': subtotal + deliveryFee + serviceFee`
 
 ### 3. إنشاء WalletNotificationService
 
@@ -1364,17 +1447,21 @@ function canStoreReceiveOrders(storeId) {
 ### ترتيب التنفيذ
 
 1. Models: `wallet_ledger_model.dart` (جديد)
-2. Services: `commission_service.dart` (جديد)
-3. Services: `wallet_notification_service.dart` (جديد)
-4. **Critical:** تعديل `OrderService.dart` لاستدعاء خصم العمولة
-5. Services: تعديل `wallet_service.dart` لإضافة `getWalletLedger()`
-6. Pages: تعديل `wallet_page.dart` لعرض السجل الموحد
-7. Models/Services: تعديل dashboard model/service
-8. Rules: تحديث `firestore.rules`
-9. Indexes: تحديث `firestore.indexes.json`
+2. Services: `commission_service.dart` (جديد) — مع `calculateServiceFee()`
+3. **Critical:** تعديل `cart_view_model.dart` + `cart_page.dart` — ربط serviceFee بالعمولة
+4. Services: `wallet_notification_service.dart` (جديد)
+5. **Critical:** تعديل `OrderService.dart` لاستدعاء خصم العمولة من `orders.serviceFee`
+6. Services: تعديل `wallet_service.dart` لإضافة `getWalletLedger()`
+7. Pages: تعديل `wallet_page.dart` لعرض السجل الموحد
+8. Models/Services: تعديل dashboard model/service
+9. Rules: تحديث `firestore.rules`
+10. Indexes: تحديث `firestore.indexes.json`
 
 ### قواعد مهمة
 
+- **رسوم الخدمة = العمولة** — `serviceFee` في السلة = `commissionAmount` عند الخصم = نفس المبلغ (افتراضي 5.0 جنيه)
+- **لا تستخدم** رقماً ثابتاً لـ serviceFee في الكود
+- عند الخصم: استخدم `orders.serviceFee` المحفوظ — لا تعِد الحساب من commissionRate
 - **لا تعدل** أي كود موجود في `pending_payment_service.dart` أو `license_service.dart`
 - **لا تعدل** منطق `moveToPastOrder()` الأصلي — فقط أضف كود العمولة كخطوة إضافية
 - **لا تعدل** نظام الإشعارات الموجود (`sendStatusNotification.ts`)

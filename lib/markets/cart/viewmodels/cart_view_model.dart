@@ -15,6 +15,9 @@ class CartViewModel extends ChangeNotifier {
   /// رسوم التوصيل المحسوبة ديناميكياً
   double _deliveryFee = 30.0; // القيمة الافتراضية
 
+  /// رسوم الخدمة (= العمولة) — تُحسب من commissionRate عند فتح السلة
+  double _serviceFee = 5.0;
+
   /// Flag to track if this ChangeNotifier has been disposed
   bool _isDisposed = false;
 
@@ -68,8 +71,16 @@ class CartViewModel extends ChangeNotifier {
     deliveryFee = fee;
   }
 
-  /// Getter for service fee (can be customized)
-  double get serviceFee => 3.99;
+  /// Getter for service fee (= commission shown on customer invoice)
+  double get serviceFee => _serviceFee;
+
+  /// تعيين رسوم الخدمة بعد حسابها من إعدادات العمولة
+  void setServiceFee(double fee) {
+    if (_serviceFee != fee) {
+      _serviceFee = fee;
+      _safeNotifyListeners();
+    }
+  }
 
   /// Getter for total amount
   double get totalAmount => subtotal + deliveryFee + serviceFee;

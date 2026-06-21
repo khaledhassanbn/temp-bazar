@@ -206,6 +206,14 @@ class OrderService {
         // ignore: avoid_print
         print('Failed to update statistics for $marketId: $e');
       }
+
+      try {
+        final items = orderData['items'] as List<dynamic>? ?? const [];
+        await _updateStoreProductSales(marketId, items);
+      } catch (e) {
+        // ignore: avoid_print
+        print('Failed to update product sales stats for $marketId: $e');
+      }
     }
   }
 
@@ -263,5 +271,33 @@ class OrderService {
         },
       },
     }, SetOptions(merge: true));
+  }
+
+  Future<void> _updateStoreProductSales(String storeId, List<dynamic> items) async {
+    if (items.isEmpty) return;
+
+    final Map<String, dynamic> productUpdates = {};
+    for (final item in items) {
+      if (item is! Map<String, dynamic>) continue;
+      final productName = (item['productName'] ?? '').toString().trim();
+      if (productName.isEmpty) continue;
+
+      final rawQty = item['quantity'];
+      final qty = rawQty is num ? rawQty.toInt() : int.tryParse('$rawQty') ?? 0;
+      if (qty > 0) {
+        // Clean dot characters so Firestore doesn't treat them as subkeys
+        final safeName = productName.replaceAll('.', '_');
+        productUpdates['sales.$safeName'] = FieldValue.increment(qty);
+      }
+    }
+
+    if (productUpdates.isEmpty) return;
+
+    await FirebaseFirestore.instance
+        .collection('markets')
+        .doc(storeId)
+        .collection('statistics')
+        .doc('product_sales')
+        .set(productUpdates, SetOptions(merge: true));
   }
 }

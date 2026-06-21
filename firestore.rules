@@ -112,7 +112,9 @@ service cloud.firestore {
         request.resource.data.diff(resource.data).affectedKeys()
           .hasOnly(['isActive', 'licenseStartAt', 'licenseEndAt', 'licenseDurationDays', 
                    'licenseAutoRenew', 'canAddProducts', 'currentPackageId', 'currentPackageName',
-                   'canReceiveOrders', 'deactivatedAt', 'status', 'isVisible']) ||
+                   'canReceiveOrders', 'deactivatedAt', 'status', 'isVisible',
+                   'commissionRate', 'commissionType', 'creditLimit',
+                   'totalCommissionsPaid', 'lastCommissionAt', 'updatedAt']) ||
         // Allow other updates only if subscription is active
         isStoreActive(storeId)
       );
@@ -405,10 +407,10 @@ service cloud.firestore {
       allow update, delete: if false;
     }
 
-    // commission_config — إعدادات العمولة
+    // commission_config — إعدادات العمولة (الأدمن يتحكم في العمولة العامة للتطبيق)
     match /commission_config/{configId} {
       allow read: if true;
-      allow write: if isSuperAdmin();
+      allow write: if isAdmin();
     }
 
     // wallet_transactions — طلبات شحن المحفظة

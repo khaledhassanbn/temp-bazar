@@ -57,6 +57,7 @@ class _CartPageState extends State<CartPage> {
   Map<String, dynamic>? _cachedMarketDocData;
   final TextEditingController _notesController = TextEditingController();
   int _cartItemCount = 0;
+  double _lastServiceFeeSubtotal = -1;
   bool _isSubmittingOrder = false;
   final GlobalKey<CartUserInfoSectionState> _userInfoKey =
       GlobalKey<CartUserInfoSectionState>();
@@ -102,6 +103,7 @@ class _CartPageState extends State<CartPage> {
           data,
           userLocationOverride: _deliveryGeoPointFromCartUi(),
         );
+        await _calculateAndSetServiceFee();
       }
     } catch (e) {
       if (mounted) {
@@ -183,6 +185,26 @@ class _CartPageState extends State<CartPage> {
     }
   }
 
+  /// حساب رسوم الخدمة (= العمولة) من إعدادات المتجر أو الإعدادات العامة
+  Future<void> _calculateAndSetServiceFee() async {
+    if (!mounted) return;
+
+    final cartViewModel = Provider.of<CartViewModel>(context, listen: false);
+    final marketId = cartViewModel.currentMarketId;
+    if (marketId == null) return;
+
+    try {
+      final fee = await CommissionService().calculateServiceFee(
+        storeId: marketId,
+        subtotal: cartViewModel.subtotal,
+      );
+      cartViewModel.setServiceFee(fee);
+    } catch (e) {
+      debugPrint('خطأ في حساب رسوم الخدمة: $e');
+      cartViewModel.setServiceFee(CommissionService.fallbackCommissionRate);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Consumer<CartViewModel>(
@@ -192,6 +214,19 @@ class _CartPageState extends State<CartPage> {
           _fetchMarketName();
         }
         _cartItemCount = cartViewModel.itemCount;
+
+        final currentSubtotal = cartViewModel.subtotal;
+        if (currentSubtotal != _lastServiceFeeSubtotal &&
+            cartViewModel.currentMarketId != null) {
+          _lastServiceFeeSubtotal = currentSubtotal;
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted) {
+              _calculateAndSetServiceFee().then((_) {
+                if (mounted) setState(() {});
+              });
+            }
+          });
+        }
 
         if (cartViewModel.isLoading) {
           return const Scaffold(
