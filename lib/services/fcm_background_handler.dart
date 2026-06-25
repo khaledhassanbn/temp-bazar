@@ -11,5 +11,14 @@ Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
   await LocalNotificationService.instance.initialize();
-  await LocalNotificationService.instance.showFromOrderFcmData(message.data);
+  final data = message.data;
+  if (data['type']?.toString() == 'announcement') {
+    await LocalNotificationService.instance.showFromAnnouncementFcmData(
+      data,
+      title: message.notification?.title,
+      body: message.notification?.body,
+    );
+  } else {
+    await LocalNotificationService.instance.showFromOrderFcmData(data);
+  }
 }

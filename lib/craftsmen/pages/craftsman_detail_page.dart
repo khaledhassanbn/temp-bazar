@@ -47,7 +47,13 @@ class _CraftsmanDetailPageState extends State<CraftsmanDetailPage> {
 
   Future<void> _load() async {
     final c = await _service.getById(widget.craftsmanId);
-    if (c != null) await _analytics.logProfileView(widget.craftsmanId);
+    if (c != null) {
+      try {
+        await _analytics.logProfileView(widget.craftsmanId);
+      } catch (e) {
+        debugPrint('Error logging profile view: $e');
+      }
+    }
     
     // التحقق إذا كان المستخدم الحالي هو صاحب هذا البروفايل
     final currentUid = FirebaseAuth.instance.currentUser?.uid;

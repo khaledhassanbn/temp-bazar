@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 import 'widgets/market_bottom_navigation.dart';
 import 'package:bazar_suez/router/widgets/app_back_guard.dart';
 import 'package:bazar_suez/widgets/order_notifications/store_order_notification_host.dart';
+import 'package:bazar_suez/notifications/widgets/notification_host.dart';
 
 class MarketLayout extends StatelessWidget {
   final Widget child;
@@ -11,21 +12,23 @@ class MarketLayout extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final currentIndex = _getIndexFromRoute(context);
-    return Stack(
-      clipBehavior: Clip.none,
-      children: [
-        AppBackGuard(
-          homePath: '/HomePage',
-          bypassToPreviousPaths: const ['/edit-store'],
-          child: Scaffold(
-            body: child,
-            bottomNavigationBar: MarketBottomNavigation(
-              currentIndex: currentIndex,
+    return NotificationHost(
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          AppBackGuard(
+            homePath: '/HomePage',
+            bypassToPreviousPaths: const ['/edit-store'],
+            child: Scaffold(
+              body: child,
+              bottomNavigationBar: MarketBottomNavigation(
+                currentIndex: currentIndex,
+              ),
             ),
           ),
-        ),
-        const StoreOrderNotificationHost(),
-      ],
+          const StoreOrderNotificationHost(),
+        ],
+      ),
     );
   }
 

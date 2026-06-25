@@ -10,6 +10,14 @@ import 'package:bazar_suez/services/fcm_background_handler.dart'
     show firebaseMessagingBackgroundHandler;
 import 'package:bazar_suez/services/order_notifications/order_notification_constants.dart';
 import 'package:bazar_suez/services/order_notifications/order_notification_coordinator.dart';
+import 'package:bazar_suez/services/order_notifications/local_notification_service.dart';
+
+/// مفاتيح بيانات FCM للإعلانات
+class FcmAnnouncementDataKeys {
+  static const type = 'type';
+  static const announcementType = 'announcement';
+  static const announcementId = 'announcementId';
+}
 
 /// خدمة FCM للتاجر والعميل — إشعار طلب جديد يتكامل مع [OrderNotificationCoordinator].
 class FcmService {
@@ -221,7 +229,18 @@ class FcmService {
 
   void _handleForegroundMessage(RemoteMessage message) async {
     debugPrint('📱 Foreground FCM: ${message.data}');
-    await _routeNewOrderFromData(Map<String, dynamic>.from(message.data));
+    final data = Map<String, dynamic>.from(message.data);
+    if (data[FcmAnnouncementDataKeys.type]?.toString() ==
+        FcmAnnouncementDataKeys.announcementType) {
+      await LocalNotificationService.instance.showFromAnnouncementFcmData(
+        data,
+        title: message.notification?.title,
+        body: message.notification?.body,
+      );
+      _foregroundMessageController.add(message);
+      return;
+    }
+    await _routeNewOrderFromData(data);
     _foregroundMessageController.add(message);
   }
 
@@ -233,7 +252,18 @@ class FcmService {
 
   /// فتح التطبيق من الإشعار — الانتقال لشاشة الطلبات فقط (بدون إعادة عرض الحوار).
   Future<void> _handleNotificationOpen(Map<String, dynamic> data) async {
-    final type = data[FcmOrderDataKeys.type]?.toString();
+    final type = data[FcmOrderDataKeys.type]?.toString() ??
+        data[FcmAnnouncementDataKeys.type]?.toString();
+
+    if (type == FcmAnnouncementDataKeys.announcementType) {
+      final announcementId =
+          data[FcmAnnouncementDataKeys.announcementId]?.toString();
+      if (announcementId != null && announcementId.isNotEmpty) {
+        navigateToAnnouncement(announcementId);
+      }
+      return;
+    }
+
     if (type != FcmOrderDataKeys.newOrder) return;
 
     final storeId = data[FcmOrderDataKeys.storeId]?.toString();

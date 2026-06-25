@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
-/// مفتاح [Navigator] الجذر — يُمرَّر لـ [GoRouter] لتمكين التنقّل من خدمات
+/// يُمرَّر لـ [GoRouter] لتمكين التنقّل من خدمات
 /// الإشعارات ودورات حياة التطبيق الخلفية.
 final GlobalKey<NavigatorState> rootNavigatorKey = GlobalKey<NavigatorState>();
 
@@ -19,4 +19,9 @@ void navigateToStoreOrders(String storeId, {String? orderId}) {
     if (orderId != null && orderId.isNotEmpty) 'orderId': orderId,
   };
   _appRouter?.go(Uri(path: '/myorder', queryParameters: qp).toString());
+}
+
+/// الانتقال لتفاصيل رسالة إعلان
+void navigateToAnnouncement(String announcementId) {
+  _appRouter?.go('/inbox/$announcementId');
 }

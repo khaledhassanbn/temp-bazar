@@ -22,6 +22,8 @@ import 'package:go_router/go_router.dart';
 import 'package:bazar_suez/support/pages/support_center_page.dart';
 import 'package:bazar_suez/support/pages/create_support_request_page.dart';
 import 'package:bazar_suez/support/pages/support_chat_page.dart';
+import 'package:bazar_suez/notifications/pages/inbox_page.dart';
+import 'package:bazar_suez/notifications/pages/message_detail_page.dart';
 
 
 final sharedRoutes = [
@@ -137,6 +139,15 @@ final sharedRoutes = [
     builder: (context, state) {
       return SupportChatPage(
         conversationId: state.pathParameters['conversationId']!,
+      );
+    },
+  ),
+  GoRoute(path: '/inbox', builder: (_, __) => const InboxPage()),
+  GoRoute(
+    path: '/inbox/:announcementId',
+    builder: (context, state) {
+      return MessageDetailPage(
+        announcementId: state.pathParameters['announcementId']!,
       );
     },
   ),

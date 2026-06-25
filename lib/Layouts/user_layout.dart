@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import 'package:bazar_suez/router/widgets/app_back_guard.dart';
+import 'package:bazar_suez/notifications/widgets/notification_host.dart';
 
 import 'widgets/user_bottom_navigation.dart';
 
@@ -12,11 +13,13 @@ class UserLayout extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final currentIndex = _getIndexFromRoute(context);
-    return AppBackGuard(
-      homePath: '/',
-      child: Scaffold(
-        body: child,
-        bottomNavigationBar: UserBottomNavigation(currentIndex: currentIndex),
+    return NotificationHost(
+      child: AppBackGuard(
+        homePath: '/',
+        child: Scaffold(
+          body: child,
+          bottomNavigationBar: UserBottomNavigation(currentIndex: currentIndex),
+        ),
       ),
     );
   }

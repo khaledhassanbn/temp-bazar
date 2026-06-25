@@ -199,6 +199,12 @@ class _AccountPageState extends State<AccountPage> {
         title: 'الدعم والمساعدة',
         tiles: [
           _MenuTileData(
+            icon: Icons.mail_outline_rounded,
+            label: 'الرسائل والإعلانات',
+            subtitle: 'إشعارات ورسائل من إدارة التطبيق',
+            onTap: () => context.push('/inbox'),
+          ),
+          _MenuTileData(
             icon: Icons.support_agent_outlined,
             label: 'تواصل مع الدعم',
             subtitle: 'نحن هنا لمساعدتك في أي وقت',

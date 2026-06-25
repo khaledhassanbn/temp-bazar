@@ -22,6 +22,7 @@ import 'markets/cart/viewmodels/cart_view_model.dart';
 import 'markets/saved_locations/viewmodels/saved_locations_viewmodel.dart';
 import 'markets/home_page/viewmodels/home_data_provider.dart';
 import 'package:bazar_suez/support/viewmodels/support_viewmodel.dart';
+import 'package:bazar_suez/notifications/viewmodels/inbox_viewmodel.dart';
 
 
 // 🐝 Hive
@@ -111,6 +112,7 @@ class _MyAppState extends State<MyApp> {
         ),
         ChangeNotifierProvider(create: (_) => HomeDataProvider()),
         ChangeNotifierProvider(create: (_) => SupportViewModel()),
+        ChangeNotifierProvider(create: (_) => InboxViewModel()),
         ChangeNotifierProvider<ConnectionService>.value(
           value: _connectionService,
         ),

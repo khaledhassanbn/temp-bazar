@@ -36,6 +36,7 @@ class LocalNotificationService {
     );
 
     await _ensureAndroidChannel();
+    await _ensureAnnouncementChannel();
 
     _ready = true;
     debugPrint('✅ LocalNotificationService initialized');
@@ -59,8 +60,31 @@ class LocalNotificationService {
     _handlePayload(response.payload);
   }
 
+  static const _announcementPayloadPrefix = 'announcement:';
+
+  Future<void> _ensureAnnouncementChannel() async {
+    final androidPlugin = _plugin.resolvePlatformSpecificImplementation<
+        AndroidFlutterLocalNotificationsPlugin>();
+    if (androidPlugin == null) return;
+
+    const channel = AndroidNotificationChannel(
+      'announcements_channel',
+      'الإعلانات',
+      description: 'إشعارات الإعلانات والرسائل',
+      importance: Importance.high,
+    );
+    await androidPlugin.createNotificationChannel(channel);
+  }
+
   void _handlePayload(String? payload) {
     if (payload == null || payload.isEmpty) return;
+    if (payload.startsWith(_announcementPayloadPrefix)) {
+      final announcementId = payload.substring(_announcementPayloadPrefix.length);
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        navigateToAnnouncement(announcementId);
+      });
+      return;
+    }
     final parts = payload.split(_payloadSep);
     if (parts.length < 2) return;
     final orderId = parts[0];
@@ -110,6 +134,46 @@ class LocalNotificationService {
       body,
       details,
       payload: '$orderId$_payloadSep$storeId',
+    );
+  }
+
+  /// إظهار إشعار إعلان من بيانات FCM
+  Future<void> showFromAnnouncementFcmData(
+    Map<String, dynamic> data, {
+    String? title,
+    String? body,
+  }) async {
+    if (!_ready) await initialize();
+
+    final type = data['type']?.toString();
+    if (type != 'announcement') return;
+
+    final announcementId = data['announcementId']?.toString() ?? '';
+    if (announcementId.isEmpty) return;
+
+    final id = announcementId.hashCode & 0x7fffffff;
+    final details = NotificationDetails(
+      android: AndroidNotificationDetails(
+        'announcements_channel',
+        'الإعلانات',
+        channelDescription: 'إشعارات الإعلانات والرسائل',
+        importance: Importance.high,
+        priority: Priority.high,
+        icon: '@mipmap/ic_launcher',
+      ),
+      iOS: const DarwinNotificationDetails(
+        presentAlert: true,
+        presentBadge: true,
+        presentSound: true,
+      ),
+    );
+
+    await _plugin.show(
+      id,
+      title ?? 'إعلان جديد',
+      body ?? 'لديك رسالة جديدة',
+      details,
+      payload: '$_announcementPayloadPrefix$announcementId',
     );
   }
 }

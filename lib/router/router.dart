@@ -40,6 +40,7 @@ bool _requiresAuth(String path) {
     '/craftsmen/register',
     '/craftsmen/dashboard',
     '/support',
+    '/inbox',
   ];
   return protectedPaths.any((p) => path.startsWith(p));
 }

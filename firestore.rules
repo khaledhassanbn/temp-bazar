@@ -319,7 +319,8 @@ service cloud.firestore {
         hasPermission('manage_craftsmen');
       allow create: if isAuthenticated() && request.auth.uid == craftsmanId;
       allow update: if (isAuthenticated() && request.auth.uid == craftsmanId) ||
-        hasPermission('manage_craftsmen');
+        hasPermission('manage_craftsmen') ||
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['stats', 'lastActiveAt']);
       allow delete: if hasPermission('delete_accounts');
 
       match /reviews/{reviewId} {
