@@ -85,7 +85,7 @@ class OrderActionButtons extends StatelessWidget {
             Expanded(
               flex: 3,
               child: _buildActionButton(
-                'طلب طيار',
+                'اختيار المناديب',
                 Icons.delivery_dining,
                 Colors.orangeAccent,
                 () {
@@ -94,7 +94,7 @@ class OrderActionButtons extends StatelessWidget {
                   } else {
                     _confirmAction(
                       context,
-                      'هل أنت متأكد من طلب الطيار؟',
+                      'هل أنت متأكد من اختيار المناديب؟',
                       'جارى تسليم للدليفري',
                     );
                   }
@@ -174,80 +174,6 @@ class OrderActionButtons extends StatelessWidget {
                 ),
               ),
             ),
-
-          // حالة انتظار موافقة المكتب أو تم قبوله دون مندوب: إتاحة تغيير المكتب، التسليم الذاتي، أو إلغاء الطلب
-          if (status == 'في انتظار قبول المكتب' || status == 'تم قبوله من المكتب') ...[
-            Expanded(
-              flex: 3,
-              child: _buildActionButton(
-                'تغيير المكتب',
-                Icons.swap_horiz,
-                Colors.deepPurple,
-                () {
-                  if (onRequestDelivery != null) {
-                    onRequestDelivery!();
-                  }
-                },
-              ),
-            ),
-            const SizedBox(width: 4),
-            Expanded(
-              flex: 2,
-              child: _buildActionButton(
-                'بنفسى',
-                Icons.person,
-                Colors.green,
-                () => _confirmAction(
-                  context,
-                  'هل أنت متأكد أنك هتسلم الطلب للعميل بنفسك؟',
-                  'تم التسليم للطيار',
-                ),
-              ),
-            ),
-            const SizedBox(width: 4),
-            Expanded(
-              flex: 2,
-              child: _buildActionButton(
-                'إلغاء',
-                Icons.cancel,
-                Colors.redAccent,
-                () => _confirmAction(
-                  context,
-                  'هل أنت متأكد من إلغاء الطلب؟',
-                  'تم رفض الطلب',
-                ),
-              ),
-            ),
-          ],
-
-          // المكتب رجّع الطلب للتاجر — مكتب جديد أو تسليم ذاتى
-          if (status == 'المكتب رفض الطلب') ...[
-            Expanded(
-              child: _buildActionButton(
-                'مكتب جديد',
-                Icons.local_shipping,
-                Colors.deepPurple,
-                () {
-                  if (onRequestDelivery != null) {
-                    onRequestDelivery!();
-                  }
-                },
-              ),
-            ),
-            const SizedBox(width: 8),
-            Expanded(
-              child: _buildActionButton(
-                'هسلمه بنفسى',
-                Icons.person,
-                Colors.green,
-                () => _confirmAction(
-                  context,
-                  'هل أنت متأكد أنك هتسلم الطلب للعميل بنفسك؟',
-                  'تم التسليم للطيار',
-                ),
-              ),
-            ),
-          ],
 
           // الحالة الرابعة: تم التسليم للطيار
           if (status == 'تم التسليم للطيار')

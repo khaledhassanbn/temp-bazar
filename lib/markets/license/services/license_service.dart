@@ -111,7 +111,7 @@ class LicenseService {
         // ضبط expiryDate لمواءمة التجديد التلقائي (Cloud Function)
         'expiryDate': newEndTs,
         'licenseDurationDays': package.days,
-        'licenseAutoRenew': data['licenseAutoRenew'] ?? false,
+        'licenseAutoRenew': true,
         // معلومات الباقة
         'currentPackageId': package.id,
         'currentPackageName': package.name,

@@ -19,7 +19,6 @@ class OrderCard extends StatelessWidget {
   onRequestDelivery;
   final String? rejectedMessage;
   final VoidCallback? onChangeIndependentCourier;
-  final VoidCallback? onSendToOffice;
 
   const OrderCard({
     super.key,
@@ -31,7 +30,6 @@ class OrderCard extends StatelessWidget {
     this.onRequestDelivery,
     this.rejectedMessage,
     this.onChangeIndependentCourier,
-    this.onSendToOffice,
   });
 
   String _timeSinceOrder(DateTime orderTime) {
@@ -547,7 +545,7 @@ class OrderCard extends StatelessWidget {
                 // ================== ردود المناديب المستقلين (Realtime) ==================
                 if (independentDispatch != null) ...[
                   _buildSectionCard(
-                    title: 'ردود المناديب (مستقل)',
+                    title: 'ردود المناديب',
                     icon: Icons.how_to_reg_rounded,
                     iconColor: Colors.orange,
                     child: _IndependentCourierResponsesView(
@@ -792,7 +790,6 @@ class OrderCard extends StatelessWidget {
                 if (independentDispatch != null) ...[
                   _IndependentDispatchQuickActions(
                     onChangeCourier: onChangeIndependentCourier,
-                    onSendToOffice: onSendToOffice,
                     onDeliverSelf: () => onStatusChange('تم التسليم للطيار'),
                     onCancel: () => onStatusChange('تم رفض الطلب'),
                   ),
@@ -1327,13 +1324,11 @@ class OrderCard extends StatelessWidget {
 
 class _IndependentDispatchQuickActions extends StatelessWidget {
   final VoidCallback? onChangeCourier;
-  final VoidCallback? onSendToOffice;
   final VoidCallback onDeliverSelf;
   final VoidCallback onCancel;
 
   const _IndependentDispatchQuickActions({
     required this.onChangeCourier,
-    required this.onSendToOffice,
     required this.onDeliverSelf,
     required this.onCancel,
   });
@@ -1356,35 +1351,20 @@ class _IndependentDispatchQuickActions extends StatelessWidget {
             const SizedBox(width: 10),
             Expanded(
               child: _ActionTile(
-                title: 'إرسال لمكتب توصيل',
-                icon: Icons.local_shipping_rounded,
-                color: Colors.deepPurple,
-                onTap: onSendToOffice,
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 10),
-        Row(
-          children: [
-            Expanded(
-              child: _ActionTile(
                 title: 'هسلمه بنفسى',
                 icon: Icons.person,
                 color: Colors.green,
                 onTap: onDeliverSelf,
               ),
             ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: _ActionTile(
-                title: 'إلغاء الطلب',
-                icon: Icons.cancel,
-                color: Colors.redAccent,
-                onTap: onCancel,
-              ),
-            ),
           ],
+        ),
+        const SizedBox(height: 10),
+        _ActionTile(
+          title: 'إلغاء الطلب',
+          icon: Icons.cancel,
+          color: Colors.redAccent,
+          onTap: onCancel,
         ),
       ],
     );
@@ -1584,7 +1564,7 @@ class _IndependentCourierResponsesView extends StatelessWidget {
               border: Border.all(color: Colors.orange.withOpacity(0.25)),
             ),
             child: const Text(
-              'لم يتم قبول الطلب بعد. يمكنك إعادة الإرسال أو اختيار مناديب آخرين أو الإرسال عبر مكتب.',
+              'لم يتم قبول الطلب بعد. يمكنك إعادة الإرسال أو اختيار مناديب آخرين.',
               style: TextStyle(
                 fontSize: 13,
                 fontWeight: FontWeight.w600,

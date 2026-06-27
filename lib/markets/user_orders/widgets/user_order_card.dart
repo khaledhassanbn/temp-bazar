@@ -750,12 +750,14 @@ class _UserOrderCardState extends State<UserOrderCard> {
                 orderId: widget.orderId,
                 rating: deliveryRating,
                 comment: deliveryComment,
+                courierId: courierId,
+                courierName: driverName,
               );
               if (context.mounted) {
                 Navigator.pop(context);
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(
-                    content: Text('شكراً لتقييمك!'),
+                    content: Text('تم إرسال تقييمك بنجاح.'),
                     backgroundColor: Colors.green,
                   ),
                 );
@@ -777,7 +779,9 @@ class _UserOrderCardState extends State<UserOrderCard> {
     }
 
     if (hasRatedStore && !hasRatedDelivery) {
-      openDeliveryDialog();
+      if (courierId.isNotEmpty) {
+        openDeliveryDialog();
+      }
       return;
     }
 
@@ -803,7 +807,17 @@ class _UserOrderCardState extends State<UserOrderCard> {
 
             if (context.mounted) {
               Navigator.pop(context);
-              await openDeliveryDialog();
+              if (courierId.isNotEmpty && !hasRatedDelivery) {
+                await openDeliveryDialog();
+              } else {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('تم إرسال تقييمك بنجاح.'),
+                    backgroundColor: Colors.green,
+                  ),
+                );
+                widget.onRatingSubmitted();
+              }
             }
           } catch (e) {
             if (context.mounted) {

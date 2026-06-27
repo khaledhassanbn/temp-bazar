@@ -46,16 +46,20 @@ class IndependentCourierPickerViewModel extends ChangeNotifier {
     notifyListeners();
 
     try {
-      final storeDoc = await _storeService.getStore(marketId);
+      final results = await Future.wait([
+        _storeService.getStore(marketId),
+        _orderService.getPresentOrder(marketId, presentOrderDocumentId),
+      ]);
+
+      final storeDoc = results[0];
+      final presentOrderDoc = results[1];
+
       storeData = storeDoc.data() ?? <String, dynamic>{};
       if (storeData?['location'] is GeoPoint) {
         storeLocation = storeData?['location'] as GeoPoint;
       }
 
-      final presentOrderDoc =
-          await _orderService.getPresentOrder(marketId, presentOrderDocumentId);
       presentOrderData = presentOrderDoc.data() ?? <String, dynamic>{};
-
       dispatchOrderStream =
           _dispatchService.streamDispatchOrder(presentOrderDocumentId);
 
@@ -66,22 +70,13 @@ class IndependentCourierPickerViewModel extends ChangeNotifier {
         couriers = list
             .where((c) => c.canReceiveOrders)
             .toList(growable: false);
-        couriers.sort((a, b) {
-          final da = a.distanceKmFromStore;
-          final db = b.distanceKmFromStore;
-          if (da == null && db == null) return 0;
-          if (da == null) return 1;
-          if (db == null) return -1;
-          return da.compareTo(db);
-        });
+        isLoading = false;
         notifyListeners();
       }, onError: (e) {
+        isLoading = false;
         errorMessage = e.toString();
         notifyListeners();
       });
-
-      isLoading = false;
-      notifyListeners();
     } catch (e) {
       isLoading = false;
       errorMessage = e.toString();
@@ -124,10 +119,20 @@ class IndependentCourierPickerViewModel extends ChangeNotifier {
     }
   }
 
+  bool _disposed = false;
+
   @override
   void dispose() {
+    _disposed = true;
     _couriersSub?.cancel();
     super.dispose();
+  }
+
+  @override
+  void notifyListeners() {
+    if (!_disposed) {
+      super.notifyListeners();
+    }
   }
 }
 

@@ -1,11 +1,40 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:bazar_suez/models/review_model.dart';
+import 'package:flutter/foundation.dart';
 
 /// خدمة التعامل مع التقييمات
 class ReviewService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final FirebaseAuth _auth = FirebaseAuth.instance;
+
+  /// طباعة سجلات التصحيح بشكل محسن وملون
+  void _logDebug(String message, {String type = 'INFO', Object? error}) {
+    if (kDebugMode) {
+      final String emoji;
+      switch (type.toUpperCase()) {
+        case 'ERROR':
+          emoji = '❌ [ERROR]';
+          break;
+        case 'WARNING':
+          emoji = '⚠️ [WARN]';
+          break;
+        case 'SUCCESS':
+          emoji = '✅ [SUCCESS]';
+          break;
+        case 'BACKGROUND':
+          emoji = '⚙️ [BG_TASK]';
+          break;
+        default:
+          emoji = '⚡ [INFO]';
+      }
+      final timestamp = DateTime.now().toIso8601String().substring(11, 19);
+      print('$emoji [$timestamp] [ReviewService] $message');
+      if (error != null) {
+        print('   └─ Error Detail: $error');
+      }
+    }
+  }
 
   /// إضافة تقييم للمتجر
   /// يتم حفظ التقييم في:
@@ -20,8 +49,12 @@ class ReviewService {
     required List<String> tags,
     required String storeName,
   }) async {
+    _logDebug('submitStoreRating: Starting process for storeId=$storeId, orderId=$orderId');
     final user = _auth.currentUser;
-    if (user == null) throw Exception('يجب تسجيل الدخول');
+    if (user == null) {
+      _logDebug('submitStoreRating failed: User not logged in', type: 'ERROR');
+      throw Exception('يجب تسجيل الدخول');
+    }
 
     final now = DateTime.now();
     final storeRating = StoreRatingInOrder(
@@ -31,66 +64,104 @@ class ReviewService {
       createdAt: now,
     );
 
-    // 1. حفظ في document الطلب (في مسار المجموعه الموحده)
-    await _firestore
-        .collection('orders')
-        .doc(orderId)
-        .update({
-      'storeRating': storeRating.toMap(),
-    });
-
-    // 2. حفظ في markets/{storeId}/reviews collection
     final reviewRef = _firestore
         .collection('markets')
         .doc(storeId)
         .collection('reviews')
         .doc();
-    
-    await reviewRef.set({
-      'orderId': orderId,
-      'userId': user.uid,
-      'userName': user.displayName ?? 'مستخدم',
-      'userPhoto': user.photoURL,
-      'rating': rating,
-      'comment': comment,
-      'tags': tags,
-      'createdAt': Timestamp.fromDate(now),
-    });
 
-    // 3. تحديث إحصائيات المتجر في markets/{storeId}/statistics
-    await _updateStoreRatingStatistics(storeId, rating);
+    _logDebug('submitStoreRating: Initiating primary writes in parallel (Order rating update & Market review record)');
+    final stopwatch = Stopwatch()..start();
+
+    try {
+      // 1 & 2: حفظ التقييم والريفيو بالتوازي باستخدام Future.wait
+      await Future.wait([
+        // 1. حفظ في document الطلب
+        _firestore
+            .collection('orders')
+            .doc(orderId)
+            .update({
+          'storeRating': storeRating.toMap(),
+        }),
+        // 2. حفظ في markets/{storeId}/reviews collection
+        reviewRef.set({
+          'orderId': orderId,
+          'userId': user.uid,
+          'userName': user.displayName ?? 'مستخدم',
+          'userPhoto': user.photoURL,
+          'rating': rating,
+          'comment': comment,
+          'tags': tags,
+          'createdAt': Timestamp.fromDate(now),
+        }),
+      ]);
+
+      stopwatch.stop();
+      _logDebug('submitStoreRating: Primary writes completed successfully in ${stopwatch.elapsedMilliseconds}ms', type: 'SUCCESS');
+
+      // 3. تحديث إحصائيات المتجر في الخلفية (دون حجب واجهة المستخدم)
+      _logDebug('submitStoreRating: Dispatching statistics update to background', type: 'BACKGROUND');
+      _updateStoreRatingStatistics(storeId, rating).then((_) {
+        _logDebug('submitStoreRating: Background statistics update completed for storeId=$storeId', type: 'SUCCESS');
+      }).catchError((error) {
+        _logDebug('submitStoreRating: Failed to update store statistics in background', type: 'ERROR', error: error);
+      });
+
+    } catch (e) {
+      _logDebug('submitStoreRating: Primary writes failed', type: 'ERROR', error: e);
+      rethrow;
+    }
   }
 
   /// إضافة تقييم لشركة الشحن
-  /// يتم حفظه فقط في users/{userId}/orders/{orderId}/deliveryRating
+  /// يتم حفظه في users/{userId}/orders/{orderId}/deliveryRating والـ courier_ratings
   Future<void> submitDeliveryRating({
     required String orderId,
     required int rating,
     String? comment,
+    String? courierId,
+    String? courierName,
   }) async {
+    _logDebug('submitDeliveryRating: Starting process for orderId=$orderId');
     final user = _auth.currentUser;
-    if (user == null) throw Exception('يجب تسجيل الدخول');
+    if (user == null) {
+      _logDebug('submitDeliveryRating failed: User not logged in', type: 'ERROR');
+      throw Exception('يجب تسجيل الدخول');
+    }
 
-    final orderDoc = await _firestore.collection('orders').doc(orderId).get();
-    final orderData = orderDoc.data() ?? <String, dynamic>{};
+    String resolvedCourierId = courierId ?? '';
+    String resolvedCourierName = courierName ?? '';
 
-    final deliveryRequest =
-        (orderData['deliveryRequest'] is Map<String, dynamic>)
-            ? orderData['deliveryRequest'] as Map<String, dynamic>
-            : (orderData['deliveryRequest'] is Map
-                ? Map<String, dynamic>.from(orderData['deliveryRequest'] as Map)
-                : <String, dynamic>{});
-    final courierId = (orderData['assignedCourierId'] ??
-            deliveryRequest['courierId'] ??
-            deliveryRequest['driverId'] ??
-            deliveryRequest['assignedDriverId'] ??
-            '')
-        .toString();
-    final courierName = (deliveryRequest['assignedDriverName'] ??
-            deliveryRequest['driverName'] ??
-            orderData['assignedDriverName'] ??
-            '')
-        .toString();
+    // لو المندوب مش مبعوث، نقرأ من الطلب
+    if (resolvedCourierId.isEmpty || resolvedCourierName.isEmpty) {
+      _logDebug('submitDeliveryRating: courier info not supplied. Fetching order document...', type: 'WARNING');
+      final orderDoc = await _firestore.collection('orders').doc(orderId).get();
+      final orderData = orderDoc.data() ?? <String, dynamic>{};
+
+      final deliveryRequest =
+          (orderData['deliveryRequest'] is Map<String, dynamic>)
+              ? orderData['deliveryRequest'] as Map<String, dynamic>
+              : (orderData['deliveryRequest'] is Map
+                  ? Map<String, dynamic>.from(orderData['deliveryRequest'] as Map)
+                  : <String, dynamic>{});
+      if (resolvedCourierId.isEmpty) {
+        resolvedCourierId = (orderData['assignedCourierId'] ??
+                deliveryRequest['courierId'] ??
+                deliveryRequest['driverId'] ??
+                deliveryRequest['assignedDriverId'] ??
+                '')
+            .toString();
+      }
+      if (resolvedCourierName.isEmpty) {
+        resolvedCourierName = (deliveryRequest['assignedDriverName'] ??
+                deliveryRequest['driverName'] ??
+                orderData['assignedDriverName'] ??
+                '')
+            .toString();
+      }
+    }
+
+    _logDebug('submitDeliveryRating: courierId=$resolvedCourierId, courierName=$resolvedCourierName');
 
     final deliveryRating = DeliveryRatingModel(
       rating: rating,
@@ -98,39 +169,63 @@ class ReviewService {
       createdAt: DateTime.now(),
     );
 
-    await _firestore
-        .collection('orders')
-        .doc(orderId)
-        .update({
-      'deliveryRating': {
-        ...deliveryRating.toMap(),
-        'courierId': courierId,
-        'courierName': courierName,
-        'ratedByUserId': user.uid,
-      },
-    });
+    _logDebug('submitDeliveryRating: Initiating primary writes in parallel (Order delivery rating & Courier central ratings)');
+    final stopwatch = Stopwatch()..start();
 
-    // سجل مركزي لتطبيق المناديب: query مباشر بـ courierId
-    if (courierId.isNotEmpty) {
-      await _firestore.collection('courier_ratings').add({
-        'orderId': orderId,
-        'courierId': courierId,
-        'courierName': courierName,
-        'rating': rating,
-        'comment': comment,
-        'raterType': 'customer',
-        'userId': user.uid,
-        'userName': user.displayName ?? 'مستخدم',
-        'createdAt': Timestamp.now(),
-      });
+    try {
+      // 1 & 2: تحديث الطلب وإضافة السجل المركزي بالتوازي باستخدام Future.wait
+      await Future.wait([
+        // 1. تحديث التقييم في الطلب
+        _firestore
+            .collection('orders')
+            .doc(orderId)
+            .update({
+          'deliveryRating': {
+            ...deliveryRating.toMap(),
+            'courierId': resolvedCourierId,
+            'courierName': resolvedCourierName,
+            'ratedByUserId': user.uid,
+          },
+        }),
+        // 2. سجل مركزي لتطبيق المناديب: query مباشر بـ courierId
+        if (resolvedCourierId.isNotEmpty)
+          _firestore.collection('courier_ratings').add({
+            'orderId': orderId,
+            'courierId': resolvedCourierId,
+            'courierName': resolvedCourierName,
+            'rating': rating,
+            'comment': comment,
+            'raterType': 'customer',
+            'userId': user.uid,
+            'userName': user.displayName ?? 'مستخدم',
+            'createdAt': Timestamp.now(),
+          })
+        else
+          Future.value(null),
+      ]);
 
-      // تحديث متوسط تقييم المندوب الموحد في courier_requests
-      await _updateCourierRatingAverage(courierId, rating);
+      stopwatch.stop();
+      _logDebug('submitDeliveryRating: Primary writes completed successfully in ${stopwatch.elapsedMilliseconds}ms', type: 'SUCCESS');
+
+      // 3. تحديث متوسط تقييم المندوب الموحد في courier_requests في الخلفية
+      if (resolvedCourierId.isNotEmpty) {
+        _logDebug('submitDeliveryRating: Dispatching courier average rating update to background', type: 'BACKGROUND');
+        _updateCourierRatingAverage(resolvedCourierId, rating).then((_) {
+          _logDebug('submitDeliveryRating: Background courier average update completed for courierId=$resolvedCourierId', type: 'SUCCESS');
+        }).catchError((error) {
+          _logDebug('submitDeliveryRating: Failed to update courier average rating in background', type: 'ERROR', error: error);
+        });
+      }
+
+    } catch (e) {
+      _logDebug('submitDeliveryRating: Primary writes failed', type: 'ERROR', error: e);
+      rethrow;
     }
   }
 
   /// تحديث إحصائيات تقييم المتجر
   Future<void> _updateStoreRatingStatistics(String storeId, int newRating) async {
+    _logDebug('_updateStoreRatingStatistics: Initiating transaction for storeId=$storeId', type: 'BACKGROUND');
     final statsRef = _firestore
         .collection('markets')
         .doc(storeId)
@@ -266,38 +361,57 @@ class ReviewService {
     required int rating,
     String? comment,
   }) async {
+    _logDebug('submitMerchantCourierRating: Starting process for orderId=$orderId, courierId=$courierId');
     final now = Timestamp.now();
+    final stopwatch = Stopwatch()..start();
 
-    // 1. حفظ في document الطلب
-    await _firestore.collection('orders').doc(orderId).update({
-      'merchantCourierRating': {
-        'rating': rating,
-        'comment': comment,
-        'courierId': courierId,
-        'courierName': courierName,
-        'marketId': marketId,
-        'createdAt': now,
-      },
-    });
+    try {
+      // 1 & 2: تحديث الطلب وإضافة السجل المركزي بالتوازي باستخدام Future.wait
+      await Future.wait([
+        // 1. حفظ في document الطلب
+        _firestore.collection('orders').doc(orderId).update({
+          'merchantCourierRating': {
+            'rating': rating,
+            'comment': comment,
+            'courierId': courierId,
+            'courierName': courierName,
+            'marketId': marketId,
+            'createdAt': now,
+          },
+        }),
+        // 2. سجل مركزي في courier_ratings
+        _firestore.collection('courier_ratings').add({
+          'orderId': orderId,
+          'courierId': courierId,
+          'courierName': courierName,
+          'rating': rating,
+          'comment': comment,
+          'raterType': 'merchant',
+          'marketId': marketId,
+          'createdAt': now,
+        }),
+      ]);
 
-    // 2. سجل مركزي في courier_ratings
-    await _firestore.collection('courier_ratings').add({
-      'orderId': orderId,
-      'courierId': courierId,
-      'courierName': courierName,
-      'rating': rating,
-      'comment': comment,
-      'raterType': 'merchant',
-      'marketId': marketId,
-      'createdAt': now,
-    });
+      stopwatch.stop();
+      _logDebug('submitMerchantCourierRating: Primary writes completed successfully in ${stopwatch.elapsedMilliseconds}ms', type: 'SUCCESS');
 
-    // 3. تحديث متوسط تقييم المندوب في courier_requests
-    await _updateCourierRatingAverage(courierId, rating);
+      // 3. تحديث متوسط تقييم المندوب في الخلفية
+      _logDebug('submitMerchantCourierRating: Dispatching courier average rating update to background', type: 'BACKGROUND');
+      _updateCourierRatingAverage(courierId, rating).then((_) {
+        _logDebug('submitMerchantCourierRating: Background courier average update completed for courierId=$courierId', type: 'SUCCESS');
+      }).catchError((error) {
+        _logDebug('submitMerchantCourierRating: Failed to update courier average rating in background', type: 'ERROR', error: error);
+      });
+
+    } catch (e) {
+      _logDebug('submitMerchantCourierRating: Primary writes failed', type: 'ERROR', error: e);
+      rethrow;
+    }
   }
 
   /// تحديث متوسط تقييم المندوب في courier_requests/{courierId}
   Future<void> _updateCourierRatingAverage(String courierId, int newRating) async {
+    _logDebug('_updateCourierRatingAverage: Finding courier request doc for courierId=$courierId', type: 'BACKGROUND');
     // البحث عن document المندوب في courier_requests بالـ courierUid
     final query = await _firestore
         .collection('courier_requests')
@@ -315,9 +429,13 @@ class ReviewService {
                 .get())
             .docs;
 
-    if (docs.isEmpty) return;
+    if (docs.isEmpty) {
+      _logDebug('_updateCourierRatingAverage: Courier request doc not found for courierId=$courierId', type: 'WARNING');
+      return;
+    }
 
     final docRef = docs.first.reference;
+    _logDebug('_updateCourierRatingAverage: Found doc. Running transaction for courierId=$courierId', type: 'BACKGROUND');
 
     await _firestore.runTransaction((transaction) async {
       final snap = await transaction.get(docRef);
@@ -339,3 +457,4 @@ class ReviewService {
     });
   }
 }
+

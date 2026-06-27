@@ -42,7 +42,7 @@ class LicenseStatus {
       startAt: _readDate(data['licenseStartAt']),
       endAt: _readDate(data['licenseEndAt']),
       durationDays: (data['licenseDurationDays'] ?? 0) as int,
-      autoRenewEnabled: data['licenseAutoRenew'] == true,
+      autoRenewEnabled: data['licenseAutoRenew'] != false,
       currentPackageId: data['currentPackageId'] as String?,
       currentPackageName: data['currentPackageName'] as String?,
     );

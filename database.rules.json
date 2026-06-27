@@ -1,0 +1,10 @@
+{
+  "rules": {
+    "couriers_live": {
+      "$courierId": {
+        ".read": "auth != null",
+        ".write": "auth != null && auth.uid == $courierId"
+      }
+    }
+  }
+}

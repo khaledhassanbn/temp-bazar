@@ -49,10 +49,11 @@ async function autoRenewSubscriptions(event) {
     let processed = 0;
     let renewed = 0;
     let insufficient = 0;
+    // التجديد التلقائي مفعّل دائماً لكل المتجر طالما يوجد رصيد كافٍ
+    // (لا يعتمد على حقل licenseAutoRenew).
     while (true) {
         let query = db
             .collection("markets")
-            .where("licenseAutoRenew", "==", true)
             .where("licenseEndAt", "<=", in24h)
             .limit(BATCH_SIZE);
         if (lastDoc)
@@ -63,7 +64,8 @@ async function autoRenewSubscriptions(event) {
         for (const doc of snapshot.docs) {
             processed++;
             const data = doc.data();
-            const ownerId = data.ownerId;
+            const ownerId = data.ownerId ||
+                data.ownerUid;
             const packageId = data.currentPackageId ||
                 data.subscription?.packageId;
             if (!ownerId || !packageId) {
@@ -109,6 +111,9 @@ async function autoRenewSubscriptions(event) {
                         expiryDate: newEnd,
                         licenseLastRenewedAt: nowTs,
                         licenseDurationDays: days,
+                        licenseAutoRenew: true,
+                        licenseRenewalFailedAt: firestore_1.FieldValue.delete(),
+                        licenseRenewalFailedReason: firestore_1.FieldValue.delete(),
                         currentPackageId: packageId,
                         currentPackageName: pkg.name,
                         subscription: {

@@ -86,7 +86,7 @@ class _IndependentCourierPickerSheetState
                       const SizedBox(width: 12),
                       const Expanded(
                         child: Text(
-                          'اختر مناديب مستقلين 3',
+                          'اختر المناديب',
                           style: TextStyle(
                             fontWeight: FontWeight.bold,
                             fontSize: 18,
@@ -122,7 +122,7 @@ class _IndependentCourierPickerSheetState
                 else if (vm.couriers.isEmpty)
                   const Expanded(
                     child: Center(
-                      child: Text('لا يوجد مناديب مستقلين متاحين الآن'),
+                      child: Text('لا يوجد مناديب متاحين الآن'),
                     ),
                   )
                 else

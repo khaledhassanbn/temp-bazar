@@ -58,12 +58,6 @@ class _LicenseStatusPageState extends State<LicenseStatusPage> {
     });
   }
 
-  Future<void> _toggleAutoRenew(bool value) async {
-    if (_marketId == null) return;
-    await _licenseService.toggleAutoRenew(marketId: _marketId!, enabled: value);
-    await _load();
-  }
-
   Future<void> _confirmAndDeleteStore() async {
     if (_marketId == null) return;
     final confirm = await showDialog<bool>(
@@ -161,14 +155,47 @@ class _LicenseStatusPageState extends State<LicenseStatusPage> {
                       color: Colors.green.shade50,
                     ),
                     const SizedBox(height: 16),
-                    SwitchListTile(
-                      title: const Text('تفعيل التجديد التلقائي'),
-                      subtitle: const Text(
-                        'سيتم خصم قيمة الباقة تلقائياً عند توفر رصيد قبل انتهاء الترخيص',
+                    Container(
+                      padding: const EdgeInsets.all(14),
+                      decoration: BoxDecoration(
+                        color: Colors.blue.shade50,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: Colors.blue.shade100),
                       ),
-                      value: _status!.autoRenewEnabled,
-                      onChanged: _toggleAutoRenew,
-                      activeColor: AppColors.mainColor,
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Icon(
+                            Icons.autorenew,
+                            color: AppColors.mainColor,
+                            size: 22,
+                          ),
+                          const SizedBox(width: 12),
+                          const Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'التجديد التلقائي مفعّل دائماً',
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 15,
+                                  ),
+                                ),
+                                SizedBox(height: 4),
+                                Text(
+                                  'سيتم تجديد الباقة تلقائياً من رصيد المحفظة قبل انتهاء الترخيص طالما الرصيد كافٍ.',
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    color: Color(0xFF4B5563),
+                                    height: 1.4,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                     const SizedBox(height: 16),
                     ElevatedButton.icon(

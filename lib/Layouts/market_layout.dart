@@ -4,6 +4,7 @@ import 'widgets/market_bottom_navigation.dart';
 import 'package:bazar_suez/router/widgets/app_back_guard.dart';
 import 'package:bazar_suez/widgets/order_notifications/store_order_notification_host.dart';
 import 'package:bazar_suez/notifications/widgets/notification_host.dart';
+import 'package:bazar_suez/markets/license/widgets/license_warning_host.dart';
 
 class MarketLayout extends StatelessWidget {
   final Widget child;
@@ -27,6 +28,7 @@ class MarketLayout extends StatelessWidget {
             ),
           ),
           const StoreOrderNotificationHost(),
+          const LicenseWarningHost(),
         ],
       ),
     );

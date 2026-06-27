@@ -199,6 +199,8 @@ class MarketOrdersViewModel extends ChangeNotifier {
         };
       }
       notifyListeners();
+    }, onError: (Object error) {
+      print('⚠️ تعذّر تحميل دليل المناديب: $error');
     });
   }
 

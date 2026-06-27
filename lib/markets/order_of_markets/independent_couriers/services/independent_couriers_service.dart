@@ -10,6 +10,10 @@ class IndependentCouriersService {
   final FirebaseFirestore _firestore;
   final FirebaseDatabase _rtdb;
 
+  Map<String, Map<String, dynamic>>? _liveCache;
+  DateTime? _liveCacheAt;
+  static const _liveCacheTtl = Duration(seconds: 8);
+
   IndependentCouriersService({
     FirebaseFirestore? firestore,
     FirebaseDatabase? rtdb,
@@ -19,57 +23,82 @@ class IndependentCouriersService {
   Stream<List<IndependentCourier>> streamApprovedCouriersWithLiveStatus({
     required GeoPoint? storeLocation,
   }) {
-    final courierRequestsStream = _firestore
+    return _firestore
         .collection('courier_requests')
         .where('status', isEqualTo: 'approved')
-        .snapshots();
-
-    // We "merge" RTDB live status by fetching each courier's node periodically.
-    // This keeps implementation simple + avoids leaking RTDB listeners in large lists.
-    // UI requirements are realtime; we re-poll via RTDB streams per courier in VM for selected screen.
-    return courierRequestsStream.asyncMap((snapshot) async {
+        .snapshots()
+        .asyncMap((snapshot) async {
       final baseCouriers =
           snapshot.docs.map(IndependentCourier.fromCourierRequestDoc).toList();
 
-      final results = <IndependentCourier>[];
-      for (final courier in baseCouriers) {
-        final live = await _getCourierLiveOnce(courier.uid);
-        final merged = _mergeLive(
-          courier: courier,
-          live: live,
-          storeLocation: storeLocation,
-        );
-        results.add(merged);
-      }
+      final uids = baseCouriers.map((c) => c.uid).toList(growable: false);
+      final liveByUid = await _getCouriersLiveForUids(uids);
+      final enriched = baseCouriers
+          .map(
+            (courier) => _mergeLive(
+              courier: courier,
+              live: liveByUid[courier.uid],
+              storeLocation: storeLocation,
+            ),
+          )
+          .toList(growable: false);
 
-      results.sort((a, b) {
-        final da = a.distanceKmFromStore;
-        final db = b.distanceKmFromStore;
-        if (da == null && db == null) return 0;
-        if (da == null) return 1;
-        if (db == null) return -1;
-        return da.compareTo(db);
-      });
-
-      return results;
+      return _sortByDistance(enriched);
     });
   }
 
-  Future<Map<String, dynamic>?> _getCourierLiveOnce(String courierUid) async {
-    try {
-      final snapshot =
-          await _rtdb.ref('couriers_live/$courierUid').get().timeout(
-                const Duration(seconds: 8),
+  List<IndependentCourier> _sortByDistance(List<IndependentCourier> couriers) {
+    final results = List<IndependentCourier>.from(couriers);
+    results.sort((a, b) {
+      final da = a.distanceKmFromStore;
+      final db = b.distanceKmFromStore;
+      if (da == null && db == null) return 0;
+      if (da == null) return 1;
+      if (db == null) return -1;
+      return da.compareTo(db);
+    });
+    return results;
+  }
+
+  Future<Map<String, Map<String, dynamic>>> _getCouriersLiveForUids(
+    List<String> uids,
+  ) async {
+    if (uids.isEmpty) return const {};
+
+    final now = DateTime.now();
+    final useCache = _liveCache != null &&
+        _liveCacheAt != null &&
+        now.difference(_liveCacheAt!) < _liveCacheTtl;
+    if (useCache) {
+      final cached = <String, Map<String, dynamic>>{};
+      for (final uid in uids) {
+        final live = _liveCache![uid];
+        if (live != null) cached[uid] = live;
+      }
+      if (cached.length == uids.length) return cached;
+    }
+
+    // قواعد RTDB تسمح بقراءة couriers_live/{uid} فقط وليس العقدة الأب
+    final entries = await Future.wait(
+      uids.map((uid) async {
+        try {
+          final snapshot = await _rtdb.ref('couriers_live/$uid').get().timeout(
+                const Duration(seconds: 2),
                 onTimeout: () => throw TimeoutException('RTDB timeout'),
               );
-      final value = snapshot.value;
-      if (value is Map) {
-        return Map<String, dynamic>.from(value);
-      }
-      return null;
-    } catch (_) {
-      return null;
-    }
+          final value = snapshot.value;
+          if (value is Map) {
+            return MapEntry(uid, Map<String, dynamic>.from(value));
+          }
+        } catch (_) {}
+        return MapEntry(uid, <String, dynamic>{});
+      }),
+    );
+
+    final parsed = Map<String, Map<String, dynamic>>.fromEntries(entries);
+    _liveCache = {...?_liveCache, ...parsed};
+    _liveCacheAt = now;
+    return parsed;
   }
 
   IndependentCourier _mergeLive({
@@ -78,7 +107,10 @@ class IndependentCouriersService {
     required GeoPoint? storeLocation,
   }) {
     final courierStatus =
-        (live?['courierStatus'] ?? live?['status'] ?? '').toString().toLowerCase();
+        (live?['courierStatus'] ?? live?['status'] ?? 'offline')
+            .toString()
+            .toLowerCase()
+            .trim();
     final isOnline = courierStatus == 'online';
     final currentOrderId = (live?['currentOrderId'] ?? live?['current_order_id'])
         ?.toString();
@@ -91,6 +123,22 @@ class IndependentCouriersService {
     if (lngRaw is num) lng = lngRaw.toDouble();
     if (lat == null && latRaw != null) lat = double.tryParse(latRaw.toString());
     if (lng == null && lngRaw != null) lng = double.tryParse(lngRaw.toString());
+
+    if (lat == null || lng == null) {
+      final currentLocation = live?['currentLocation'];
+      if (currentLocation is Map) {
+        final clLat = currentLocation['latitude'];
+        final clLng = currentLocation['longitude'];
+        if (clLat is num) lat = clLat.toDouble();
+        if (clLng is num) lng = clLng.toDouble();
+        if (lat == null && clLat != null) {
+          lat = double.tryParse(clLat.toString());
+        }
+        if (lng == null && clLng != null) {
+          lng = double.tryParse(clLng.toString());
+        }
+      }
+    }
 
     double? distanceKm;
     if (storeLocation != null && lat != null && lng != null) {

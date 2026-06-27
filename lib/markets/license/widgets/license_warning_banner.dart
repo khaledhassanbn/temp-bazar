@@ -3,7 +3,7 @@ import 'package:go_router/go_router.dart';
 import '../../create_market/models/store_model.dart';
 
 /// بانر تحذيري يظهر أسفل الـ AppBar مباشرة
-/// يظهر دائماً عندما يتبقى 3 أيام أو أقل على انتهاء الترخيص
+/// يظهر دائماً عندما يتبقى 5 أيام أو أقل على انتهاء الترخيص
 class LicenseWarningBanner extends StatelessWidget {
   final StoreModel store;
   final VoidCallback? onRenewTap;
@@ -19,8 +19,8 @@ class LicenseWarningBanner extends StatelessWidget {
     final daysLeft = store.daysUntilExpiry;
     final isExpired = store.isLicenseExpired;
 
-    // يظهر فقط إذا كان باقي 3 أيام أو أقل أو منتهي
-    if (!isExpired && daysLeft > 3) {
+    // يظهر فقط إذا كان باقي 5 أيام أو أقل أو منتهي
+    if (!isExpired && daysLeft > 5) {
       return const SizedBox.shrink();
     }
 
@@ -245,7 +245,7 @@ class LicenseWarningChip extends StatelessWidget {
     final daysLeft = store.daysUntilExpiry;
     final isExpired = store.isLicenseExpired;
 
-    if (!isExpired && daysLeft > 3) {
+    if (!isExpired && daysLeft > 5) {
       return const SizedBox.shrink();
     }
 
