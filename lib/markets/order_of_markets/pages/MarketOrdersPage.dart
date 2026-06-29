@@ -696,6 +696,76 @@ class _MarketOrdersPageState extends State<MarketOrdersPage>
                                   excludedCourierUids: excluded,
                                 );
                               },
+                              onAutoRedispatchIndependentCourier: () async {
+                                final documentId =
+                                    order['documentId'] as String?;
+                                if (documentId == null) return;
+                                final error = await _viewModel
+                                    .autoRedispatchIndependentCourier(
+                                  documentId,
+                                );
+                                if (!mounted) return;
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text(
+                                      error ?? 'تم إعادة الإرسال للمناديب',
+                                    ),
+                                    backgroundColor: error != null
+                                        ? Colors.red
+                                        : Colors.green,
+                                  ),
+                                );
+                              },
+                              onManualRedispatchIndependentCourier: () {
+                                final independentDispatch =
+                                    order['independentDispatch']
+                                        as Map<String, dynamic>?;
+                                final courierResponses =
+                                    independentDispatch?['courierResponses']
+                                        as Map<String, dynamic>?;
+                                final excluded = <String>{
+                                  if (courierResponses != null)
+                                    for (final entry
+                                        in courierResponses.entries)
+                                      if (const {
+                                        'rejected',
+                                        'released',
+                                        'cancelled_by_merchant',
+                                      }.contains(
+                                        entry.value.toString().toLowerCase(),
+                                      ))
+                                        entry.key,
+                                  if ((independentDispatch?['previousCourierId'] ??
+                                          '')
+                                      .toString()
+                                      .isNotEmpty)
+                                    (independentDispatch!['previousCourierId']
+                                            as String)
+                                        .toString(),
+                                };
+                                _openIndependentCourierPicker(
+                                  orderDocumentId:
+                                      (order['documentId'] ?? '').toString(),
+                                  excludedCourierUids: excluded,
+                                );
+                              },
+                              onCancelIndependentOrderFinal: () async {
+                                final documentId =
+                                    order['documentId'] as String?;
+                                if (documentId == null) return;
+                                await _viewModel
+                                    .cancelIndependentCourierDispatch(
+                                  documentId,
+                                  'cancel_order',
+                                );
+                                if (!mounted) return;
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                    content: Text('تم إلغاء الطلب نهائياً'),
+                                    backgroundColor: Colors.orange,
+                                  ),
+                                );
+                              },
                               rejectedMessage: _viewModel.getRejectedMessage(
                                 order['documentId'] ?? '',
                               ),

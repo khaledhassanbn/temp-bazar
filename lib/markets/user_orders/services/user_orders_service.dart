@@ -388,6 +388,8 @@ class UserOrdersService {
         return 'الزبون رفض الاستلام';
       case 'rejected':
         return 'مرفوض نهائياً';
+      case 'returned_to_merchant':
+        return 'جارٍ إعادة تعيين مندوب';
       default:
         return status;
     }

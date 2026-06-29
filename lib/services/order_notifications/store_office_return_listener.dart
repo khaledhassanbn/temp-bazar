@@ -42,9 +42,12 @@ class StoreOfficeReturnListener {
               final isReturnedDelivery = _isReturnedToMerchantRaw(deliveryRequest['status']?.toString());
               
               if (isReturnedMain || isReturnedDelivery) {
+                final returnedBy = (data['returnedBy'] ?? '').toString();
                 OrderNotificationCoordinator.instance.notifyOfficeReturnedOrder(
                   orderDocumentId: change.doc.id,
                   storeId: storeId,
+                  returnedBy: returnedBy.isNotEmpty ? returnedBy : null,
+                  goodsPickedUp: data['goodsPickedUp'] == true,
                 );
               }
             }

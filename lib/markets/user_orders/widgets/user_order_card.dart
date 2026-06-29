@@ -154,10 +154,12 @@ class _UserOrderCardState extends State<UserOrderCard> {
     final deliveryInfo = widget.deliveryInfo;
 
     final rawStatus = OrderStatusHelper.resolveRawStatus(order);
-    final statusArabic = OrderStatusHelper.toCustomerArabic(rawStatus);
+    final statusArabic = OrderStatusHelper.resolveCustomerArabic(order);
     final statusColor = Color(OrderStatusHelper.statusColor(rawStatus));
     final isCompleted = OrderStatusHelper.isDelivered(order);
     final isRejected = OrderStatusHelper.isRejected(order);
+    final canCancel = OrderStatusHelper.canCustomerCancel(order);
+    final showTracking = OrderStatusHelper.shouldShowDeliveryTracking(order);
 
     final createdAt = order['createdAt'] as Timestamp?;
     final dateStr = createdAt != null
@@ -374,7 +376,8 @@ class _UserOrderCardState extends State<UserOrderCard> {
 
           // معلومات المندوب عندما يكون الطلب فى نظام الشحن
           if ((driverName.isNotEmpty || driverPhone.isNotEmpty) &&
-              !isRejected)
+              !isRejected &&
+              showTracking)
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
               child: Container(
@@ -434,15 +437,17 @@ class _UserOrderCardState extends State<UserOrderCard> {
               ),
             ),
 
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            child: _buildTrackingSection(
-              order: order,
-              marketName: marketName,
-              courierId: courierId,
-              showMap: shouldShowTrackingMap,
+          if (showTracking)
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              child: _buildTrackingSection(
+                order: order,
+                marketName: marketName,
+                courierId: courierId,
+                showMap: shouldShowTrackingMap,
+                rawStatus: rawStatus,
+              ),
             ),
-          ),
 
           // معلومات المتجر
           Padding(
@@ -597,7 +602,7 @@ class _UserOrderCardState extends State<UserOrderCard> {
                         ),
                       ),
                     ),
-                    if (!isCompleted && !isRejected)
+                    if (canCancel)
                       Padding(
                         padding: const EdgeInsets.only(top: 8.0, right: 8.0),
                         child: InkWell(
@@ -878,6 +883,7 @@ class _UserOrderCardState extends State<UserOrderCard> {
     required String marketName,
     required String courierId,
     required bool showMap,
+    required String rawStatus,
   }) {
     final customerInfoMap = _asMap(order['customerInfo']);
     final deliveryMap = _asMap(order['deliveryRequest']);
@@ -916,6 +922,7 @@ class _UserOrderCardState extends State<UserOrderCard> {
     }
 
     if (!showMap) {
+      final waitingMessage = _trackingWaitingMessage(rawStatus);
       return Container(
         width: double.infinity,
         padding: const EdgeInsets.all(12),
@@ -923,9 +930,9 @@ class _UserOrderCardState extends State<UserOrderCard> {
           color: Colors.blueGrey.withOpacity(0.08),
           borderRadius: BorderRadius.circular(12),
         ),
-        child: const Text(
-          'بانتظار استلام المندوب للطلب',
-          style: TextStyle(fontWeight: FontWeight.w600),
+        child: Text(
+          waitingMessage,
+          style: const TextStyle(fontWeight: FontWeight.w600),
           textAlign: TextAlign.center,
         ),
       );
@@ -1134,8 +1141,33 @@ class _UserOrderCardState extends State<UserOrderCard> {
     return 0.0;
   }
 
+  String _trackingWaitingMessage(String rawStatus) {
+    switch (rawStatus.toLowerCase()) {
+      case 'searching':
+      case 'assigned':
+      case 'notified_multiple':
+        return 'في انتظار قبول مندوب للطلب';
+      case 'driver_accepted':
+      case 'accepted':
+        return 'المندوب في الطريق للمتجر';
+      case 'returned_to_merchant':
+        return 'جارٍ إعادة تعيين مندوب';
+      default:
+        return 'جارٍ تجهيز الطلب للتوصيل';
+    }
+  }
+
   void _showInvoiceDialog(BuildContext context, Map<String, dynamic> order, List<dynamic> items, num totalAmount) {
-    final deliveryFee = (order['deliveryFee'] ?? 0.0) as num;
+    final invoiceDetails = _asMap(order['invoiceDetails']);
+    final deliveryFee = (order['deliveryFee'] ??
+            invoiceDetails['deliveryFee'] ??
+            0.0) as num;
+    final serviceFee = (order['serviceFee'] ??
+            invoiceDetails['serviceFee'] ??
+            0.0) as num;
+    final subtotal = (order['subtotal'] ??
+            invoiceDetails['subtotal'] ??
+            0.0) as num;
     final discount = (order['discount'] ?? 0.0) as num;
 
     showModalBottomSheet(
@@ -1189,6 +1221,20 @@ class _UserOrderCardState extends State<UserOrderCard> {
                   );
                 }),
                 const Divider(height: 30),
+                if (subtotal > 0)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 4),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text('المجموع الفرعي', style: TextStyle(fontSize: 14)),
+                        Text(
+                          '${subtotal.toStringAsFixed(2)} ج.م',
+                          style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+                        ),
+                      ],
+                    ),
+                  ),
                 if (deliveryFee > 0)
                   Padding(
                     padding: const EdgeInsets.symmetric(vertical: 4),
@@ -1197,6 +1243,20 @@ class _UserOrderCardState extends State<UserOrderCard> {
                       children: [
                         const Text('رسوم التوصيل', style: TextStyle(fontSize: 14)),
                         Text('${deliveryFee.toStringAsFixed(2)} ج.م', style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
+                      ],
+                    ),
+                  ),
+                if (serviceFee > 0)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 4),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text('رسوم الخدمة', style: TextStyle(fontSize: 14)),
+                        Text(
+                          '${serviceFee.toStringAsFixed(2)} ج.م',
+                          style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+                        ),
                       ],
                     ),
                   ),

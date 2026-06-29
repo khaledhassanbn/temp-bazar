@@ -19,6 +19,9 @@ class OrderCard extends StatelessWidget {
   onRequestDelivery;
   final String? rejectedMessage;
   final VoidCallback? onChangeIndependentCourier;
+  final VoidCallback? onAutoRedispatchIndependentCourier;
+  final VoidCallback? onManualRedispatchIndependentCourier;
+  final VoidCallback? onCancelIndependentOrderFinal;
 
   const OrderCard({
     super.key,
@@ -30,7 +33,16 @@ class OrderCard extends StatelessWidget {
     this.onRequestDelivery,
     this.rejectedMessage,
     this.onChangeIndependentCourier,
+    this.onAutoRedispatchIndependentCourier,
+    this.onManualRedispatchIndependentCourier,
+    this.onCancelIndependentOrderFinal,
   });
+
+  bool _isCourierReturnedToMerchant(Map<String, dynamic>? dispatch) {
+    if (dispatch == null) return false;
+    return (dispatch['status'] ?? '').toString().toLowerCase() ==
+        'returned_to_merchant';
+  }
 
   String _timeSinceOrder(DateTime orderTime) {
     final diff = DateTime.now().difference(orderTime);
@@ -786,13 +798,23 @@ class OrderCard extends StatelessWidget {
 
                 const SizedBox(height: 16),
 
-                // ================== Independent courier quick actions (2x2) ==================
+                // ================== Independent courier quick actions ==================
                 if (independentDispatch != null) ...[
-                  _IndependentDispatchQuickActions(
-                    onChangeCourier: onChangeIndependentCourier,
-                    onDeliverSelf: () => onStatusChange('تم التسليم للطيار'),
-                    onCancel: () => onStatusChange('تم رفض الطلب'),
-                  ),
+                  if (_isCourierReturnedToMerchant(independentDispatch))
+                    _CourierReturnedRedispatchActions(
+                      goodsPickedUp: independentDispatch['goodsPickedUp'] == true,
+                      returnReason:
+                          (independentDispatch['returnReason'] ?? '').toString(),
+                      onAutoRedispatch: onAutoRedispatchIndependentCourier,
+                      onManualRedispatch: onManualRedispatchIndependentCourier,
+                      onCancelFinal: onCancelIndependentOrderFinal,
+                    )
+                  else
+                    _IndependentDispatchQuickActions(
+                      onChangeCourier: onChangeIndependentCourier,
+                      onDeliverSelf: () => onStatusChange('تم التسليم للطيار'),
+                      onCancel: () => onStatusChange('تم رفض الطلب'),
+                    ),
                   const SizedBox(height: 12),
                 ],
 
@@ -1322,6 +1344,93 @@ class OrderCard extends StatelessWidget {
   }
 }
 
+class _CourierReturnedRedispatchActions extends StatelessWidget {
+  final bool goodsPickedUp;
+  final String returnReason;
+  final VoidCallback? onAutoRedispatch;
+  final VoidCallback? onManualRedispatch;
+  final VoidCallback? onCancelFinal;
+
+  const _CourierReturnedRedispatchActions({
+    required this.goodsPickedUp,
+    required this.returnReason,
+    this.onAutoRedispatch,
+    this.onManualRedispatch,
+    this.onCancelFinal,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: Colors.orange.shade50,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: Colors.orange.shade200),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                goodsPickedUp
+                    ? 'أرجع المندوب الطلب ويحمل البضاعة'
+                    : 'تنازل المندوب عن الطلب قبل الاستلام',
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  color: Colors.orange.shade900,
+                  fontSize: 13,
+                ),
+              ),
+              if (returnReason.isNotEmpty) ...[
+                const SizedBox(height: 6),
+                Text(
+                  'السبب: $returnReason',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Colors.orange.shade800,
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
+        const SizedBox(height: 10),
+        Row(
+          children: [
+            Expanded(
+              child: _ActionTile(
+                title: 'إعادة إرسال تلقائي',
+                icon: Icons.autorenew_rounded,
+                color: AppColors.mainColor,
+                onTap: onAutoRedispatch,
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: _ActionTile(
+                title: 'اختيار مندوب',
+                icon: Icons.person_search_rounded,
+                color: Colors.teal,
+                onTap: onManualRedispatch,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 10),
+        _ActionTile(
+          title: 'إلغاء الطلب نهائياً',
+          icon: Icons.cancel,
+          color: Colors.redAccent,
+          onTap: onCancelFinal,
+        ),
+      ],
+    );
+  }
+}
+
 class _IndependentDispatchQuickActions extends StatelessWidget {
   final VoidCallback? onChangeCourier;
   final VoidCallback onDeliverSelf;
@@ -1450,7 +1559,10 @@ class _IndependentCourierResponsesView extends StatelessWidget {
       case 'customer_rejected':
         return 'رفض الزبون استلام الشحنة';
       case 'returned_to_merchant':
-        return 'تم إلغاء الطلب وإرجاعه للمتجر';
+        final goodsPickedUp = dispatch['goodsPickedUp'] == true;
+        return goodsPickedUp
+            ? 'أرجع المندوب الطلب للمتجر'
+            : 'تنازل المندوب — أعد الإرسال';
       case 'cancelled':
         return 'تم إلغاء الطلب';
       case 'reassigned_by_merchant':

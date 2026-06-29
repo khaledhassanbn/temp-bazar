@@ -19,7 +19,18 @@ class OrderStatusHelper {
     'rejected',
     'customer_rejected',
     'cancelled_by_customer',
+    'cancelled_by_merchant',
+    'cancelled',
     'تم إلغاء الطلب',
+    'تم إلغاء الطلب من التاجر',
+  };
+
+  static const _terminalNonDeliveredStatuses = {
+    'rejected',
+    'cancelled_by_customer',
+    'cancelled_by_merchant',
+    'cancelled',
+    'customer_rejected',
   };
 
   static bool _matchesSet(String value, Set<String> set) {
@@ -63,8 +74,13 @@ class OrderStatusHelper {
     }
 
     if (data['isActive'] == false && !isDelivered(data)) {
-      return _matchesSet(status, _rejectedStatuses) ||
-          status.contains('رفض') ||
+      if (_matchesSet(status, _rejectedStatuses) ||
+          _matchesSet(orderStatus, _rejectedStatuses)) {
+        return true;
+      }
+      return status.contains('رفض') ||
+          status.contains('إلغاء') ||
+          orderStatus.contains('cancelled') ||
           orderStatus == 'rejected';
     }
 
@@ -98,13 +114,30 @@ class OrderStatusHelper {
       return deliveryRequest['status'].toString();
     }
 
-    if (data['dispatchType'] == 'independent_courier' &&
-        data['status'] != null) {
-      return data['status'].toString();
-    }
-
     final rawStatus = (data['status'] as String?)?.trim();
     final rawOrderStatus = (data['orderStatus'] as String?)?.trim();
+
+    // حالات نهائية — نفضّل orderStatus لو status قديم أو للإشعارات فقط
+    if (rawOrderStatus != null && rawOrderStatus.isNotEmpty) {
+      final lower = rawOrderStatus.toLowerCase();
+      if (_terminalNonDeliveredStatuses.contains(lower) ||
+          lower == 'completed' ||
+          lower == 'delivered') {
+        return rawOrderStatus;
+      }
+    }
+
+    if (data['dispatchType'] == 'independent_courier' &&
+        rawStatus != null &&
+        rawStatus.isNotEmpty) {
+      const notificationOnly = {'new', 'accepted', 'rejected'};
+      if (notificationOnly.contains(rawStatus.toLowerCase()) &&
+          rawOrderStatus != null &&
+          rawOrderStatus.isNotEmpty) {
+        return rawOrderStatus;
+      }
+      return rawStatus;
+    }
 
     const notificationOnly = {'new', 'accepted', 'rejected'};
     if (rawStatus != null &&
@@ -120,6 +153,69 @@ class OrderStatusHelper {
     return 'pending';
   }
 
+  /// حالة عربية موحّدة لواجهة الزبون
+  static String resolveCustomerArabic(Map<String, dynamic> data) {
+    final raw = resolveRawStatus(data);
+    return toCustomerArabic(raw);
+  }
+
+  /// هل يُعرض قسم تتبع المندوب؟
+  static bool shouldShowDeliveryTracking(Map<String, dynamic> data) {
+    if (isDelivered(data) || isRejected(data)) return false;
+
+    final raw = resolveRawStatus(data).toLowerCase();
+    const preDelivery = {
+      'pending',
+      'new',
+      'قيد المراجعة',
+      'cancelled_by_merchant',
+      'cancelled_by_customer',
+      'cancelled',
+      'rejected',
+    };
+    if (preDelivery.contains(raw)) return false;
+    if (raw.contains('رفض') || raw.contains('إلغاء')) return false;
+
+    return const {
+      'searching',
+      'assigned',
+      'notified_multiple',
+      'driver_accepted',
+      'accepted',
+      'picked_up',
+      'out_for_delivery',
+      'returned_to_merchant',
+    }.contains(raw);
+  }
+
+  /// هل يمكن للزبون إلغاء الطلب؟
+  static bool canCustomerCancel(Map<String, dynamic> data) {
+    if (isDelivered(data) || isRejected(data)) return false;
+    if (data['isActive'] == false) return false;
+
+    final raw = resolveRawStatus(data).toLowerCase();
+    const nonCancellable = {
+      'picked_up',
+      'out_for_delivery',
+      'completed',
+      'delivered',
+      'preparing',
+      'delivering',
+      'searching',
+      'assigned',
+      'notified_multiple',
+      'driver_accepted',
+      'returned_to_merchant',
+    };
+    if (nonCancellable.contains(raw)) return false;
+
+    return raw == 'pending' ||
+        raw == 'new' ||
+        raw == 'قيد المراجعة' ||
+        raw == 'accepted' ||
+        raw == 'تم استلام الطلب';
+  }
+
   /// تحويل الحالة إلى عربية للعرض فى واجهة العميل
   static String toCustomerArabic(String status) {
     if (status == 'قيد المراجعة' ||
@@ -129,6 +225,8 @@ class OrderStatusHelper {
         status == 'تم التسليم' ||
         status == 'الطلب مكتمل' ||
         status == 'تم رفض الطلب' ||
+        status == 'تم إلغاء الطلب' ||
+        status == 'تم إلغاء الطلب من التاجر' ||
         status == 'في انتظار قبول المكتب' ||
         status == 'تم قبوله من المكتب' ||
         status == 'تم تعيين مندوب' ||
@@ -154,6 +252,14 @@ class OrderStatusHelper {
         return 'تم رفض الطلب';
       case 'cancelled_by_customer':
         return 'تم إلغاء الطلب';
+      case 'cancelled_by_merchant':
+        return 'تم إلغاء الطلب من التاجر';
+      case 'cancelled':
+        return 'تم إلغاء الطلب';
+      case 'returned_to_merchant':
+        return 'جارٍ إعادة تعيين مندوب';
+      case 'searching':
+        return 'في انتظار قبول مندوب';
       case 'assigned':
         return 'تم تعيين مندوب';
       case 'driver_accepted':
@@ -171,6 +277,11 @@ class OrderStatusHelper {
     final lower = status.toLowerCase();
     if (isDelivered({'status': status})) return 0xFF4CAF50;
     if (_matchesSet(status, _rejectedStatuses)) return 0xFFF44336;
+    if (lower.contains('cancelled') ||
+        lower.contains('إلغاء') ||
+        lower.contains('رفض')) {
+      return 0xFFF44336;
+    }
 
     switch (lower) {
       case 'pending':
@@ -179,6 +290,8 @@ class OrderStatusHelper {
       case 'assigned':
       case 'driver_accepted':
       case 'picked_up':
+      case 'searching':
+      case 'returned_to_merchant':
         return 0xFFFF9800;
       case 'accepted':
         return 0xFF2196F3;

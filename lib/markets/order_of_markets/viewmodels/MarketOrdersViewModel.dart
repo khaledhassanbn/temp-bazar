@@ -5,6 +5,8 @@ import 'package:flutter/material.dart';
 import '../services/OrderService.dart';
 import '../services/delivery_request_service.dart';
 import 'package:bazar_suez/markets/create_market/services/store_service.dart';
+import 'package:bazar_suez/markets/order_of_markets/independent_couriers/services/independent_courier_dispatch_service.dart';
+import 'package:bazar_suez/markets/order_of_markets/independent_couriers/services/independent_couriers_service.dart';
 import 'package:bazar_suez/services/delivery_fee/delivery_fee_service.dart';
 
 bool _isReturnedToMerchantRaw(String? status) {
@@ -338,7 +340,10 @@ class MarketOrdersViewModel extends ChangeNotifier {
       if (rawStatusFromDelivery != null) {
         status = _convertDeliveryStatusToArabic(rawStatusFromDelivery);
       } else if (rawStatusFromIndependent != null) {
-        status = _convertIndependentStatusToArabic(rawStatusFromIndependent);
+        status = _convertIndependentStatusToArabic(
+          rawStatusFromIndependent,
+          orderData: data,
+        );
       } else {
         status = _convertLegacyStatusToArabic(rawStatusFromOrder);
       }
@@ -628,7 +633,10 @@ class MarketOrdersViewModel extends ChangeNotifier {
     }
   }
 
-  String _convertIndependentStatusToArabic(String status) {
+  String _convertIndependentStatusToArabic(
+    String status, {
+    Map<String, dynamic>? orderData,
+  }) {
     if (status == 'في انتظار قبول المندوب' ||
         status == 'المندوب قبل الطلب' ||
         status == 'تم استلام الطلب من المتجر' ||
@@ -636,7 +644,9 @@ class MarketOrdersViewModel extends ChangeNotifier {
         status == 'المندوب رفض الطلب' ||
         status == 'الزبون رفض الاستلام' ||
         status == 'تم إلغاء الطلب من التاجر' ||
-        status == 'تم إعادة التعيين من التاجر') {
+        status == 'تم إعادة التعيين من التاجر' ||
+        status == 'ألغى المندوب الطلب — أعد الإرسال' ||
+        status == 'أرجع المندوب الطلب للمتجر') {
       return status;
     }
 
@@ -658,13 +668,84 @@ class MarketOrdersViewModel extends ChangeNotifier {
         return 'المندوب رفض الطلب';
       case 'customer_rejected':
         return 'الزبون رفض الاستلام';
-      case 'cancelled':
+      case 'returned_to_merchant':
+        final goodsPickedUp = orderData?['goodsPickedUp'] == true;
+        final returnedBy = (orderData?['returnedBy'] ?? '').toString();
+        if (returnedBy == 'courier') {
+          return goodsPickedUp
+              ? 'أرجع المندوب الطلب للمتجر'
+              : 'ألغى المندوب الطلب — أعد الإرسال';
+        }
+        return 'المكتب رفض الطلب';
       case 'cancelled_by_merchant':
         return 'تم إلغاء الطلب من التاجر';
+      case 'cancelled':
+        return 'تم إلغاء الطلب';
       case 'reassigned_by_merchant':
         return 'تم إعادة التعيين من التاجر';
       default:
         return status;
+    }
+  }
+
+  /// إعادة إرسال تلقائي لأقرب مناديب متاحين بعد إرجاع/تنازل المندوب.
+  Future<String?> autoRedispatchIndependentCourier(String orderDocumentId) async {
+    try {
+      final orderDoc = await _service.getPresentOrder(marketId, orderDocumentId);
+      if (!orderDoc.exists) return 'الطلب غير موجود';
+
+      final orderData = orderDoc.data() ?? <String, dynamic>{};
+      if (orderData['dispatchType'] != 'independent_courier') {
+        return 'هذا الطلب ليس عبر مندوب مستقل';
+      }
+
+      final storeDoc = await _storeService.getStore(marketId);
+      final storeData = storeDoc.data() ?? <String, dynamic>{};
+      final storeLocation = storeData['location'] is GeoPoint
+          ? storeData['location'] as GeoPoint
+          : null;
+
+      final couriersService = IndependentCouriersService();
+      final dispatchService = IndependentCourierDispatchService();
+      final couriers = await couriersService.fetchApprovedCouriersWithLiveStatus(
+        storeLocation: storeLocation,
+      );
+
+      final courierResponses =
+          orderData['courierResponses'] as Map<String, dynamic>? ?? {};
+      final excluded = <String>{
+        for (final entry in courierResponses.entries)
+          if (const {'rejected', 'released', 'cancelled_by_merchant'}
+              .contains(entry.value.toString().toLowerCase()))
+            entry.key,
+      };
+      final previousCourierId =
+          (orderData['previousCourierId'] ?? '').toString();
+      if (previousCourierId.isNotEmpty) {
+        excluded.add(previousCourierId);
+      }
+
+      final selected = couriers
+          .where((c) => c.canReceiveOrders && !excluded.contains(c.uid))
+          .take(3)
+          .map((c) => c.uid)
+          .toList();
+
+      if (selected.isEmpty) {
+        return 'لا يوجد مناديب متاحون حالياً — جرّب الاختيار اليدوي';
+      }
+
+      await dispatchService.createOrResendIndependentCourierOrder(
+        orderId: orderDocumentId,
+        storeId: marketId,
+        storeData: storeData,
+        presentOrderData: orderData,
+        courierUids: selected,
+      );
+      notifyListeners();
+      return null;
+    } catch (e) {
+      return e.toString();
     }
   }
 
@@ -705,8 +786,11 @@ class MarketOrdersViewModel extends ChangeNotifier {
       updates['cancelReason'] = 'merchant_delivering_self';
     } else if (actionType == 'cancel_order') {
       updates['status'] = 'cancelled_by_merchant';
+      updates['orderStatus'] = 'cancelled_by_merchant';
       updates['dispatchStatus'] = 'cancelled_by_merchant';
+      updates['isActive'] = false;
       updates['cancelledAt'] = FieldValue.serverTimestamp();
+      updates['completedAt'] = FieldValue.serverTimestamp();
       updates['cancelReason'] = 'merchant_cancelled_order';
     }
 

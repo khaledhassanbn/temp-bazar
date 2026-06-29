@@ -5,11 +5,15 @@ import 'package:bazar_suez/router/app_navigation.dart';
 class OfficeReturnAlertDialog extends StatelessWidget {
   final String orderDocumentId;
   final String storeId;
+  final String? returnedBy;
+  final bool goodsPickedUp;
 
   const OfficeReturnAlertDialog({
     super.key,
     required this.orderDocumentId,
     required this.storeId,
+    this.returnedBy,
+    this.goodsPickedUp = false,
   });
 
   static const Color accent = Color(0xFFB45309);
@@ -22,6 +26,14 @@ class OfficeReturnAlertDialog extends StatelessWidget {
       Navigator.of(context).pop();
       navigateToStoreOrders(storeId, orderId: orderDocumentId);
     }
+
+    final isCourierReturn = returnedBy == 'courier';
+    final title = isCourierReturn
+        ? (goodsPickedUp ? 'المندوب أرجع الطلب' : 'المندوب تنازل عن الطلب')
+        : 'المكتب رفض الطلب';
+    final subtitle = isCourierReturn
+        ? 'يمكنك إعادة الإرسال تلقائياً أو اختيار مندوب آخر من صفحة الطلبات'
+        : 'يمكنك اختيار مكتب آخر أو التسليم بنفسك من صفحة الطلبات';
 
     return Dialog(
       backgroundColor: Colors.transparent,
@@ -67,22 +79,22 @@ class OfficeReturnAlertDialog extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(width: 14),
-                  const Expanded(
+                  Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          'المكتب رفض الطلب',
-                          style: TextStyle(
+                          title,
+                          style: const TextStyle(
                             color: Colors.white,
                             fontWeight: FontWeight.w800,
                             fontSize: 17,
                           ),
                         ),
-                        SizedBox(height: 4),
+                        const SizedBox(height: 4),
                         Text(
-                          'يمكنك اختيار مكتب آخر أو التسليم بنفسك من صفحة الطلبات',
-                          style: TextStyle(
+                          subtitle,
+                          style: const TextStyle(
                             color: Colors.white70,
                             fontSize: 12,
                             height: 1.35,

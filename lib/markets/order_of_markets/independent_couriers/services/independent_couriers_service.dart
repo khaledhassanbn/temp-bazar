@@ -47,6 +47,32 @@ class IndependentCouriersService {
     });
   }
 
+  /// جلب لمرة واحدة (لإعادة الإرسال التلقائي).
+  Future<List<IndependentCourier>> fetchApprovedCouriersWithLiveStatus({
+    required GeoPoint? storeLocation,
+  }) async {
+    final snapshot = await _firestore
+        .collection('courier_requests')
+        .where('status', isEqualTo: 'approved')
+        .get();
+
+    final baseCouriers =
+        snapshot.docs.map(IndependentCourier.fromCourierRequestDoc).toList();
+    final uids = baseCouriers.map((c) => c.uid).toList(growable: false);
+    final liveByUid = await _getCouriersLiveForUids(uids);
+    final enriched = baseCouriers
+        .map(
+          (courier) => _mergeLive(
+            courier: courier,
+            live: liveByUid[courier.uid],
+            storeLocation: storeLocation,
+          ),
+        )
+        .toList(growable: false);
+
+    return _sortByDistance(enriched);
+  }
+
   List<IndependentCourier> _sortByDistance(List<IndependentCourier> couriers) {
     final results = List<IndependentCourier>.from(couriers);
     results.sort((a, b) {

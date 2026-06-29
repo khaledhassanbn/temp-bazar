@@ -15,10 +15,16 @@ enum _QueuedAlertKind { newOrder, officeReturned }
 class _QueuedAlert {
   const _QueuedAlert.newOrder(this.storeId, this.orderId)
       : kind = _QueuedAlertKind.newOrder,
-        orderDocumentId = orderId;
+        orderDocumentId = orderId,
+        returnedBy = null,
+        goodsPickedUp = false;
 
-  const _QueuedAlert.officeReturned(this.storeId, this.orderDocumentId)
-      : kind = _QueuedAlertKind.officeReturned,
+  const _QueuedAlert.officeReturned(
+    this.storeId,
+    this.orderDocumentId, {
+    this.returnedBy,
+    this.goodsPickedUp = false,
+  })  : kind = _QueuedAlertKind.officeReturned,
         orderId = orderDocumentId;
 
   final _QueuedAlertKind kind;
@@ -27,6 +33,8 @@ class _QueuedAlert {
   final String orderId;
   /// معرّف مستند الطلب فى [present_order] — يُستخدم لإرجاع المكتب للتاجر.
   final String orderDocumentId;
+  final String? returnedBy;
+  final bool goodsPickedUp;
 }
 
 /// يمنع التكرار بين FCM والاستماع المباشر، ويعرض نوافذ متتابعة عند وجود أكثر من طلب.
@@ -57,16 +65,25 @@ class OrderNotificationCoordinator {
     _chain = _chain.then((_) => _runQueue());
   }
 
-  /// المكتب رجّع الطلب للتاجر (`returned_to_merchant`) — صوت وتنبيه مثل الطلب الجديد.
+  /// المكتب أو المندوب رجّع الطلب للتاجر (`returned_to_merchant`).
   void notifyOfficeReturnedOrder({
     required String orderDocumentId,
     required String storeId,
+    String? returnedBy,
+    bool goodsPickedUp = false,
   }) {
     if (orderDocumentId.isEmpty || storeId.isEmpty) return;
     final key = '$storeId::$orderDocumentId';
     if (_queuedOrShownOfficeReturn.contains(key)) return;
     _queuedOrShownOfficeReturn.add(key);
-    _queue.addLast(_QueuedAlert.officeReturned(storeId, orderDocumentId));
+    _queue.addLast(
+      _QueuedAlert.officeReturned(
+        storeId,
+        orderDocumentId,
+        returnedBy: returnedBy,
+        goodsPickedUp: goodsPickedUp,
+      ),
+    );
     _chain = _chain.then((_) => _runQueue());
   }
 
@@ -121,6 +138,8 @@ class OrderNotificationCoordinator {
             builder: (dialogCtx) => OfficeReturnAlertDialog(
               orderDocumentId: item.orderDocumentId,
               storeId: item.storeId,
+              returnedBy: item.returnedBy,
+              goodsPickedUp: item.goodsPickedUp,
             ),
           );
         }
