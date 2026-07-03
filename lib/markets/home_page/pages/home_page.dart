@@ -48,7 +48,8 @@ class _HomePageState extends State<HomePage>
   String? _selectedCategoryId;
   late AnimationController _fadeCtrl;
   late Animation<double> _fadeAnim;
-  final PageController _bannerCtrl = PageController();
+  late final PageController _bannerCtrl =
+      PageController(viewportFraction: 0.93);
   late Timer _bannerTimer;
 
   Future<void> _selectCategory(String categoryId) async {
@@ -102,9 +103,12 @@ class _HomePageState extends State<HomePage>
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  _buildSpecialForYouHeader(),
                   _buildBannerSection(),
-                  _buildCategoriesSection(),
+                  const ServiceProvidersSection(),
+                  ModernCategoriesSection(
+                    selectedCategoryId: _selectedCategoryId,
+                    onCategorySelected: _selectCategory,
+                  ),
                   _buildFlashSaleSection(),
                   const SizedBox(height: 100),
                 ],
@@ -135,25 +139,6 @@ class _HomePageState extends State<HomePage>
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (_) => const SavedLocationsSheet(),
-    );
-  }
-
-  Widget _buildSpecialForYouHeader() {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 20, 16, 0),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          const Text(
-            'متاجر مميزة',
-            style: TextStyle(
-              color: HomeAppColors.textDark,
-              fontSize: 22,
-              fontWeight: FontWeight.w800,
-            ),
-          ),
-        ],
-      ),
     );
   }
 
@@ -338,7 +323,12 @@ class _HomePageState extends State<HomePage>
     final isMarketOwner = auth.isMarketOwner;
 
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+      padding: const EdgeInsets.fromLTRB(
+        _InstashopMetrics.horizontalPadding,
+        14,
+        _InstashopMetrics.horizontalPadding,
+        0,
+      ),
       child: StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
         stream: FirebaseFirestore.instance
             .collection('app_settings')
@@ -373,10 +363,14 @@ class _HomePageState extends State<HomePage>
             });
           }
 
+          final bannerHeight =
+              MediaQuery.sizeOf(context).height *
+              _InstashopMetrics.bannerHeightRatio;
+
           return Column(
             children: [
               SizedBox(
-                height: 200,
+                height: bannerHeight,
                 child: PageView.builder(
                   controller: _bannerCtrl,
                   onPageChanged: (p) => setState(() => _bannerPage = p),
@@ -389,17 +383,16 @@ class _HomePageState extends State<HomePage>
                           : 'assets/images/create_market.png';
                       final onTap = isMarketOwner
                           ? () => pushIfAuthed(
-                                context,
-                                '/request-ads',
-                                message:
-                                    'سجّل دخولك لطلب إعلانات لمتجرك',
-                              )
+                              context,
+                              '/request-ads',
+                              message: 'سجّل دخولك لطلب إعلانات لمتجرك',
+                            )
                           : () => pushIfAuthed(
-                                context,
-                                '/pricingpage',
-                                message:
-                                    'سجّل دخولك لإنشاء متجرك والاشتراك في باقة',
-                              );
+                              context,
+                              '/pricingpage',
+                              message:
+                                  'سجّل دخولك لإنشاء متجرك والاشتراك في باقة',
+                            );
                       return _BannerCard(
                         image: AssetImage(assetPath),
                         onTap: onTap,
@@ -445,125 +438,6 @@ class _HomePageState extends State<HomePage>
     );
   }
 
-  Widget _buildCategoriesSection() {
-    return Consumer<CategoryViewModel>(
-      builder: (context, vm, _) {
-        if (!vm.hasLoaded && !vm.isLoading) {
-          Future.microtask(() => vm.fetchCategories());
-        }
-
-        final displayCats = vm.categories.take(8).toList();
-
-        return Container(
-          margin: const EdgeInsets.only(top: 16),
-          width: double.infinity,
-          decoration: const BoxDecoration(
-            color: Colors.white,
-          ),
-          padding: const EdgeInsets.fromLTRB(16, 12, 16, 20),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // ── Header
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Row(
-                    children: [
-                      Container(
-                        width: 4,
-                        height: 22,
-                        decoration: BoxDecoration(
-                          color: HomeAppColors.primary,
-                          borderRadius: BorderRadius.circular(2),
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      const Text(
-                        'الفئات',
-                        style: TextStyle(
-                          color: HomeAppColors.primary,
-                          fontSize: 18,
-                          fontWeight: FontWeight.w800,
-                        ),
-                      ),
-                    ],
-                  ),
-                  GestureDetector(
-                    onTap: () => context.push('/CategoriesGrid'),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 5,
-                      ),
-                      decoration: BoxDecoration(
-                        color: HomeAppColors.primary.withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                      child: const Text(
-                        'عرض الكل',
-                        style: TextStyle(
-                          color: HomeAppColors.primary,
-                          fontSize: 12,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 4),
-
-              // ── Grid
-              if (vm.isLoading)
-                const SizedBox(
-                  height: 120,
-                  child: Center(
-                    child: CircularProgressIndicator(
-                      color: HomeAppColors.primary,
-                      strokeWidth: 2,
-                    ),
-                  ),
-                )
-              else if (displayCats.isEmpty)
-                const SizedBox(
-                  height: 80,
-                  child: Center(
-                    child: Text(
-                      'لا توجد فئات',
-                      style: TextStyle(color: HomeAppColors.textMed),
-                    ),
-                  ),
-                )
-              else
-                GridView.builder(
-                  shrinkWrap: true,
-                  physics: const NeverScrollableScrollPhysics(),
-                  gridDelegate:
-                      const SliverGridDelegateWithFixedCrossAxisCount(
-                        crossAxisCount: 4,
-                        crossAxisSpacing: 10,
-                        mainAxisSpacing: 10,
-                        childAspectRatio: 0.70,
-                      ),
-                  itemCount: displayCats.length,
-                  itemBuilder: (context, i) {
-                    final cat = displayCats[i];
-                    final isSelected = _selectedCategoryId == cat.id;
-                    return _CategoryCard(
-                      category: cat,
-                      isSelected: isSelected,
-                      onTap: () => _selectCategory(cat.id),
-                    );
-                  },
-                ),
-            ],
-          ),
-        );
-      },
-    );
-  }
-
   Widget _buildFlashSaleSection() {
     return Consumer2<CategoryViewModel, CategoryFilterViewModel>(
       builder: (context, catVm, filterVm, _) {
@@ -589,59 +463,14 @@ class _HomePageState extends State<HomePage>
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               // ── Header المتاجر
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 24, 16, 16),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Row(
-                      children: [
-                        Container(
-                          width: 4,
-                          height: 22,
-                          decoration: BoxDecoration(
-                            color: HomeAppColors.primary,
-                            borderRadius: BorderRadius.circular(2),
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        const Text(
-                          'المتاجر',
-                          style: TextStyle(
-                            color: HomeAppColors.primary,
-                            fontSize: 18,
-                            fontWeight: FontWeight.w800,
-                          ),
-                        ),
-                      ],
-                    ),
-                    GestureDetector(
-                      onTap: () {
-                        if (_selectedCategoryId != null) {
-                          context.push('/CategoryMarketPage?categoryId=$_selectedCategoryId');
-                        }
-                      },
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 12,
-                          vertical: 5,
-                        ),
-                        decoration: BoxDecoration(
-                          color: HomeAppColors.primary.withOpacity(0.1),
-                          borderRadius: BorderRadius.circular(20),
-                        ),
-                        child: const Text(
-                          'عرض الكل',
-                          style: TextStyle(
-                            color: HomeAppColors.primary,
-                            fontSize: 12,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
+              _InstashopSectionHeader(
+                title: 'المتاجر',
+                topSpacing: _InstashopMetrics.sectionStoresTopSpacing,
+                onSeeAll: _selectedCategoryId != null
+                    ? () => context.push(
+                          '/CategoryMarketPage?categoryId=$_selectedCategoryId',
+                        )
+                    : null,
               ),
 
               if (_selectedCategoryId != null &&
@@ -739,7 +568,10 @@ class _SearchBar extends StatelessWidget {
             decoration: BoxDecoration(
               color: Colors.white.withOpacity(0.15),
               borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: Colors.white.withOpacity(0.3), width: 1),
+              border: Border.all(
+                color: Colors.white.withOpacity(0.3),
+                width: 1,
+              ),
             ),
             child: const Icon(
               Icons.handyman_outlined,
@@ -763,19 +595,19 @@ class _BannerCard extends StatelessWidget {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        margin: const EdgeInsets.symmetric(horizontal: 2),
+        margin: const EdgeInsets.symmetric(horizontal: 4),
         decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(24),
+          borderRadius: BorderRadius.circular(_InstashopMetrics.bannerRadius),
           boxShadow: [
             BoxShadow(
-              color: HomeAppColors.primary.withOpacity(0.25),
-              blurRadius: 20,
-              offset: const Offset(0, 8),
+              color: Colors.black.withValues(alpha: 0.08),
+              blurRadius: 16,
+              offset: const Offset(0, 6),
             ),
           ],
         ),
         child: ClipRRect(
-          borderRadius: BorderRadius.circular(24),
+          borderRadius: BorderRadius.circular(_InstashopMetrics.bannerRadius),
           child: Stack(
             fit: StackFit.expand,
             children: [
@@ -789,110 +621,6 @@ class _BannerCard extends StatelessWidget {
           ),
         ),
       ),
-    );
-  }
-}
-
-class _CategoryCard extends StatelessWidget {
-  final CategoryModel category;
-  final VoidCallback? onTap;
-  final bool isSelected;
-
-  const _CategoryCard({
-    required this.category,
-    required this.isSelected,
-    this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        decoration: BoxDecoration(
-          color: isSelected
-              ? HomeAppColors.primary
-              : const Color(0xFFEEF7FB),
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(
-            color: isSelected
-                ? HomeAppColors.primary
-                : Colors.transparent,
-            width: 1.5,
-          ),
-        ),
-        padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 6),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Container(
-              width: 46,
-              height: 46,
-              decoration: BoxDecoration(
-                color: isSelected
-                    ? Colors.white.withOpacity(0.2)
-                    : HomeAppColors.primary.withOpacity(0.12),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(12),
-                child: _buildCategoryImage(category.icon, isSelected),
-              ),
-            ),
-            const SizedBox(height: 7),
-            Text(
-              category.name,
-              style: TextStyle(
-                color: isSelected ? Colors.white : HomeAppColors.textDark,
-                fontSize: 11,
-                fontWeight: FontWeight.w700,
-                height: 1.2,
-              ),
-              textAlign: TextAlign.center,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildCategoryImage(String icon, bool isSelected) {
-    final fallback = Icon(
-      Icons.category_outlined,
-      color: isSelected ? Colors.white : HomeAppColors.primary,
-      size: 26,
-    );
-
-    if (icon.isEmpty) return fallback;
-
-    if (icon.startsWith('http://') || icon.startsWith('https://')) {
-      return CachedNetworkImage(
-        imageUrl: icon,
-        fit: BoxFit.cover,
-        width: 46,
-        height: 46,
-        placeholder: (_, __) => const Center(
-          child: CircularProgressIndicator(
-            strokeWidth: 2,
-            color: HomeAppColors.primary,
-          ),
-        ),
-        errorWidget: (_, __, ___) => fallback,
-      );
-    }
-
-    final path = icon.startsWith('assets/')
-        ? icon
-        : 'assets/images/categories/$icon';
-    return Image.asset(
-      path,
-      fit: BoxFit.cover,
-      width: 46,
-      height: 46,
-      errorBuilder: (_, __, ___) => fallback,
     );
   }
 }
@@ -1102,6 +830,588 @@ class _LogoBadge extends StatelessWidget {
                 size: 18,
                 color: HomeAppColors.primary,
               ),
+      ),
+    );
+  }
+}
+
+// ─── Service provider model ───────────────────────────────────────────────────
+class ServiceProviderCategory {
+  final String id;
+  final String name;
+  final String nameEn;
+  final IconData icon;
+  final List<Color> gradient;
+
+  const ServiceProviderCategory({
+    required this.id,
+    required this.name,
+    required this.nameEn,
+    required this.icon,
+    required this.gradient,
+  });
+}
+
+const List<ServiceProviderCategory> kServiceCategories = [
+  ServiceProviderCategory(
+    id: 'plumber',
+    name: 'سباكة',
+    nameEn: 'Plumbing',
+    icon: Icons.plumbing_rounded,
+    gradient: [Color(0xFF4E99B4), Color(0xFF2D7A96)],
+  ),
+  ServiceProviderCategory(
+    id: 'electric',
+    name: 'كهرباء',
+    nameEn: 'Electric',
+    icon: Icons.electric_bolt_rounded,
+    gradient: [Color(0xFFFFB347), Color(0xFFFF7043)],
+  ),
+  ServiceProviderCategory(
+    id: 'satellite',
+    name: 'دش',
+    nameEn: 'Satellite',
+    icon: Icons.satellite_alt_rounded,
+    gradient: [Color(0xFF667EEA), Color(0xFF764BA2)],
+  ),
+  ServiceProviderCategory(
+    id: 'teacher',
+    name: 'مدرسين',
+    nameEn: 'Tutors',
+    icon: Icons.school_rounded,
+    gradient: [Color(0xFF11998E), Color(0xFF38EF7D)],
+  ),
+  ServiceProviderCategory(
+    id: 'painter',
+    name: 'دهان',
+    nameEn: 'Painting',
+    icon: Icons.format_paint_rounded,
+    gradient: [Color(0xFFFC5C7D), Color(0xFF6A82FB)],
+  ),
+  ServiceProviderCategory(
+    id: 'ac',
+    name: 'تكييف',
+    nameEn: 'AC Repair',
+    icon: Icons.ac_unit_rounded,
+    gradient: [Color(0xFF43CEA2), Color(0xFF185A9D)],
+  ),
+  ServiceProviderCategory(
+    id: 'carpenter',
+    name: 'نجارة',
+    nameEn: 'Carpentry',
+    icon: Icons.handyman_rounded,
+    gradient: [Color(0xFFF953C6), Color(0xFFB91D73)],
+  ),
+  ServiceProviderCategory(
+    id: 'cleaning',
+    name: 'تنظيف',
+    nameEn: 'Cleaning',
+    icon: Icons.cleaning_services_rounded,
+    gradient: [Color(0xFF0F2027), Color(0xFF2C5364)],
+  ),
+];
+
+// ─── Instashop category grid metrics (reverse-engineered from reference UI) ───
+class _InstashopMetrics {
+  static const double horizontalPadding = 20;
+  static const int crossAxisCount = 3;
+  static const double crossAxisSpacing = 8;
+  static const double mainAxisSpacing = 28;
+  static const double imageFillRatio = 0.88;
+  static const double labelGap = 10;
+  static const double labelFontSize = 13;
+  static const double labelLineHeight = 1.25;
+  static const int labelMaxLines = 2;
+  static const double labelAreaHeight = 34;
+  static const int categoriesPerScrollPage = 6;
+  static const int serviceProviderVisibleCount = 4;
+  static const double serviceSpacing = 4;
+  static const String categoryLabelFont = 'IBMPlexSansArabic';
+  static const double bannerHeightRatio = 0.20;
+  static const double bannerRadius = 16;
+  static const double sectionTopSpacing = 10;
+  static const double sectionStoresTopSpacing = 14;
+  static const double sectionHeaderBottom = 6;
+  static const double sectionAfterCategories = 12;
+
+  final double screenWidth;
+
+  const _InstashopMetrics(this.screenWidth);
+
+  factory _InstashopMetrics.of(BuildContext context) =>
+      _InstashopMetrics(MediaQuery.sizeOf(context).width);
+
+  double get gridWidth => screenWidth - horizontalPadding * 2;
+
+  double get cellWidth =>
+      (gridWidth - crossAxisSpacing * (crossAxisCount - 1)) / crossAxisCount;
+
+  double get imageSize => cellWidth * imageFillRatio;
+
+  double get imageSlotHeight => imageSize;
+
+  double get itemHeight => imageSlotHeight + labelGap + labelAreaHeight;
+
+  double get serviceCellWidth =>
+      (gridWidth - serviceSpacing * (serviceProviderVisibleCount - 1)) /
+      serviceProviderVisibleCount;
+
+  double get serviceImageSize => serviceCellWidth * imageFillRatio;
+
+  double get serviceItemHeight =>
+      serviceImageSize + labelGap + labelAreaHeight;
+
+  int rowCountFor(int itemCount) =>
+      (itemCount / crossAxisCount).ceil().clamp(1, 99);
+
+  double gridHeightFor(int itemCount) {
+    final rows = rowCountFor(itemCount);
+    return itemHeight * rows + mainAxisSpacing * (rows - 1);
+  }
+
+  double get gridHeight => gridHeightFor(categoriesPerScrollPage);
+
+  double get sectionTitleSize => 20;
+  double get seeAllSize => 13;
+}
+
+class _InstashopSectionStyles {
+  static TextStyle title(double size) => TextStyle(
+        color: const Color(0xFF1A1A1A),
+        fontSize: size,
+        fontWeight: FontWeight.w700,
+        letterSpacing: -0.2,
+        fontFamily: 'NotoSansArabic',
+      );
+
+  static TextStyle seeAll(double size) => TextStyle(
+        color: HomeAppColors.primary,
+        fontSize: size,
+        fontWeight: FontWeight.w600,
+        fontFamily: 'NotoSansArabic',
+      );
+
+  static TextStyle categoryLabel({
+    required bool isSelected,
+  }) =>
+      TextStyle(
+        color: isSelected ? HomeAppColors.primary : const Color(0xFF262626),
+        fontSize: _InstashopMetrics.labelFontSize,
+        fontWeight: FontWeight.w700,
+        height: _InstashopMetrics.labelLineHeight,
+        fontFamily: _InstashopMetrics.categoryLabelFont,
+      );
+}
+
+class _InstashopSectionHeader extends StatelessWidget {
+  final String title;
+  final VoidCallback? onSeeAll;
+  final double topSpacing;
+
+  const _InstashopSectionHeader({
+    required this.title,
+    this.onSeeAll,
+    this.topSpacing = _InstashopMetrics.sectionTopSpacing,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final metrics = _InstashopMetrics.of(context);
+    return Padding(
+      padding: EdgeInsets.fromLTRB(
+        _InstashopMetrics.horizontalPadding,
+        topSpacing,
+        _InstashopMetrics.horizontalPadding,
+        _InstashopMetrics.sectionHeaderBottom,
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(
+            title,
+            style: _InstashopSectionStyles.title(metrics.sectionTitleSize),
+          ),
+          if (onSeeAll != null)
+            GestureDetector(
+              onTap: onSeeAll,
+              child: Text(
+                'عرض الكل',
+                style: _InstashopSectionStyles.seeAll(metrics.seeAllSize),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+// Ground shadow classes removed as shadows are now embedded inside image assets.
+
+class ModernCategoriesSection extends StatelessWidget {
+  final String? selectedCategoryId;
+  final ValueChanged<String> onCategorySelected;
+
+  const ModernCategoriesSection({
+    super.key,
+    required this.selectedCategoryId,
+    required this.onCategorySelected,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Consumer<CategoryViewModel>(
+      builder: (context, vm, _) {
+        if (!vm.hasLoaded && !vm.isLoading) {
+          Future.microtask(() => vm.fetchCategories());
+        }
+
+        return ColoredBox(
+          color: Colors.white,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _InstashopSectionHeader(
+                title: 'الفئات',
+                onSeeAll: () => context.push('/CategoriesGrid'),
+              ),
+              if (vm.isLoading)
+                SizedBox(
+                  height: _InstashopMetrics.of(context).gridHeight,
+                  child: const Center(
+                    child: CircularProgressIndicator(
+                      color: HomeAppColors.primary,
+                      strokeWidth: 2,
+                    ),
+                  ),
+                )
+              else if (vm.categories.isEmpty)
+                const SizedBox(
+                  height: 80,
+                  child: Center(
+                    child: Text(
+                      'لا توجد فئات',
+                      style: TextStyle(color: Color(0xFF9AAAC0)),
+                    ),
+                  ),
+                )
+              else
+                _CategoriesGridWithScroll(
+                  categories: vm.categories,
+                  selectedCategoryId: selectedCategoryId,
+                  onCategorySelected: onCategorySelected,
+                ),
+              const SizedBox(height: _InstashopMetrics.sectionAfterCategories),
+            ],
+          ),
+        );
+      },
+    );
+  }
+}
+
+// ── 6 per scroll page (3×2) — all store categories ──────────────────────────
+class _CategoriesGridWithScroll extends StatelessWidget {
+  final List<CategoryModel> categories;
+  final String? selectedCategoryId;
+  final ValueChanged<String> onCategorySelected;
+
+  const _CategoriesGridWithScroll({
+    required this.categories,
+    required this.selectedCategoryId,
+    required this.onCategorySelected,
+  });
+
+  Widget _buildPageGrid(
+    _InstashopMetrics metrics,
+    List<CategoryModel> pageItems,
+  ) {
+    final rows = <Widget>[];
+
+    for (var i = 0; i < pageItems.length; i += _InstashopMetrics.crossAxisCount) {
+      final end = (i + _InstashopMetrics.crossAxisCount < pageItems.length)
+          ? i + _InstashopMetrics.crossAxisCount
+          : pageItems.length;
+      final rowItems = pageItems.sublist(i, end);
+
+      rows.add(
+        IntrinsicHeight(
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              for (var j = 0; j < _InstashopMetrics.crossAxisCount; j++)
+                Expanded(
+                  child: Padding(
+                    padding: EdgeInsets.only(
+                      left: j == 0 ? 0 : _InstashopMetrics.crossAxisSpacing / 2,
+                      right: j == _InstashopMetrics.crossAxisCount - 1
+                          ? 0
+                          : _InstashopMetrics.crossAxisSpacing / 2,
+                    ),
+                    child: j < rowItems.length
+                        ? _InstashopCategoryTile(
+                            metrics: metrics,
+                            category: rowItems[j],
+                            isSelected:
+                                selectedCategoryId == rowItems[j].id,
+                            onTap: () => onCategorySelected(rowItems[j].id),
+                          )
+                        : const SizedBox.shrink(),
+                  ),
+                ),
+            ],
+          ),
+        ),
+      );
+
+      if (end < pageItems.length) {
+        rows.add(const SizedBox(height: _InstashopMetrics.mainAxisSpacing));
+      }
+    }
+
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: rows,
+    );
+  }
+
+  List<List<CategoryModel>> _chunkPages(List<CategoryModel> items) {
+    const pageSize = _InstashopMetrics.categoriesPerScrollPage;
+    final pages = <List<CategoryModel>>[];
+    for (var i = 0; i < items.length; i += pageSize) {
+      final end = (i + pageSize < items.length) ? i + pageSize : items.length;
+      pages.add(items.sublist(i, end));
+    }
+    return pages;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final metrics = _InstashopMetrics.of(context);
+    final pages = _chunkPages(categories);
+    final pageHeight = metrics.gridHeight;
+
+    if (pages.length <= 1) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(
+          horizontal: _InstashopMetrics.horizontalPadding,
+        ),
+        child: _buildPageGrid(metrics, pages.first),
+      );
+    }
+
+    return SizedBox(
+      height: pageHeight,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        physics: const BouncingScrollPhysics(),
+        padding: const EdgeInsets.symmetric(
+          horizontal: _InstashopMetrics.horizontalPadding,
+        ),
+        itemCount: pages.length,
+        separatorBuilder: (_, __) =>
+            const SizedBox(width: _InstashopMetrics.crossAxisSpacing),
+        itemBuilder: (ctx, pageIndex) {
+          return SizedBox(
+            width: metrics.gridWidth,
+            child: _buildPageGrid(metrics, pages[pageIndex]),
+          );
+        },
+      ),
+    );
+  }
+}
+
+// ── Instashop-style category tile: floating PNG on white ─────────────────────
+class _InstashopCategoryTile extends StatelessWidget {
+  final _InstashopMetrics metrics;
+  final CategoryModel category;
+  final bool isSelected;
+  final VoidCallback onTap;
+
+  const _InstashopCategoryTile({
+    required this.metrics,
+    required this.category,
+    required this.isSelected,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final imageSize = isSelected ? metrics.imageSize * 1.04 : metrics.imageSize;
+
+    return GestureDetector(
+      onTap: onTap,
+      behavior: HitTestBehavior.opaque,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          SizedBox(
+            height: metrics.imageSlotHeight,
+            width: double.infinity,
+            child: Center(
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 200),
+                width: imageSize,
+                height: imageSize,
+                child: _CategoryPngImage(
+                  icon: category.icon,
+                  size: imageSize,
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: _InstashopMetrics.labelGap),
+          Text(
+            category.name,
+            style: _InstashopSectionStyles.categoryLabel(
+              isSelected: isSelected,
+            ),
+            textAlign: TextAlign.center,
+            maxLines: _InstashopMetrics.labelMaxLines,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _CategoryPngImage extends StatelessWidget {
+  final String icon;
+  final double size;
+
+  const _CategoryPngImage({required this.icon, required this.size});
+
+  @override
+  Widget build(BuildContext context) {
+    final fallback = Icon(
+      Icons.category_rounded,
+      color: HomeAppColors.primary,
+      size: size * 0.48,
+    );
+
+    if (icon.isEmpty) return fallback;
+
+    if (icon.startsWith('http://') || icon.startsWith('https://')) {
+      return CachedNetworkImage(
+        imageUrl: icon,
+        width: size,
+        height: size,
+        fit: BoxFit.contain,
+        placeholder: (_, __) => Center(
+          child: SizedBox(
+            width: size * 0.28,
+            height: size * 0.28,
+            child: const CircularProgressIndicator(
+              strokeWidth: 2,
+              color: HomeAppColors.primary,
+            ),
+          ),
+        ),
+        errorWidget: (_, __, ___) => fallback,
+      );
+    }
+
+    final path = icon.startsWith('assets/')
+        ? icon
+        : 'assets/images/categories/$icon';
+    return Image.asset(
+      path,
+      width: size,
+      height: size,
+      fit: BoxFit.contain,
+      errorBuilder: (_, __, ___) => fallback,
+    );
+  }
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+// WIDGET 2 — Service Providers Section
+// ═════════════════════════════════════════════════════════════════════════════
+
+class ServiceProvidersSection extends StatelessWidget {
+  const ServiceProvidersSection({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final metrics = _InstashopMetrics.of(context);
+
+    return ColoredBox(
+      color: Colors.white,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _InstashopSectionHeader(
+            title: 'مزودو الخدمات',
+            onSeeAll: () => context.push('/craftsmen'),
+          ),
+          SizedBox(
+            height: metrics.serviceItemHeight,
+            child: ListView.separated(
+              scrollDirection: Axis.horizontal,
+              physics: const BouncingScrollPhysics(),
+              padding: const EdgeInsets.symmetric(
+                horizontal: _InstashopMetrics.horizontalPadding,
+              ),
+              itemCount: kServiceCategories.length,
+              separatorBuilder: (_, __) =>
+                  const SizedBox(width: _InstashopMetrics.serviceSpacing),
+              itemBuilder: (ctx, i) => SizedBox(
+                width: metrics.serviceCellWidth,
+                child: _ServiceProviderTile(
+                  imageSize: metrics.serviceImageSize,
+                  service: kServiceCategories[i],
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 8),
+        ],
+      ),
+    );
+  }
+}
+
+// ── Service provider tile — same Instashop proportions as store categories ─────
+class _ServiceProviderTile extends StatelessWidget {
+  final double imageSize;
+  final ServiceProviderCategory service;
+
+  const _ServiceProviderTile({
+    required this.imageSize,
+    required this.service,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: () => context.push('/craftsmen?category=${service.id}'),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          SizedBox(
+            height: imageSize,
+            width: double.infinity,
+            child: Center(
+              child: Icon(
+                service.icon,
+                color: service.gradient.first,
+                size: imageSize * 0.52,
+              ),
+            ),
+          ),
+          const SizedBox(height: _InstashopMetrics.labelGap),
+          Text(
+            service.name,
+            style: _InstashopSectionStyles.categoryLabel(isSelected: false),
+            textAlign: TextAlign.center,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ],
       ),
     );
   }

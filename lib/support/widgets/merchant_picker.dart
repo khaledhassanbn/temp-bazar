@@ -32,7 +32,7 @@ class MerchantPicker extends StatelessWidget {
               child: Text(
                 'لم يتم العثور على متاجر قمت بالشراء منها مؤخراً. سيتم رفع الطلب كبلاغ عام للمتجر.',
                 style: TextStyle(
-                  fontFamily: 'Tajawal',
+                  fontFamily: 'NotoSansArabic',
                   fontSize: 13,
                   color: Colors.black54,
                 ),
@@ -49,7 +49,7 @@ class MerchantPicker extends StatelessWidget {
         const Text(
           'اختر المتجر المعني من تعاملاتك الأخيرة:',
           style: TextStyle(
-            fontFamily: 'Tajawal',
+            fontFamily: 'NotoSansArabic',
             fontSize: 14,
             fontWeight: FontWeight.bold,
             color: Colors.black87,
@@ -133,7 +133,7 @@ class MerchantPicker extends StatelessWidget {
                         child: Text(
                           name,
                           style: TextStyle(
-                            fontFamily: 'Tajawal',
+                            fontFamily: 'NotoSansArabic',
                             fontSize: 12,
                             fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
                             color: isSelected ? AppColors.mainColor : Colors.black87,

@@ -50,7 +50,7 @@ class _InboxPageState extends State<InboxPage> {
                   const Text(
                     'الرسائل والإعلانات',
                     style: TextStyle(
-                      fontFamily: 'Tajawal',
+                      fontFamily: 'NotoSansArabic',
                       fontSize: 18,
                       fontWeight: FontWeight.bold,
                       color: Colors.black87,
@@ -95,7 +95,7 @@ class _InboxPageState extends State<InboxPage> {
                 child: Text(
                   'حدث خطأ أثناء تحميل الرسائل',
                   style: TextStyle(
-                    fontFamily: 'Tajawal',
+                    fontFamily: 'NotoSansArabic',
                     color: Colors.red.shade700,
                   ),
                 ),
@@ -112,7 +112,7 @@ class _InboxPageState extends State<InboxPage> {
                     Text(
                       'لا توجد رسائل حالياً',
                       style: TextStyle(
-                        fontFamily: 'Tajawal',
+                        fontFamily: 'NotoSansArabic',
                         fontSize: 16,
                         color: Colors.grey[600],
                       ),
@@ -209,7 +209,7 @@ class _InboxTile extends StatelessWidget {
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(
-                        fontFamily: 'Tajawal',
+                        fontFamily: 'NotoSansArabic',
                         fontSize: 15,
                         fontWeight:
                             message.isRead ? FontWeight.w600 : FontWeight.bold,
@@ -221,7 +221,7 @@ class _InboxTile extends StatelessWidget {
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(
-                        fontFamily: 'Tajawal',
+                        fontFamily: 'NotoSansArabic',
                         fontSize: 13,
                         color: Colors.grey[600],
                         height: 1.4,
@@ -231,7 +231,7 @@ class _InboxTile extends StatelessWidget {
                     Text(
                       dateStr,
                       style: TextStyle(
-                        fontFamily: 'Tajawal',
+                        fontFamily: 'NotoSansArabic',
                         fontSize: 11,
                         color: Colors.grey[500],
                       ),

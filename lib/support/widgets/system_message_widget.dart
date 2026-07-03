@@ -28,7 +28,7 @@ class SystemMessageWidget extends StatelessWidget {
               child: Text(
                 text,
                 style: const TextStyle(
-                  fontFamily: 'Tajawal',
+                  fontFamily: 'NotoSansArabic',
                   fontSize: 12,
                   color: Color(0xFF856404),
                   height: 1.4,

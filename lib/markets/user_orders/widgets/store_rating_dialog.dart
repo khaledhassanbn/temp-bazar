@@ -371,7 +371,7 @@ class _StoreRatingDialogState extends State<StoreRatingDialog> {
                   'الإبلاغ عن المتجر',
                   style: TextStyle(
                     color: Colors.red,
-                    fontFamily: 'Tajawal',
+                    fontFamily: 'NotoSansArabic',
                     fontWeight: FontWeight.bold,
                   ),
                 ),

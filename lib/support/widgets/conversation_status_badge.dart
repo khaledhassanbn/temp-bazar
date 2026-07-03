@@ -25,7 +25,7 @@ class ConversationStatusBadge extends StatelessWidget {
       child: Text(
         statusName,
         style: TextStyle(
-          fontFamily: 'Tajawal',
+          fontFamily: 'NotoSansArabic',
           fontSize: 12,
           fontWeight: FontWeight.bold,
           color: color,

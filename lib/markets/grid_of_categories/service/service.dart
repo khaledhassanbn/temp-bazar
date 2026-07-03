@@ -13,6 +13,7 @@ class CategoryService {
 
       return querySnapshot.docs
           .map((doc) => CategoryModel.fromFirestore(doc.data(), doc.id))
+          .where((category) => category.name.trim() != 'مستلزمات')
           .toList();
     } catch (e) {
       print("❌ خطأ أثناء جلب الفئات: $e");

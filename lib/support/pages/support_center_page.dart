@@ -27,7 +27,7 @@ class _SupportCenterPageState extends State<SupportCenterPage> {
           title: const Text(
             'مركز المساعدة',
             style: TextStyle(
-              fontFamily: 'Tajawal',
+              fontFamily: 'NotoSansArabic',
               fontSize: 18,
               fontWeight: FontWeight.bold,
               color: Colors.black87,
@@ -50,7 +50,7 @@ class _SupportCenterPageState extends State<SupportCenterPage> {
                 child: Text(
                   'حدث خطأ أثناء تحميل المحادثات. يرجى المحاولة لاحقاً.',
                   style: TextStyle(
-                    fontFamily: 'Tajawal',
+                    fontFamily: 'NotoSansArabic',
                     color: Colors.red.shade700,
                   ),
                 ),
@@ -105,7 +105,7 @@ class _SupportCenterPageState extends State<SupportCenterPage> {
               label: const Text(
                 'إنشاء طلب دعم جديد',
                 style: TextStyle(
-                  fontFamily: 'Tajawal',
+                  fontFamily: 'NotoSansArabic',
                   fontSize: 16,
                   fontWeight: FontWeight.bold,
                   color: Colors.white,
@@ -148,7 +148,7 @@ class _SupportCenterPageState extends State<SupportCenterPage> {
             const Text(
               'لا توجد طلبات دعم حالية',
               style: TextStyle(
-                fontFamily: 'Tajawal',
+                fontFamily: 'NotoSansArabic',
                 fontSize: 18,
                 fontWeight: FontWeight.bold,
                 color: Colors.black87,
@@ -158,7 +158,7 @@ class _SupportCenterPageState extends State<SupportCenterPage> {
             const Text(
               'إذا واجهتك أي مشكلة في طلباتك أو في استخدام التطبيق، يمكنك الضغط على الزر أدناه لفتح تذكرة دعم وسيتواصل معك فريق العمل.',
               style: TextStyle(
-                fontFamily: 'Tajawal',
+                fontFamily: 'NotoSansArabic',
                 fontSize: 14,
                 color: Colors.grey,
                 height: 1.5,

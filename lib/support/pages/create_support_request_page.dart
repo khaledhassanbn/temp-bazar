@@ -139,7 +139,7 @@ class _CreateSupportRequestPageState extends State<CreateSupportRequestPage> {
                   const Text(
                     'إرفاق صورة للمشكلة',
                     style: TextStyle(
-                      fontFamily: 'Tajawal',
+                      fontFamily: 'NotoSansArabic',
                       fontSize: 16,
                       fontWeight: FontWeight.bold,
                       color: Colors.black87,
@@ -272,7 +272,7 @@ class _CreateSupportRequestPageState extends State<CreateSupportRequestPage> {
           title: const Text(
             'إنشاء طلب دعم',
             style: TextStyle(
-              fontFamily: 'Tajawal',
+              fontFamily: 'NotoSansArabic',
               fontSize: 18,
               fontWeight: FontWeight.bold,
               color: Colors.black87,
@@ -290,7 +290,7 @@ class _CreateSupportRequestPageState extends State<CreateSupportRequestPage> {
                     SizedBox(height: 16),
                     Text(
                       'جاري إرسال طلبك وصورتك...',
-                      style: TextStyle(fontFamily: 'Tajawal', color: Colors.grey),
+                      style: TextStyle(fontFamily: 'NotoSansArabic', color: Colors.grey),
                     )
                   ],
                 ),
@@ -304,7 +304,7 @@ class _CreateSupportRequestPageState extends State<CreateSupportRequestPage> {
                       const Text(
                         'ما نوع المشكلة التي تواجهها؟',
                         style: TextStyle(
-                          fontFamily: 'Tajawal',
+                          fontFamily: 'NotoSansArabic',
                           fontSize: 16,
                           fontWeight: FontWeight.bold,
                           color: Colors.black87,
@@ -365,7 +365,7 @@ class _CreateSupportRequestPageState extends State<CreateSupportRequestPage> {
                     children: [
                       const Text(
                         'نوع الطلب المختار',
-                        style: TextStyle(fontFamily: 'Tajawal', fontSize: 12, color: Colors.grey),
+                        style: TextStyle(fontFamily: 'NotoSansArabic', fontSize: 12, color: Colors.grey),
                       ),
                       Text(
                         _selectedIssueType == IssueType.storeIssue
@@ -378,7 +378,7 @@ class _CreateSupportRequestPageState extends State<CreateSupportRequestPage> {
                                         ? 'مشكلة بالتطبيق'
                                         : 'استفسار عام',
                         style: const TextStyle(
-                          fontFamily: 'Tajawal',
+                          fontFamily: 'NotoSansArabic',
                           fontSize: 15,
                           fontWeight: FontWeight.bold,
                           color: Colors.black87,
@@ -398,7 +398,7 @@ class _CreateSupportRequestPageState extends State<CreateSupportRequestPage> {
                     },
                     child: const Text(
                       'تغيير',
-                      style: TextStyle(fontFamily: 'Tajawal', color: AppColors.mainColor),
+                      style: TextStyle(fontFamily: 'NotoSansArabic', color: AppColors.mainColor),
                     ),
                   ),
               ],
@@ -443,7 +443,7 @@ class _CreateSupportRequestPageState extends State<CreateSupportRequestPage> {
                   Text(
                     'بلاغ خاص بمتجر: ${_relatedName ?? ""}',
                     style: const TextStyle(
-                      fontFamily: 'Tajawal',
+                      fontFamily: 'NotoSansArabic',
                       fontSize: 14,
                       fontWeight: FontWeight.bold,
                     ),
@@ -494,7 +494,7 @@ class _CreateSupportRequestPageState extends State<CreateSupportRequestPage> {
                   Text(
                     'بلاغ خاص بمندوب: ${_relatedName ?? ""}',
                     style: const TextStyle(
-                      fontFamily: 'Tajawal',
+                      fontFamily: 'NotoSansArabic',
                       fontSize: 14,
                       fontWeight: FontWeight.bold,
                     ),
@@ -520,7 +520,7 @@ class _CreateSupportRequestPageState extends State<CreateSupportRequestPage> {
         const Text(
           'إرفاق صورة (اختياري)',
           style: TextStyle(
-            fontFamily: 'Tajawal',
+            fontFamily: 'NotoSansArabic',
             fontSize: 14,
             fontWeight: FontWeight.bold,
             color: Colors.black87,
@@ -550,7 +550,7 @@ class _CreateSupportRequestPageState extends State<CreateSupportRequestPage> {
                       Text(
                         'اضغط هنا لإرفاق لقطة شاشة أو صورة توضيحية',
                         style: TextStyle(
-                          fontFamily: 'Tajawal',
+                          fontFamily: 'NotoSansArabic',
                           fontSize: 12,
                           color: Colors.grey,
                         ),
@@ -630,7 +630,7 @@ class _PickerOption extends StatelessWidget {
           Text(
             label,
             style: const TextStyle(
-              fontFamily: 'Tajawal',
+              fontFamily: 'NotoSansArabic',
               fontSize: 12,
               color: Colors.black87,
             ),

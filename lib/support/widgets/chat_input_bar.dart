@@ -81,7 +81,7 @@ class _ChatInputBarState extends State<ChatInputBar> {
                   const Text(
                     'إرفاق صورة',
                     style: TextStyle(
-                      fontFamily: 'Tajawal',
+                      fontFamily: 'NotoSansArabic',
                       fontSize: 16,
                       fontWeight: FontWeight.bold,
                       color: Colors.black87,
@@ -186,7 +186,7 @@ class _ChatInputBarState extends State<ChatInputBar> {
                     child: Text(
                       'تم إرفاق صورة جاهزة للإرسال',
                       style: TextStyle(
-                        fontFamily: 'Tajawal',
+                        fontFamily: 'NotoSansArabic',
                         fontSize: 13,
                         color: Colors.black54,
                       ),
@@ -216,11 +216,11 @@ class _ChatInputBarState extends State<ChatInputBar> {
                         maxLines: 5,
                         textDirection: TextDirection.rtl,
                         enabled: !widget.isSending,
-                        style: const TextStyle(fontFamily: 'Tajawal', fontSize: 14),
+                        style: const TextStyle(fontFamily: 'NotoSansArabic', fontSize: 14),
                         decoration: const InputDecoration(
                           hintText: 'اكتب رسالتك هنا...',
                           hintStyle: TextStyle(
-                            fontFamily: 'Tajawal',
+                            fontFamily: 'NotoSansArabic',
                             fontSize: 13,
                             color: Colors.grey,
                           ),
@@ -301,7 +301,7 @@ class _AttachmentOption extends StatelessWidget {
           Text(
             label,
             style: const TextStyle(
-              fontFamily: 'Tajawal',
+              fontFamily: 'NotoSansArabic',
               fontSize: 12,
               color: Colors.black87,
             ),

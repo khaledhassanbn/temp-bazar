@@ -256,7 +256,7 @@ class _DeliveryRatingDialogState extends State<DeliveryRatingDialog> {
                     'الإبلاغ عن المندوب',
                     style: TextStyle(
                       color: Colors.red,
-                      fontFamily: 'Tajawal',
+                      fontFamily: 'NotoSansArabic',
                       fontWeight: FontWeight.bold,
                     ),
                   ),

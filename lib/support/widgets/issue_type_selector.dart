@@ -110,7 +110,7 @@ class IssueTypeSelector extends StatelessWidget {
                     Text(
                       item.label,
                       style: TextStyle(
-                        fontFamily: 'Tajawal',
+                        fontFamily: 'NotoSansArabic',
                         fontSize: 15,
                         fontWeight: FontWeight.bold,
                         color: isSelected ? AppColors.mainColor : Colors.black87,
@@ -122,7 +122,7 @@ class IssueTypeSelector extends StatelessWidget {
                       child: Text(
                         item.description,
                         style: TextStyle(
-                          fontFamily: 'Tajawal',
+                          fontFamily: 'NotoSansArabic',
                           fontSize: 11,
                           color: isSelected ? AppColors.mainColor.withOpacity(0.8) : Colors.grey.shade600,
                         ),

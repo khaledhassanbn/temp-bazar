@@ -139,24 +139,24 @@ class _MyAppState extends State<MyApp> {
             builder: (context, child) =>
                 ConnectivityListener(child: child ?? const SizedBox.shrink()),
             theme: ThemeData(
-              fontFamily: "Tajawal",
+              fontFamily: "NotoSansArabic",
               textTheme: const TextTheme(
-                bodyMedium: TextStyle(fontSize: 16, fontFamily: "Tajawal"),
-                bodyLarge: TextStyle(fontSize: 18, fontFamily: "Tajawal"),
+                bodyMedium: TextStyle(fontSize: 16, fontFamily: "NotoSansArabic"),
+                bodyLarge: TextStyle(fontSize: 18, fontFamily: "NotoSansArabic"),
                 headlineSmall: TextStyle(
                   fontSize: 20,
                   fontWeight: FontWeight.bold,
-                  fontFamily: "Tajawal",
+                  fontFamily: "NotoSansArabic",
                 ),
                 headlineMedium: TextStyle(
                   fontSize: 24,
                   fontWeight: FontWeight.bold,
-                  fontFamily: "Tajawal",
+                  fontFamily: "NotoSansArabic",
                 ),
                 titleLarge: TextStyle(
                   fontSize: 22,
                   fontWeight: FontWeight.bold,
-                  fontFamily: "Tajawal",
+                  fontFamily: "NotoSansArabic",
                 ),
               ),
             ),

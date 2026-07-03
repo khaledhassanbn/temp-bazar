@@ -31,7 +31,7 @@ class DriverPicker extends StatelessWidget {
               child: Text(
                 'لم يتم العثور على مناديب مسجلين مؤخراً في طلباتك. سيتم رفع طلبك كشكوى عامة بخصوص المندوب.',
                 style: TextStyle(
-                  fontFamily: 'Tajawal',
+                  fontFamily: 'NotoSansArabic',
                   fontSize: 13,
                   color: Colors.black54,
                 ),
@@ -48,7 +48,7 @@ class DriverPicker extends StatelessWidget {
         const Text(
           'اختر المندوب المعني من تعاملاتك الأخيرة:',
           style: TextStyle(
-            fontFamily: 'Tajawal',
+            fontFamily: 'NotoSansArabic',
             fontSize: 14,
             fontWeight: FontWeight.bold,
             color: Colors.black87,
@@ -88,7 +88,7 @@ class DriverPicker extends StatelessWidget {
                   title: Text(
                     name,
                     style: TextStyle(
-                      fontFamily: 'Tajawal',
+                      fontFamily: 'NotoSansArabic',
                       fontSize: 14,
                       fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
                       color: isSelected ? AppColors.mainColor : Colors.black87,

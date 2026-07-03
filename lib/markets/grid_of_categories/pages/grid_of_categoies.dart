@@ -45,6 +45,10 @@ class _CategoriesGridPageState extends State<CategoriesGridPage> {
 
     final filteredCategories = vm.categories
         .where((cat) => cat.name.contains(searchQuery))
+        .where((cat) {
+          final name = cat.name.trim();
+          return name != 'خدمات' && !name.contains('صنايعية');
+        })
         .toList();
 
     return Directionality(
@@ -130,46 +134,6 @@ class _CategoriesGridPageState extends State<CategoriesGridPage> {
                 ),
               ),
 
-              // ----------------------- 🔹 دخول قسم الصنايعية
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-                child: Material(
-                  color: AppColors.mainColor,
-                  borderRadius: BorderRadius.circular(16),
-                  child: InkWell(
-                    borderRadius: BorderRadius.circular(16),
-                    onTap: () => context.push('/craftsmen'),
-                    child: const Padding(
-                      padding: EdgeInsets.symmetric(
-                        horizontal: 16,
-                        vertical: 14,
-                      ),
-                      child: Row(
-                        children: [
-                          Icon(Icons.handyman, color: Colors.white),
-                          SizedBox(width: 12),
-                          Expanded(
-                            child: Text(
-                              'الصنايعية والخدمات',
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontWeight: FontWeight.bold,
-                                fontSize: 16,
-                              ),
-                            ),
-                          ),
-                          Icon(
-                            Icons.arrow_back_ios_new,
-                            color: Colors.white70,
-                            size: 16,
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-
               // ----------------------- 🔹 شبكة الفئات
               Expanded(
                 child: vm.isLoading
@@ -181,7 +145,7 @@ class _CategoriesGridPageState extends State<CategoriesGridPage> {
                             const SliverGridDelegateWithFixedCrossAxisCount(
                               crossAxisCount: 3,
                               crossAxisSpacing: 12,
-                              mainAxisSpacing: 8,
+                              mainAxisSpacing: 20,
                               childAspectRatio: 0.75,
                             ),
                         itemCount: filteredCategories.length,
@@ -198,51 +162,30 @@ class _CategoriesGridPageState extends State<CategoriesGridPage> {
                                 Column(
                                       mainAxisSize: MainAxisSize.min,
                                       children: [
-                                        // المربع - يحتوي فقط على الصورة
+                                        // الصورة على الخلفية مباشرة بدون برواز أو ظل
                                         Expanded(
-                                          child: Container(
-                                            width: double.infinity,
-                                            decoration: BoxDecoration(
-                                              color: Colors.white,
-                                              borderRadius:
-                                                  BorderRadius.circular(16),
-                                              boxShadow: [
-                                                BoxShadow(
-                                                  color: Colors.black
-                                                      .withOpacity(0.08),
-                                                  blurRadius: 8,
-                                                  spreadRadius: 1,
-                                                  offset: const Offset(0, 2),
-                                                ),
-                                              ],
-                                            ),
-                                            child: ClipRRect(
-                                              borderRadius:
-                                                  BorderRadius.circular(16),
-                                              child: category.icon.isNotEmpty
-                                                  ? _buildCategoryImage(
-                                                      category.icon,
-                                                    )
-                                                  : Container(
-                                                      color: Colors.grey[100],
-                                                      child: Icon(
-                                                        Icons.category,
-                                                        size: 50,
-                                                        color:
-                                                            AppColors.mainColor,
-                                                      ),
-                                                    ),
-                                            ),
+                                          child: Padding(
+                                            padding: const EdgeInsets.all(4.0),
+                                            child: category.icon.isNotEmpty
+                                                ? _buildCategoryImage(
+                                                    category.icon,
+                                                  )
+                                                : Icon(
+                                                    Icons.category,
+                                                    size: 50,
+                                                    color:
+                                                        AppColors.mainColor,
+                                                  ),
                                           ),
                                         ),
-                                        // اسم الفئة خارج المربع
+                                        // اسم الفئة
                                         const SizedBox(height: 8),
                                         Text(
                                           category.name,
                                           style: const TextStyle(
                                             color: Color(0xFF2C3E50),
-                                            fontWeight: FontWeight.w600,
-                                            fontSize: 13,
+                                            fontWeight: FontWeight.bold,
+                                            fontSize: 16,
                                           ),
                                           textAlign: TextAlign.center,
                                           maxLines: 2,
@@ -275,22 +218,17 @@ class _CategoriesGridPageState extends State<CategoriesGridPage> {
       // رابط Firebase - استخدم CachedNetworkImage للـ disk cache
       return CachedNetworkImage(
         imageUrl: icon,
-        fit: BoxFit.cover,
+        fit: BoxFit.contain,
         width: double.infinity,
         height: double.infinity,
-        placeholder: (context, url) => Container(
-          color: Colors.grey[100],
-          child: Center(
-            child: CircularProgressIndicator(
-              strokeWidth: 2,
-              color: AppColors.mainColor,
-            ),
+        placeholder: (context, url) => Center(
+          child: CircularProgressIndicator(
+            strokeWidth: 2,
+            color: AppColors.mainColor,
           ),
         ),
-        errorWidget: (context, url, error) => Container(
-          color: Colors.grey[100],
-          child: Icon(Icons.category, size: 50, color: AppColors.mainColor),
-        ),
+        errorWidget: (context, url, error) =>
+            Icon(Icons.category, size: 50, color: AppColors.mainColor),
       );
     } else {
       // اسم صورة محلية - استخدم Image.asset
@@ -300,13 +238,11 @@ class _CategoriesGridPageState extends State<CategoriesGridPage> {
 
       return Image.asset(
         imagePath,
-        fit: BoxFit.cover,
+        fit: BoxFit.contain,
         width: double.infinity,
         height: double.infinity,
-        errorBuilder: (context, _, __) => Container(
-          color: Colors.grey[100],
-          child: Icon(Icons.category, size: 50, color: AppColors.mainColor),
-        ),
+        errorBuilder: (context, _, __) =>
+            Icon(Icons.category, size: 50, color: AppColors.mainColor),
       );
     }
   }

@@ -79,7 +79,7 @@ class _CraftsmanPickerState extends State<CraftsmanPicker> {
         const Text(
           'ابحث عن الصنايعي المعني بالاسم أو المهنة:',
           style: TextStyle(
-            fontFamily: 'Tajawal',
+            fontFamily: 'NotoSansArabic',
             fontSize: 14,
             fontWeight: FontWeight.bold,
             color: Colors.black87,
@@ -90,7 +90,7 @@ class _CraftsmanPickerState extends State<CraftsmanPicker> {
           controller: _searchController,
           decoration: InputDecoration(
             hintText: 'اكتب اسم الصنايعي أو مهنته (مثلاً: سباك، كهربائي)...',
-            hintStyle: const TextStyle(fontFamily: 'Tajawal', fontSize: 13, color: Colors.grey),
+            hintStyle: const TextStyle(fontFamily: 'NotoSansArabic', fontSize: 13, color: Colors.grey),
             prefixIcon: const Icon(Icons.search, color: AppColors.mainColor),
             suffixIcon: _searchController.text.isNotEmpty
                 ? IconButton(
@@ -130,7 +130,7 @@ class _CraftsmanPickerState extends State<CraftsmanPicker> {
                   child: Text(
                     'الصنايعي المحدد: $_selectedName',
                     style: const TextStyle(
-                      fontFamily: 'Tajawal',
+                      fontFamily: 'NotoSansArabic',
                       fontSize: 13,
                       fontWeight: FontWeight.bold,
                       color: AppColors.mainColor,
@@ -146,7 +146,7 @@ class _CraftsmanPickerState extends State<CraftsmanPicker> {
                   },
                   child: const Text(
                     'تغيير',
-                    style: TextStyle(fontFamily: 'Tajawal', color: Colors.red, fontSize: 12),
+                    style: TextStyle(fontFamily: 'NotoSansArabic', color: Colors.red, fontSize: 12),
                   ),
                 ),
               ],
@@ -201,7 +201,7 @@ class _CraftsmanPickerState extends State<CraftsmanPicker> {
                   title: Text(
                     name,
                     style: TextStyle(
-                      fontFamily: 'Tajawal',
+                      fontFamily: 'NotoSansArabic',
                       fontSize: 14,
                       fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
                       color: isSelected ? AppColors.mainColor : Colors.black87,
@@ -210,7 +210,7 @@ class _CraftsmanPickerState extends State<CraftsmanPicker> {
                   subtitle: Text(
                     profession,
                     style: const TextStyle(
-                      fontFamily: 'Tajawal',
+                      fontFamily: 'NotoSansArabic',
                       fontSize: 12,
                       color: Colors.grey,
                     ),
@@ -236,7 +236,7 @@ class _CraftsmanPickerState extends State<CraftsmanPicker> {
             child: Center(
               child: Text(
                 'لا توجد نتائج مطابقة لبحثك.',
-                style: TextStyle(fontFamily: 'Tajawal', fontSize: 13, color: Colors.grey),
+                style: TextStyle(fontFamily: 'NotoSansArabic', fontSize: 13, color: Colors.grey),
               ),
             ),
           ),

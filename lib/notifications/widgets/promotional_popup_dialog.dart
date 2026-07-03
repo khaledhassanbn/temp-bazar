@@ -53,7 +53,7 @@ class PromotionalPopupDialog extends StatelessWidget {
                 popup.title!,
                 textAlign: TextAlign.center,
                 style: const TextStyle(
-                  fontFamily: 'Tajawal',
+                  fontFamily: 'NotoSansArabic',
                   fontSize: 18,
                   fontWeight: FontWeight.bold,
                 ),
@@ -67,7 +67,7 @@ class PromotionalPopupDialog extends StatelessWidget {
                 popup.description!,
                 textAlign: TextAlign.center,
                 style: TextStyle(
-                  fontFamily: 'Tajawal',
+                  fontFamily: 'NotoSansArabic',
                   fontSize: 14,
                   color: Colors.grey[700],
                   height: 1.5,
@@ -93,7 +93,7 @@ class PromotionalPopupDialog extends StatelessWidget {
                   child: const Text(
                     'عرض التفاصيل',
                     style: TextStyle(
-                      fontFamily: 'Tajawal',
+                      fontFamily: 'NotoSansArabic',
                       fontWeight: FontWeight.bold,
                     ),
                   ),

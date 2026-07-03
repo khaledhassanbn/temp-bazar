@@ -78,7 +78,7 @@ class ChatBubble extends StatelessWidget {
                 child: Text(
                   'الدعم الفني',
                   style: TextStyle(
-                    fontFamily: 'Tajawal',
+                    fontFamily: 'NotoSansArabic',
                     fontSize: 11,
                     fontWeight: FontWeight.bold,
                     color: Colors.grey,
@@ -144,7 +144,7 @@ class ChatBubble extends StatelessWidget {
                         child: Text(
                           message.text!,
                           style: TextStyle(
-                            fontFamily: 'Tajawal',
+                            fontFamily: 'NotoSansArabic',
                             fontSize: 14,
                             color: isUser ? Colors.white : Colors.black87,
                             height: 1.4,
@@ -160,7 +160,7 @@ class ChatBubble extends StatelessWidget {
               child: Text(
                 _formatTime(message.createdAt),
                 style: TextStyle(
-                  fontFamily: 'Tajawal',
+                  fontFamily: 'NotoSansArabic',
                   fontSize: 10,
                   color: Colors.grey.shade400,
                 ),

@@ -121,7 +121,7 @@ class ConversationCard extends StatelessWidget {
                       child: Text(
                         conversation.issueTypeDisplayName,
                         style: const TextStyle(
-                          fontFamily: 'Tajawal',
+                          fontFamily: 'NotoSansArabic',
                           fontSize: 14,
                           fontWeight: FontWeight.bold,
                           color: Colors.black87,
@@ -140,7 +140,7 @@ class ConversationCard extends StatelessWidget {
                   Text(
                     relatedName,
                     style: TextStyle(
-                      fontFamily: 'Tajawal',
+                      fontFamily: 'NotoSansArabic',
                       fontSize: 13,
                       color: Colors.grey.shade700,
                       fontWeight: FontWeight.w600,
@@ -161,7 +161,7 @@ class ConversationCard extends StatelessWidget {
                           Text(
                             conversation.lastMessage,
                             style: TextStyle(
-                              fontFamily: 'Tajawal',
+                              fontFamily: 'NotoSansArabic',
                               fontSize: 13,
                               color: conversation.unreadUserCount > 0
                                   ? Colors.black
@@ -177,7 +177,7 @@ class ConversationCard extends StatelessWidget {
                           Text(
                             _getRelativeTime(conversation.updatedAt),
                             style: TextStyle(
-                              fontFamily: 'Tajawal',
+                              fontFamily: 'NotoSansArabic',
                               fontSize: 11,
                               color: Colors.grey.shade400,
                             ),

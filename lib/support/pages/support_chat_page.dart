@@ -113,7 +113,7 @@ class _SupportChatPageState extends State<SupportChatPage> {
               body: const Center(
                 child: Text(
                   'المحادثة غير موجودة أو تم حذفها.',
-                  style: TextStyle(fontFamily: 'Tajawal'),
+                  style: TextStyle(fontFamily: 'NotoSansArabic'),
                 ),
               ),
             );
@@ -145,7 +145,7 @@ class _SupportChatPageState extends State<SupportChatPage> {
                         Text(
                           conversation.issueTypeDisplayName,
                           style: const TextStyle(
-                            fontFamily: 'Tajawal',
+                            fontFamily: 'NotoSansArabic',
                             fontSize: 15,
                             fontWeight: FontWeight.bold,
                             color: Colors.black87,
@@ -155,7 +155,7 @@ class _SupportChatPageState extends State<SupportChatPage> {
                           Text(
                             relatedName,
                             style: TextStyle(
-                              fontFamily: 'Tajawal',
+                              fontFamily: 'NotoSansArabic',
                               fontSize: 12,
                               color: Colors.grey.shade600,
                             ),
@@ -190,7 +190,7 @@ class _SupportChatPageState extends State<SupportChatPage> {
                         return const Center(
                           child: Text(
                             'لا توجد رسائل بعد.',
-                            style: TextStyle(fontFamily: 'Tajawal', color: Colors.grey),
+                            style: TextStyle(fontFamily: 'NotoSansArabic', color: Colors.grey),
                           ),
                         );
                       }
@@ -229,7 +229,7 @@ class _SupportChatPageState extends State<SupportChatPage> {
                               ? 'تم حل هذه الشكوى وتصنيفها كمكتملة. المحادثة مغلقة.'
                               : 'لقد تم إغلاق محادثة الدعم هذه من قِبل الإدارة.',
                           style: TextStyle(
-                            fontFamily: 'Tajawal',
+                            fontFamily: 'NotoSansArabic',
                             fontSize: 13,
                             color: Colors.grey.shade600,
                             fontWeight: FontWeight.bold,

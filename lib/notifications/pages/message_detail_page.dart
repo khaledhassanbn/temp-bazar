@@ -74,7 +74,7 @@ class _MessageDetailPageState extends State<MessageDetailPage> {
           foregroundColor: Colors.white,
           title: const Text(
             'تفاصيل الرسالة',
-            style: TextStyle(fontFamily: 'Tajawal', fontWeight: FontWeight.bold),
+            style: TextStyle(fontFamily: 'NotoSansArabic', fontWeight: FontWeight.bold),
           ),
         ),
         body: _loading
@@ -85,7 +85,7 @@ class _MessageDetailPageState extends State<MessageDetailPage> {
                 ? const Center(
                     child: Text(
                       'لم يتم العثور على الرسالة',
-                      style: TextStyle(fontFamily: 'Tajawal'),
+                      style: TextStyle(fontFamily: 'NotoSansArabic'),
                     ),
                   )
                 : SingleChildScrollView(
@@ -110,7 +110,7 @@ class _MessageDetailPageState extends State<MessageDetailPage> {
                         Text(
                           _message!.title,
                           style: const TextStyle(
-                            fontFamily: 'Tajawal',
+                            fontFamily: 'NotoSansArabic',
                             fontSize: 22,
                             fontWeight: FontWeight.bold,
                             color: Color(0xFF2C3E50),
@@ -121,7 +121,7 @@ class _MessageDetailPageState extends State<MessageDetailPage> {
                           DateFormat('d MMMM yyyy، h:mm a', 'ar')
                               .format(_message!.sentAt),
                           style: TextStyle(
-                            fontFamily: 'Tajawal',
+                            fontFamily: 'NotoSansArabic',
                             fontSize: 13,
                             color: Colors.grey[600],
                           ),
@@ -130,7 +130,7 @@ class _MessageDetailPageState extends State<MessageDetailPage> {
                         Text(
                           _message!.body,
                           style: const TextStyle(
-                            fontFamily: 'Tajawal',
+                            fontFamily: 'NotoSansArabic',
                             fontSize: 16,
                             height: 1.7,
                             color: Color(0xFF34495E),
@@ -152,7 +152,7 @@ class _MessageDetailPageState extends State<MessageDetailPage> {
                             child: Text(
                               _message!.cta!.label,
                               style: const TextStyle(
-                                fontFamily: 'Tajawal',
+                                fontFamily: 'NotoSansArabic',
                                 fontSize: 16,
                                 fontWeight: FontWeight.bold,
                               ),
