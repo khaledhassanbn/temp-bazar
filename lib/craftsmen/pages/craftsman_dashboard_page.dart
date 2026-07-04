@@ -66,6 +66,8 @@ class _CraftsmanDashboardPageState extends State<CraftsmanDashboardPage> {
                         _sectionHeader('الإعدادات السريعة', Icons.tune_rounded),
                         const SizedBox(height: 10),
                         _ToggleCard(craftsman: c, service: _service),
+                        const SizedBox(height: 12),
+                        _AdsQuickActions(),
                         const SizedBox(height: 20),
                         _sectionHeader('التقييم والمراجعات', Icons.star_rounded),
                         const SizedBox(height: 10),
@@ -1081,6 +1083,35 @@ class _EmptyState extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+}
+
+class _AdsQuickActions extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Expanded(
+          child: OutlinedButton.icon(
+            onPressed: () => context.push('/request-ads'),
+            icon: const Icon(Icons.add_circle_outline),
+            label: Text('طلب إعلان', style: GoogleFonts.cairo()),
+          ),
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: ElevatedButton.icon(
+            onPressed: () => context.push('/my-ads'),
+            icon: const Icon(Icons.campaign_outlined),
+            label: Text('إعلاناتي', style: GoogleFonts.cairo()),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.mainColor,
+              foregroundColor: Colors.white,
+            ),
+          ),
+        ),
+      ],
     );
   }
 }

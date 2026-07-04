@@ -7,9 +7,11 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:bazar_suez/markets/grid_of_categories/ViewModel/ViewModel.dart';
 import 'package:bazar_suez/markets/grid_of_categories/Model/model.dart';
-import 'package:bazar_suez/markets/Markets_after_category/viewmodel/category_filter_viewmodel.dart';
-import 'package:bazar_suez/markets/Markets_after_category/widget/category_stores_filter_bar.dart';
+import 'package:bazar_suez/markets/Markets_after_category/service/category_store_service.dart';
+import 'package:bazar_suez/markets/Markets_after_category/widget/instashop_store_card.dart';
 import 'package:bazar_suez/markets/create_market/models/store_model.dart';
+import 'package:bazar_suez/services/delivery_fee/delivery_fee_service.dart';
+import 'package:bazar_suez/services/delivery_fee/delivery_fee_settings.dart';
 import 'package:bazar_suez/widgets/auth_gate.dart';
 
 import '../../cart/viewmodels/cart_view_model.dart';
@@ -46,6 +48,11 @@ class _HomePageState extends State<HomePage>
   int _bannerPage = 0;
   int _bannerItemCount = 1;
   String? _selectedCategoryId;
+  List<StoreModel> _topSellingStores = [];
+  bool _loadingTopStores = true;
+  final CategoryStoreService _storeService = CategoryStoreService();
+  final DeliveryFeeService _deliveryFeeService = DeliveryFeeService();
+  DeliveryFeeSettings? _deliverySettings;
   late AnimationController _fadeCtrl;
   late Animation<double> _fadeAnim;
   late final PageController _bannerCtrl =
@@ -53,9 +60,69 @@ class _HomePageState extends State<HomePage>
   late Timer _bannerTimer;
 
   Future<void> _selectCategory(String categoryId) async {
-    if (_selectedCategoryId == categoryId) return;
     setState(() => _selectedCategoryId = categoryId);
-    await context.read<CategoryFilterViewModel>().setCategory(categoryId);
+    if (!mounted) return;
+    context.push('/CategoryMarketPage?categoryId=$categoryId');
+  }
+
+  Future<void> _loadTopSellingStores() async {
+    try {
+      final stores = await _storeService.getAllStores();
+      final activeStores = stores
+          .where((s) => s.isVisible && s.storeStatus)
+          .toList()
+        ..sort(
+          (a, b) => b.completedOrderCount.compareTo(a.completedOrderCount),
+        );
+      if (mounted) {
+        setState(() {
+          _topSellingStores = activeStores.take(5).toList();
+          _loadingTopStores = false;
+        });
+      }
+    } catch (_) {
+      if (mounted) setState(() => _loadingTopStores = false);
+    }
+  }
+
+  Future<void> _loadDeliverySettings() async {
+    try {
+      final settings = await _deliveryFeeService.getSettings();
+      if (mounted) setState(() => _deliverySettings = settings);
+    } catch (_) {
+      if (mounted) {
+        setState(() => _deliverySettings = DeliveryFeeSettings.defaults());
+      }
+    }
+  }
+
+  Widget _buildTopSellingStoreCard(
+    StoreModel store,
+    SavedLocationsViewModel locationVm,
+  ) {
+    int? deliveryTime;
+    double? deliveryFee;
+
+    if (locationVm.activeLocation != null &&
+        store.location != null &&
+        _deliverySettings != null) {
+      final distanceKm = DeliveryFeeService.calculateDistanceFromGeoPoints(
+        locationVm.activeLocation!,
+        store.location!,
+      );
+      deliveryTime = DeliveryFeeService.calculateDeliveryTime(distanceKm);
+      deliveryFee = _deliveryFeeService.calculateDeliveryFee(
+        distanceKm,
+        _deliverySettings!,
+      );
+    }
+
+    return InstashopStoreCard(
+      store: store,
+      deliveryTimeMin: deliveryTime,
+      deliveryFee: deliveryFee,
+      onTap: () => context.push('/HomeMarketPage?marketLink=${store.link}'),
+    );
   }
 
   @override
@@ -67,6 +134,8 @@ class _HomePageState extends State<HomePage>
     );
     _fadeAnim = CurvedAnimation(parent: _fadeCtrl, curve: Curves.easeOut);
     _fadeCtrl.forward();
+    _loadTopSellingStores();
+    _loadDeliverySettings();
 
     _bannerTimer = Timer.periodic(const Duration(seconds: 3), (_) {
       if (!mounted) return;
@@ -400,14 +469,9 @@ class _HomePageState extends State<HomePage>
                     }
 
                     final ad = ads[i - 1];
-                    final marketLink = ad.targetStoreId;
                     return _BannerCard(
                       image: NetworkImage(ad.imageUrl!),
-                      onTap: marketLink == null || marketLink.isEmpty
-                          ? null
-                          : () => context.push(
-                              '/HomeMarketPage?marketLink=$marketLink',
-                            ),
+                      onTap: () => _handleAdTap(context, ad),
                     );
                   },
                 ),
@@ -438,89 +502,105 @@ class _HomePageState extends State<HomePage>
     );
   }
 
-  Widget _buildFlashSaleSection() {
-    return Consumer2<CategoryViewModel, CategoryFilterViewModel>(
-      builder: (context, catVm, filterVm, _) {
-        final categories = catVm.categories;
-
-        // عند أول تحميل للفئات: اختر الأولى تلقائياً
-        if (categories.isNotEmpty && _selectedCategoryId == null) {
-          _selectedCategoryId = categories.first.id;
-          Future.microtask(() {
-            filterVm.setCategory(categories.first.id);
-          });
+  void _handleAdTap(BuildContext context, AdModel ad) {
+    final targetId = ad.targetStoreId;
+    switch (ad.effectiveTargetType) {
+      case AdTargetType.imageOnly:
+        if (ad.imageUrl != null && ad.imageUrl!.isNotEmpty) {
+          _showZoomedImage(context, ad.imageUrl!);
         }
+      case AdTargetType.craftsman:
+        if (targetId != null && targetId.isNotEmpty) {
+          context.push('/craftsman/$targetId');
+        }
+      case AdTargetType.store:
+      default:
+        if (targetId != null && targetId.isNotEmpty) {
+          context.push('/HomeMarketPage?marketLink=$targetId');
+        }
+    }
+  }
 
-        final stores =
-            (_selectedCategoryId != null &&
-                filterVm.selectedCategoryId == _selectedCategoryId)
-            ? filterVm.sortedStores.take(8).toList()
-            : <StoreModel>[];
-
-        return Padding(
-          padding: const EdgeInsets.fromLTRB(0, 0, 0, 0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // ── Header المتاجر
-              _InstashopSectionHeader(
-                title: 'المتاجر',
-                topSpacing: _InstashopMetrics.sectionStoresTopSpacing,
-                onSeeAll: _selectedCategoryId != null
-                    ? () => context.push(
-                          '/CategoryMarketPage?categoryId=$_selectedCategoryId',
-                        )
-                    : null,
+  void _showZoomedImage(BuildContext context, String imageUrl) {
+    showDialog(
+      context: context,
+      builder: (ctx) => Dialog(
+        insetPadding: const EdgeInsets.all(16),
+        child: Stack(
+          children: [
+            InteractiveViewer(
+              child: Image.network(imageUrl, fit: BoxFit.contain),
+            ),
+            Positioned(
+              top: 8,
+              left: 8,
+              child: IconButton(
+                icon: const Icon(Icons.close, color: Colors.white),
+                style: IconButton.styleFrom(backgroundColor: Colors.black54),
+                onPressed: () => Navigator.pop(ctx),
               ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 
-              if (_selectedCategoryId != null &&
-                  filterVm.selectedCategoryId == _selectedCategoryId) ...[
-                CategoryStoresFilterBar(primaryColor: HomeAppColors.primary),
-                const SizedBox(height: 8),
-              ],
+  Widget _buildFlashSaleSection() {
+    final locationVm = context.watch<SavedLocationsViewModel>();
 
-              // ── قائمة المتاجر
-              if (filterVm.isLoading)
-                const SizedBox(
-                  height: 200,
-                  child: Center(
-                    child: CircularProgressIndicator(
-                      color: HomeAppColors.primary,
-                      strokeWidth: 2,
-                    ),
-                  ),
-                )
-              else if (stores.isEmpty)
-                const SizedBox(
-                  height: 160,
-                  child: Center(
-                    child: Text(
-                      'لا توجد متاجر في هذه الفئة',
-                      style: TextStyle(
-                        color: HomeAppColors.textMed,
-                        fontSize: 14,
-                      ),
-                    ),
-                  ),
-                )
-              else
-                GridView.builder(
-                  shrinkWrap: true,
-                  physics: const NeverScrollableScrollPhysics(),
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: 2,
-                    crossAxisSpacing: 14,
-                    mainAxisSpacing: 14,
-                    childAspectRatio: 0.72,
-                  ),
-                  itemCount: stores.length,
-                  itemBuilder: (ctx, i) => _HomeStoreCard(store: stores[i]),
-                ),
-            ],
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(0, 0, 0, 0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _InstashopSectionHeader(
+            title: 'الأكثر مبيعاً',
+            topSpacing: 4,
           ),
-        );
-      },
+          if (_loadingTopStores)
+            const SizedBox(
+              height: 240,
+              child: Center(
+                child: CircularProgressIndicator(
+                  color: HomeAppColors.primary,
+                  strokeWidth: 2,
+                ),
+              ),
+            )
+          else if (_topSellingStores.isEmpty)
+            const SizedBox(
+              height: 160,
+              child: Center(
+                child: Text(
+                  'لا توجد متاجر حالياً',
+                  style: TextStyle(
+                    color: HomeAppColors.textMed,
+                    fontSize: 14,
+                  ),
+                ),
+              ),
+            )
+          else
+            SizedBox(
+              height: 248,
+              child: ListView.separated(
+                scrollDirection: Axis.horizontal,
+                physics: const BouncingScrollPhysics(),
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+                itemCount: _topSellingStores.length,
+                separatorBuilder: (_, __) => const SizedBox(width: 14),
+                itemBuilder: (ctx, i) => SizedBox(
+                  width: MediaQuery.sizeOf(ctx).width * 0.82,
+                  child: _buildTopSellingStoreCard(
+                    _topSellingStores[i],
+                    locationVm,
+                  ),
+                ),
+              ),
+            ),
+        ],
+      ),
     );
   }
 }
@@ -625,216 +705,6 @@ class _BannerCard extends StatelessWidget {
   }
 }
 
-class _HomeStoreCard extends StatelessWidget {
-  final StoreModel store;
-  const _HomeStoreCard({required this.store});
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: () => context.push('/HomeMarketPage?marketLink=${store.link}'),
-      child: Directionality(
-        textDirection: TextDirection.rtl,
-        child: Container(
-          width: double.infinity,
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(18),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.06),
-                blurRadius: 18,
-                offset: const Offset(0, 10),
-              ),
-            ],
-          ),
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(18),
-            child: Stack(
-              children: [
-                Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    // ── صورة الغلاف + بادج التقييم
-                    SizedBox(
-                      height: 120,
-                      child: Stack(
-                        fit: StackFit.expand,
-                        children: [_coverImage()],
-                      ),
-                    ),
-
-                    // ── مساحة التفاصيل (مع ترك فراغ للّوجو العائم)
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(14, 26, 14, 14),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              Expanded(
-                                child: Text(
-                                  store.name,
-                                  style: const TextStyle(
-                                    color: Colors.black87,
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.w800,
-                                    height: 1.15,
-                                  ),
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                              ),
-                              const SizedBox(width: 10),
-                              Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  const Icon(
-                                    Icons.star_rounded,
-                                    color: Colors.amber,
-                                    size: 18,
-                                  ),
-                                  const SizedBox(width: 4),
-                                  Text(
-                                    store.averageRating.toStringAsFixed(1),
-                                    style: const TextStyle(
-                                      color: Colors.black87,
-                                      fontSize: 13,
-                                      fontWeight: FontWeight.w800,
-                                      height: 1,
-                                    ),
-                                  ),
-                                  if (store.totalReviews > 0) ...[
-                                    const SizedBox(width: 6),
-                                    Text(
-                                      '(${store.totalReviews})',
-                                      style: TextStyle(
-                                        color: Colors.grey.shade600,
-                                        fontSize: 12,
-                                        fontWeight: FontWeight.w600,
-                                      ),
-                                    ),
-                                  ],
-                                ],
-                              ),
-                            ],
-                          ),
-                          if (store.description.isNotEmpty) ...[
-                            const SizedBox(height: 6),
-                            Text(
-                              store.description,
-                              style: TextStyle(
-                                color: Colors.grey.shade600,
-                                fontSize: 12,
-                                fontWeight: FontWeight.w600,
-                                height: 1.2,
-                              ),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ],
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-
-                // ── لوجو المتجر (floating) بين الغلاف والنص
-                Positioned(
-                  top: 120 - 24,
-                  right: 14,
-                  child: _LogoBadge(logoUrl: store.logoUrl, size: 48),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _coverImage() {
-    final url = store.coverUrl;
-    if (url == null || url.isEmpty) return _storeIcon();
-    return CachedNetworkImage(
-      imageUrl: url,
-      fit: BoxFit.cover,
-      placeholder: (_, __) => Container(
-        color: HomeAppColors.background,
-        child: const Center(
-          child: CircularProgressIndicator(
-            strokeWidth: 2,
-            color: HomeAppColors.primary,
-          ),
-        ),
-      ),
-      errorWidget: (_, __, ___) => _storeIcon(),
-    );
-  }
-
-  Widget _storeIcon() {
-    return Container(
-      height: 120,
-      width: double.infinity,
-      color: HomeAppColors.background,
-      child: const Center(
-        child: Icon(
-          Icons.store_outlined,
-          size: 48,
-          color: HomeAppColors.primary,
-        ),
-      ),
-    );
-  }
-}
-
-class _LogoBadge extends StatelessWidget {
-  final String? logoUrl;
-  final double size;
-  const _LogoBadge({required this.logoUrl, this.size = 38});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: size,
-      height: size,
-      decoration: BoxDecoration(
-        color: Colors.white,
-        shape: BoxShape.circle,
-        border: Border.all(color: Colors.black.withValues(alpha: 0.08)),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.06),
-            blurRadius: 10,
-            offset: const Offset(0, 6),
-          ),
-        ],
-      ),
-      child: ClipOval(
-        child:
-            (logoUrl != null &&
-                logoUrl!.isNotEmpty &&
-                (logoUrl!.startsWith('http://') ||
-                    logoUrl!.startsWith('https://')))
-            ? CachedNetworkImage(
-                imageUrl: logoUrl!,
-                fit: BoxFit.cover,
-                errorWidget: (_, __, ___) => const Icon(
-                  Icons.storefront_rounded,
-                  size: 18,
-                  color: HomeAppColors.primary,
-                ),
-              )
-            : const Icon(
-                Icons.storefront_rounded,
-                size: 18,
-                color: HomeAppColors.primary,
-              ),
-      ),
-    );
-  }
-}
-
 // ─── Service provider model ───────────────────────────────────────────────────
 class ServiceProviderCategory {
   final String id;
@@ -930,9 +800,8 @@ class _InstashopMetrics {
   static const double bannerHeightRatio = 0.20;
   static const double bannerRadius = 16;
   static const double sectionTopSpacing = 10;
-  static const double sectionStoresTopSpacing = 14;
   static const double sectionHeaderBottom = 6;
-  static const double sectionAfterCategories = 12;
+  static const double sectionAfterCategories = 2;
 
   final double screenWidth;
 

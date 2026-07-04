@@ -114,7 +114,8 @@ service cloud.firestore {
                    'licenseAutoRenew', 'canAddProducts', 'currentPackageId', 'currentPackageName',
                    'canReceiveOrders', 'deactivatedAt', 'status', 'isVisible',
                    'commissionRate', 'commissionType', 'creditLimit',
-                   'totalCommissionsPaid', 'lastCommissionAt', 'updatedAt']) ||
+                   'totalCommissionsPaid', 'lastCommissionAt', 'updatedAt',
+                   'independentCourierEnabled']) ||
         // Allow other updates only if subscription is active
         isStoreActive(storeId)
       );
@@ -410,6 +411,12 @@ service cloud.firestore {
 
     // commission_config — إعدادات العمولة (الأدمن يتحكم في العمولة العامة للتطبيق)
     match /commission_config/{configId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // settings — إعدادات عامة (رسوم التوصيل، طلب المناديب، ...)
+    match /settings/{docId} {
       allow read: if true;
       allow write: if isAdmin();
     }

@@ -1,0 +1,410 @@
+# 🎯 إعادة بناء لوحة إدارة إعلانات البانر — خطة شاملة (محدّثة)
+
+## الهدف
+تحويل نظام إدارة إعلانات البانر إلى **نظام احترافي مستقبلي** يشمل:
+1. **تطبيق الأدمن**: Dashboard + موافقة/رفض + إعلان من الإدارة + إيقاف/حذف + ترتيب
+2. **التطبيق الرئيسي**: صفحة إدارة إعلانات التاجر + دعم مزودي الخدمة (الحرفيين) لطلب إعلانات
+
+---
+
+## 📦 الجزء الأول: تطبيق الأدمن (`suez_admin`)
+
+---
+
+### 1. تحديث نموذج الإعلان (AdModel)
+
+#### [MODIFY] [ad_model.dart](file:///d:/project/suezadmin/suez_admin/lib/ads/models/ad_model.dart)
+
+إضافة الحقول:
+- `String? createdBy` — `admin` | `merchant` | `craftsman`
+- `String? ownerUid` — معرّف صاحب الإعلان
+- `String? ownerName` — اسم صاحب الإعلان
+- `bool isPaused` — إيقاف مؤقت
+- `String? targetType` — `store` | `craftsman` | `image_only`
+- `double price` — السعر المدفوع (0 لإعلانات الأدمن)
+- `String? requestId` — ربط بطلب الإعلان الأصلي
+
+تحديث `isValid` ليأخذ `isPaused` بالاعتبار.
+
+---
+
+### 2. تحديث نموذج طلب الإعلان (AdRequestModel)
+
+#### [MODIFY] [ad_request_model.dart](file:///d:/project/suezadmin/suez_admin/lib/ads/models/ad_request_model.dart)
+
+إضافة:
+- `String? rejectionReason` — سبب الرفض
+- `bool refunded` — هل تم استرجاع الفلوس
+- `DateTime? reviewedAt` — تاريخ المراجعة
+- `String? reviewedBy` — الأدمن المراجع
+- `String? ownerType` — `merchant` | `craftsman` (لتمييز نوع مقدم الطلب)
+- `String? craftsmanId` — معرّف الحرفي (للطلبات من مزودي الخدمة)
+
+---
+
+### 3. تحديث خدمة الإعلانات (AdsService)
+
+#### [MODIFY] [ads_service.dart](file:///d:/project/suezadmin/suez_admin/lib/ads/services/ads_service.dart)
+
+- إضافة `pauseAd` / `resumeAd`
+- إضافة `createAdminAd` لإنشاء إعلان من الأدمن
+- تحديث `fetchAds` ليجلب **كل** الإعلانات
+- إضافة `getAdsStats` لإحصائيات Dashboard
+- إضافة `fetchAllStoresAndCraftsmen` لخيارات التوجيه
+
+---
+
+### 4. تحديث خدمة طلبات الإعلانات (AdRequestService)
+
+#### [MODIFY] [ad_request_service.dart](file:///d:/project/suezadmin/suez_admin/lib/ads/services/ad_request_service.dart)
+
+- تحديث `updateRequestStatus` لتشمل:
+  - `rejectionReason` عند الرفض
+  - `refunded` flag
+  - استدعاء `refundToWallet`
+  - استدعاء `sendAdNotification`
+- إضافة `refundToWallet` — يضيف الفلوس لمحفظة التاجر مع تسجيل في `wallet_ledger`
+- إضافة `sendAdNotification` — إشعار للتاجر (باستخدام Cloud Functions الموجود `sendDirectNotification`)
+
+---
+
+### 5. صفحة Dashboard الرئيسية
+
+#### [NEW] [ads_dashboard_page.dart](file:///d:/project/suezadmin/suez_admin/lib/ads/views/ads_dashboard_page.dart)
+
+Dashboard فيها:
+- **بطاقات إحصائية**: 🟢 نشطة | 📅 مجدولة | ⏳ معلقة | ❌ مرفوضة | ⏸️ متوقفة | ⌛ منتهية | 💰 أرباح
+- **أزرار سريعة**: إنشاء إعلان من الإدارة | طلبات الإعلانات (badge) | إدارة الإعلانات | ترتيب
+
+---
+
+### 6. تحديث صفحة إدارة الإعلانات
+
+#### [MODIFY] [admin_ads_page.dart](file:///d:/project/suezadmin/suez_admin/lib/ads/views/admin_ads_page.dart)
+
+- عرض **كل** الإعلانات مع تبويبات: الكل | نشطة | متوقفة | منتهية
+- أزرار: ⏸️ إيقاف | ▶️ استئناف | 🗑️ حذف
+- عرض: صاحب الإعلان، الوقت المتبقي، نوع التوجيه
+
+---
+
+### 7. تحديث صفحة طلبات الإعلانات
+
+#### [MODIFY] [admin_ad_requests_page.dart](file:///d:/project/suezadmin/suez_admin/lib/ads/views/admin_ad_requests_page.dart)
+
+- تبويبات: معلقة | موافق عليها | مرفوضة
+- عند الرفض → Bottom Sheet بأسباب:
+  - صورة غير مناسبة | إعلان مخالف | بيانات ناقصة | جودة منخفضة | سبب مخصص
+  - → refund تلقائي + إشعار
+- عند الموافقة → إنشاء إعلان + إشعار
+- **عرض نوع مقدم الطلب**: تاجر أو مزود خدمة (بشارة مختلفة)
+
+---
+
+### 8. صفحة إنشاء إعلان من الإدارة
+
+#### [NEW] [create_admin_ad_page.dart](file:///d:/project/suezadmin/suez_admin/lib/ads/views/create_admin_ad_page.dart)
+
+- رفع صورة + مدة العرض
+- نوع التوجيه:
+  - متجر (Dropdown) | مزود خدمة/حرفي (Dropdown) | صورة فقط (تفتح مكبّرة عند النقر)
+- `createdBy = admin`, `price = 0`
+
+---
+
+### 9. ViewModels
+
+#### [MODIFY] [admin_ads_viewmodel.dart](file:///d:/project/suezadmin/suez_admin/lib/ads/viewmodels/admin_ads_viewmodel.dart)
+- `loadAllAds` + `pauseAd` + `resumeAd` + فلترة
+
+#### [MODIFY] [admin_ad_requests_viewmodel.dart](file:///d:/project/suezadmin/suez_admin/lib/ads/viewmodels/admin_ad_requests_viewmodel.dart)
+- `rejectWithReason` + refund + `loadAllRequests` + فلترة
+
+#### [NEW] [ads_dashboard_viewmodel.dart](file:///d:/project/suezadmin/suez_admin/lib/ads/viewmodels/ads_dashboard_viewmodel.dart)
+- إحصائيات شاملة
+
+#### [NEW] [create_admin_ad_viewmodel.dart](file:///d:/project/suezadmin/suez_admin/lib/ads/viewmodels/create_admin_ad_viewmodel.dart)
+- إدارة إنشاء إعلان أدمن
+
+---
+
+### 10. Widgets
+
+#### [NEW] [stats_card.dart](file:///d:/project/suezadmin/suez_admin/lib/ads/widgets/stats_card.dart)
+#### [NEW] [rejection_bottom_sheet.dart](file:///d:/project/suezadmin/suez_admin/lib/ads/widgets/rejection_bottom_sheet.dart)
+
+#### [MODIFY] [ad_slot_card.dart](file:///d:/project/suezadmin/suez_admin/lib/ads/widgets/ad_slot_card.dart)
+- إيقاف/استئناف + عرض createdBy + ownerType badge
+
+#### [MODIFY] [request_card.dart](file:///d:/project/suezadmin/suez_admin/lib/ads/widgets/request_card.dart)
+- سبب الرفض + حالة الاسترجاع + badge نوع مقدم الطلب (تاجر/حرفي)
+
+---
+
+### 11. Routes & Dashboard
+
+#### [MODIFY] [admin_routes.dart](file:///d:/project/suezadmin/suez_admin/lib/router/routes_config/admin_routes.dart)
+- `/admin/ads-dashboard` → `AdsDashboardPage`
+- `/admin/create-admin-ad` → `CreateAdminAdPage`
+
+#### [MODIFY] [dashboard_page.dart](file:///d:/project/suezadmin/suez_admin/lib/dashboard/dashboard_page.dart)
+- `إعلانات الهيدر` route → `/admin/ads-dashboard`
+
+---
+
+## 📱 الجزء الثاني: التطبيق الرئيسي (`temp_bazar`)
+
+---
+
+### 12. صفحة "إعلاناتي" للتاجر/مزود الخدمة
+
+#### [NEW] [my_ads_page.dart](file:///d:/project/bazarsuez/bazar_suez/temp_bazar/lib/ads/views/my_ads_page.dart)
+
+صفحة تعرض للتاجر أو مزود الخدمة إعلاناته:
+
+**قسم الطلبات المعلقة:**
+- كل طلب بحالته (معلق ⏳ | موافق ✅ | مرفوض ❌)
+- إذا مرفوض: سبب الرفض + حالة الاسترجاع
+
+**قسم الإعلانات النشطة:**
+- لكل إعلان نشط:
+  - صورة الإعلان
+  - ⏱️ الوقت المتبقي (Progress bar + نص: "باقي ٣ أيام و ٥ ساعات")
+  - تاريخ البدء وتاريخ الانتهاء
+  - 🖼️ **زر تغيير الصورة** — يرفع صورة جديدة ويحدّث الإعلان في `home_ads`
+  - 🗑️ **زر حذف الإعلان** — مع **رسالة تحذير واضحة**:
+    > ⚠️ **تحذير: حذف الإعلان نهائي**
+    > سيتم حذف إعلانك فوراً ولن تتمكن من استرجاع المبلغ المدفوع.
+    > هل أنت متأكد؟
+
+    مع زرين: `إلغاء` | `حذف نهائياً` (أحمر)
+
+**قسم الإعلانات المنتهية:**
+- تاريخ بسيط للإعلانات اللي خلصت
+
+---
+
+### 13. ViewModel لصفحة إعلاناتي
+
+#### [NEW] [my_ads_viewmodel.dart](file:///d:/project/bazarsuez/bazar_suez/temp_bazar/lib/ads/viewmodels/my_ads_viewmodel.dart)
+
+- `loadMyAds` — يجلب الإعلانات من `home_ads` المرتبطة بـ `ownerUid` الحالي
+- `loadMyRequests` — يجلب طلبات الإعلان من `ad_requests`
+- `changeAdImage` — رفع صورة جديدة وتحديث الإعلان
+- `deleteMyAd` — حذف الإعلان (بدون استرجاع مال)
+- حساب الوقت المتبقي (ساعات/أيام)
+
+---
+
+### 14. خدمة إعلانات التاجر/مزود الخدمة (محدّثة)
+
+#### [MODIFY] [ad_request_service.dart](file:///d:/project/bazarsuez/bazar_suez/temp_bazar/lib/ads/services/ad_request_service.dart) (التطبيق الرئيسي)
+
+- إضافة `changeAdImage` — رفع صورة جديدة وتحديث `home_ads`
+- إضافة `deleteUserAd` — حذف إعلان المستخدم
+- إضافة `fetchMyActiveAds` — جلب إعلانات المستخدم النشطة من `home_ads`
+- تحديث `createAdRequest` ليدعم `ownerType` (`merchant` | `craftsman`) و `craftsmanId`
+
+---
+
+### 15. تحديث صفحة طلب الإعلان لدعم الحرفيين
+
+#### [MODIFY] [request_ads_page.dart](file:///d:/project/bazarsuez/bazar_suez/temp_bazar/lib/ads/views/request_ads_page.dart)
+
+التعديلات:
+- التحقق من نوع المستخدم (`isMarketOwner` أو `isCraftsman`)
+- **إذا تاجر**: نفس الـ Flow الحالي (اختيار متجر + صورة + أيام + دفع)
+- **إذا مزود خدمة (حرفي)**: 
+  - بدل "اختر المتجر" → يظهر اسم ملف الحرفي تلقائياً (من `craftsmen` collection)
+  - نفس الخطوات: صورة + أيام + هاتف + دفع من المحفظة
+  - `ownerType = 'craftsman'`, `craftsmanId = craftsmanDocId`
+  - عند النقر على الإعلان في الصفحة الرئيسية → يفتح ملف الحرفي
+
+---
+
+### 16. تحديث ViewModel طلب الإعلان
+
+#### [MODIFY] [request_ads_viewmodel.dart](file:///d:/project/bazarsuez/bazar_suez/temp_bazar/lib/ads/viewmodels/request_ads_viewmodel.dart)
+
+- إضافة `loadCraftsmanProfile` — جلب بيانات الحرفي من Firestore
+- تحديث `submitRequest` ليرسل `ownerType` و `craftsmanId`
+- التعامل مع الحالتين (تاجر/حرفي) في نفس الـ ViewModel
+
+---
+
+### 17. تحديث نموذج طلب الإعلان (التطبيق الرئيسي)
+
+#### [MODIFY] [ad_request_model.dart](file:///d:/project/bazarsuez/bazar_suez/temp_bazar/lib/ads/models/ad_request_model.dart)
+
+إضافة نفس الحقول الجديدة:
+- `String? ownerType` — `merchant` | `craftsman`
+- `String? craftsmanId`
+- `String? rejectionReason`
+- `bool refunded`
+
+---
+
+### 18. تحديث نموذج الإعلان (التطبيق الرئيسي)
+
+#### [MODIFY] [ad_model.dart](file:///d:/project/bazarsuez/bazar_suez/temp_bazar/lib/ads/models/ad_model.dart)
+
+إضافة نفس الحقول الجديدة:
+- `String? createdBy`, `String? ownerUid`, `String? ownerName`
+- `bool isPaused` — لتعمل `isValid` بشكل صحيح مع الإيقاف المؤقت
+- `String? targetType` — لتحديد كيفية التوجيه عند النقر
+- `double price`, `String? requestId`
+
+تحديث `isValid`:
+```dart
+bool get isValid {
+  if (!isActive || isPaused || imageUrl == null || imageUrl!.isEmpty || startTime == null) {
+    return false;
+  }
+  final expiryTime = startTime!.add(Duration(hours: durationHours));
+  return DateTime.now().isBefore(expiryTime);
+}
+```
+
+---
+
+### 19. تحديث عرض البانر في الصفحة الرئيسية
+
+#### [MODIFY] [home_page.dart](file:///d:/project/bazarsuez/bazar_suez/temp_bazar/lib/markets/home_page/pages/home_page.dart)
+
+تحديث `_buildBannerSection` لدعم `targetType`:
+- `store` → يفتح صفحة المتجر (الحالي)
+- `craftsman` → يفتح ملف الحرفي
+- `image_only` → يفتح الصورة مكبّرة في Dialog
+
+---
+
+### 20. Routes (التطبيق الرئيسي)
+
+#### [MODIFY] [shared_routes.dart](file:///d:/project/bazarsuez/bazar_suez/temp_bazar/lib/router/routes_config/shared_routes.dart)
+- `/my-ads` → `MyAdsPage`
+
+#### [MODIFY] [site_path_rules.dart](file:///d:/project/bazarsuez/bazar_suez/temp_bazar/lib/router/site_path_rules.dart)
+- إضافة `'my-ads'` للمسارات المحمية
+
+---
+
+### 21. نقطة الدخول لصفحة "إعلاناتي"
+
+يمكن الوصول لصفحة "إعلاناتي" من:
+- **صفحة الحساب (AccountPage)** — أيقونة/بطاقة "إعلاناتي" 📢
+- **بعد إرسال طلب إعلان** — زر "عرض إعلاناتي"
+
+---
+
+## هيكل Firestore (المحدّث)
+
+### `app_settings/home_ads`
+```json
+{
+  "ads": [
+    {
+      "slotId": 1,
+      "imageUrl": "...",
+      "targetStoreId": "store123",
+      "targetType": "store",          // store | craftsman | image_only
+      "startTime": "Timestamp",
+      "durationHours": 48,
+      "isActive": true,
+      "isPaused": false,
+      "createdBy": "merchant",        // admin | merchant | craftsman
+      "ownerUid": "user_uid_123",
+      "ownerName": "متجر الأمل",
+      "price": 140.0,
+      "requestId": "req_abc123",
+      "status": "active"
+    }
+  ]
+}
+```
+
+### `ad_requests` (المحدّث)
+```json
+{
+  "storeId": "store_or_craftsman_id",
+  "storeName": "اسم المتجر أو الحرفي",
+  "ownerType": "merchant",           // merchant | craftsman
+  "craftsmanId": null,               // معرّف الحرفي إذا كان مزود خدمة
+  "status": "rejected",
+  "rejectionReason": "صورة غير مناسبة",
+  "refunded": true,
+  "reviewedAt": "Timestamp",
+  "reviewedBy": "admin_uid"
+}
+```
+
+---
+
+## Open Questions
+
+> [!IMPORTANT]
+> **إرسال الإشعارات للتاجر:**
+> سأستخدم نفس النظام الموجود (`sendDirectNotification` Cloud Function) في [announcement_service.dart](file:///d:/project/suezadmin/suez_admin/lib/notifications/services/announcement_service.dart). هل ده مناسب؟
+
+> [!IMPORTANT]
+> **الوصول لصفحة "إعلاناتي" من الحرفي:**
+> هل تريد إضافة زر "طلب إعلان" و "إعلاناتي" في `craftsman_dashboard_page.dart` كمان؟ ولا الوصول هيكون من صفحة الحساب فقط؟
+
+---
+
+## ملخص الملفات
+
+### تطبيق الأدمن (`suez_admin`) — 16 ملف
+| النوع | الملف | الوصف |
+|-------|-------|-------|
+| MODIFY | `ad_model.dart` | حقول جديدة |
+| MODIFY | `ad_request_model.dart` | حقول رفض + نوع مقدم |
+| MODIFY | `ads_service.dart` | pause/resume + admin ad + stats |
+| MODIFY | `ad_request_service.dart` | refund + notification + rejection |
+| NEW | `ads_dashboard_page.dart` | Dashboard إحصائيات |
+| NEW | `create_admin_ad_page.dart` | إعلان من الإدارة |
+| MODIFY | `admin_ads_page.dart` | تبويبات + إيقاف/حذف |
+| MODIFY | `admin_ad_requests_page.dart` | تبويبات + أسباب رفض |
+| MODIFY | `admin_ads_viewmodel.dart` | كل الإعلانات + pause |
+| MODIFY | `admin_ad_requests_viewmodel.dart` | reject + refund |
+| NEW | `ads_dashboard_viewmodel.dart` | إحصائيات |
+| NEW | `create_admin_ad_viewmodel.dart` | إنشاء إعلان أدمن |
+| NEW | `stats_card.dart` | Widget إحصائية |
+| NEW | `rejection_bottom_sheet.dart` | أسباب الرفض |
+| MODIFY | `ad_slot_card.dart` | pause + owner badge |
+| MODIFY | `request_card.dart` | rejection + owner type |
+| MODIFY | `admin_routes.dart` | routes جديدة |
+| MODIFY | `dashboard_page.dart` | route تحديث |
+
+### التطبيق الرئيسي (`temp_bazar`) — 9 ملفات
+| النوع | الملف | الوصف |
+|-------|-------|-------|
+| MODIFY | `ad_model.dart` | حقول جديدة + isPaused |
+| MODIFY | `ad_request_model.dart` | ownerType + craftsmanId |
+| MODIFY | `ad_request_service.dart` | changeImage + deleteAd + craftsman |
+| MODIFY | `request_ads_page.dart` | دعم الحرفيين |
+| MODIFY | `request_ads_viewmodel.dart` | craftsman profile |
+| NEW | `my_ads_page.dart` | صفحة إعلاناتي |
+| NEW | `my_ads_viewmodel.dart` | ViewModel إعلاناتي |
+| MODIFY | `home_page.dart` | targetType handling |
+| MODIFY | `shared_routes.dart` | /my-ads route |
+
+---
+
+## خطة التحقق
+
+### Build Verification
+- `flutter analyze` بدون أخطاء في كلا المشروعين
+
+### Manual Verification
+- ✅ Dashboard إحصائيات شغالة
+- ✅ إنشاء إعلان من الأدمن (store / craftsman / image_only)
+- ✅ رفض طلب مع سبب + refund + إشعار
+- ✅ موافقة طلب + إشعار
+- ✅ إيقاف/استئناف/حذف إعلان
+- ✅ ترتيب الإعلانات
+- ✅ صفحة إعلاناتي — تاجر يشوف إعلاناته
+- ✅ تغيير صورة إعلان من التاجر
+- ✅ حذف إعلان من التاجر مع تحذير
+- ✅ حرفي يطلب إعلان ويشوف إعلاناته
+- ✅ النقر على إعلان حرفي يفتح ملفه
+- ✅ النقر على إعلان image_only يفتح الصورة مكبّرة

@@ -6,6 +6,7 @@ import 'package:bazar_suez/markets/search/pages/search_page.dart';
 import 'package:bazar_suez/markets/planes/pages/pricing_page.dart';
 import 'package:bazar_suez/markets/home_page/pages/home_page.dart';
 import 'package:bazar_suez/ads/views/request_ads_page.dart';
+import 'package:bazar_suez/ads/views/my_ads_page.dart';
 import 'package:bazar_suez/markets/wallet/pages/wallet_page.dart';
 import 'package:bazar_suez/markets/wallet/pages/deposit_request_page.dart';
 import 'package:bazar_suez/markets/saved_locations/pages/delivery_addresses_page.dart';
@@ -41,6 +42,7 @@ final sharedRoutes = [
     },
   ),
   GoRoute(path: '/request-ads', builder: (_, __) => const RequestAdsPage()),
+  GoRoute(path: '/my-ads', builder: (_, __) => const MyAdsPage()),
   GoRoute(path: '/AccountPage', builder: (_, __) => const AccountPage()),
   GoRoute(path: '/favourite-markets', builder: (_, __) => const FavouriteMarketsPage()),
   GoRoute(

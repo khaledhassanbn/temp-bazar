@@ -15,6 +15,7 @@ import 'package:bazar_suez/markets/order_of_markets/widget/OrderCard.dart';
 import 'package:bazar_suez/markets/order_of_markets/widget/OrderStats.dart';
 import 'package:bazar_suez/markets/order_of_markets/viewmodels/MarketOrdersViewModel.dart';
 import 'package:bazar_suez/markets/order_of_markets/independent_couriers/widgets/independent_courier_picker_sheet.dart';
+import 'package:bazar_suez/services/independent_courier/independent_courier_settings_service.dart';
 import 'package:bazar_suez/services/review_service.dart';
 import 'package:bazar_suez/theme/app_color.dart';
 
@@ -35,6 +36,7 @@ class _MarketOrdersPageState extends State<MarketOrdersPage>
     with SingleTickerProviderStateMixin {
   late final MarketOrdersViewModel _viewModel;
   late final TextEditingController _searchController;
+  final _courierSettingsService = IndependentCourierSettingsService();
   AnimationController? _animController;
 
   /// طلبات ظهر dialog التقييم للمندوب فيها (لتجنب الإعادة)
@@ -358,10 +360,32 @@ class _MarketOrdersPageState extends State<MarketOrdersPage>
     return Colors.green;
   }
 
+  void _showCourierUnavailableMessage() {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text(
+          IndependentCourierSettingsService.serviceUnavailableMessage,
+        ),
+      ),
+    );
+  }
+
+  Future<bool> _ensureCourierEnabled() async {
+    final enabled = await _courierSettingsService
+        .isIndependentCourierEnabledForStore(widget.marketId);
+    if (!enabled) {
+      _showCourierUnavailableMessage();
+    }
+    return enabled;
+  }
+
   Future<void> _handleRequestDelivery(
     Map<String, dynamic> order,
     Map<String, String>? distanceInfo,
   ) async {
+    if (!await _ensureCourierEnabled()) return;
+
     final documentId = order['documentId'] as String?;
     if (documentId == null) {
       if (mounted) {
@@ -388,6 +412,8 @@ class _MarketOrdersPageState extends State<MarketOrdersPage>
     required String orderDocumentId,
     Set<String> excludedCourierUids = const <String>{},
   }) async {
+    if (!await _ensureCourierEnabled()) return;
+
     if (!mounted) return;
     await showModalBottomSheet<void>(
       context: context,
@@ -697,6 +723,7 @@ class _MarketOrdersPageState extends State<MarketOrdersPage>
                                 );
                               },
                               onAutoRedispatchIndependentCourier: () async {
+                                if (!await _ensureCourierEnabled()) return;
                                 final documentId =
                                     order['documentId'] as String?;
                                 if (documentId == null) return;

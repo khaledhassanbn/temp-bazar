@@ -4,16 +4,41 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
 import '../../theme/app_color.dart';
+import '../../authentication/guards/AuthGuard.dart';
 import '../viewmodels/request_ads_viewmodel.dart';
 import '../widgets/loading_snackbar.dart';
 
-class RequestAdsPage extends StatelessWidget {
+class RequestAdsPage extends StatefulWidget {
   const RequestAdsPage({super.key});
 
   @override
+  State<RequestAdsPage> createState() => _RequestAdsPageState();
+}
+
+class _RequestAdsPageState extends State<RequestAdsPage> {
+  late final RequestAdsViewModel _viewModel;
+
+  @override
+  void initState() {
+    super.initState();
+    _viewModel = RequestAdsViewModel();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final auth = context.read<AuthGuard>();
+      _viewModel.initialize(auth);
+    });
+  }
+
+  @override
+  void dispose() {
+    _viewModel.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    return ChangeNotifierProvider(
-      create: (_) => RequestAdsViewModel()..loadUserStores(),
+    return ChangeNotifierProvider.value(
+      value: _viewModel,
       child: const _RequestAdsView(),
     );
   }
@@ -39,18 +64,22 @@ class _RequestAdsViewState extends State<_RequestAdsView> {
 
   @override
   void dispose() {
+    _daysController.removeListener(_onDaysChanged);
+    _phoneController.removeListener(_onPhoneChanged);
     _daysController.dispose();
     _phoneController.dispose();
     super.dispose();
   }
 
   void _onDaysChanged() {
+    if (!mounted) return;
     final viewModel = context.read<RequestAdsViewModel>();
     final days = int.tryParse(_daysController.text) ?? 0;
     viewModel.setDays(days);
   }
 
   void _onPhoneChanged() {
+    if (!mounted) return;
     final viewModel = context.read<RequestAdsViewModel>();
     viewModel.setPhoneNumber(_phoneController.text);
   }
@@ -71,12 +100,33 @@ class _RequestAdsViewState extends State<_RequestAdsView> {
         ),
         body: Consumer<RequestAdsViewModel>(
           builder: (context, viewModel, _) {
-            if (viewModel.isLoadingStores) {
+            if (viewModel.isLoadingData) {
               return const Center(child: CircularProgressIndicator());
+            }
+
+            if (viewModel.userType == AdRequestUserType.none) {
+              return Center(
+                child: Padding(
+                  padding: const EdgeInsets.all(24),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.block, size: 64, color: Colors.grey[400]),
+                      const SizedBox(height: 16),
+                      const Text(
+                        'طلب الإعلان متاح للتجار وأصحاب مهن الحرف فقط',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(fontSize: 16),
+                      ),
+                    ],
+                  ),
+                ),
+              );
             }
 
             if (viewModel.errorMessage != null) {
               WidgetsBinding.instance.addPostFrameCallback((_) {
+                if (!context.mounted) return;
                 LoadingSnackBar.showError(context, viewModel.errorMessage!);
                 viewModel.clearError();
               });
@@ -87,7 +137,6 @@ class _RequestAdsViewState extends State<_RequestAdsView> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // صورة الإعلان
                   const Text(
                     'صورة الإعلان',
                     style: TextStyle(
@@ -135,43 +184,75 @@ class _RequestAdsViewState extends State<_RequestAdsView> {
                             ),
                     ),
                   ),
-
                   const SizedBox(height: 24),
-
-                  // اختيار المتجر
-                  const Text(
-                    'اختر المتجر',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.black87,
+                  if (viewModel.isMerchant) ...[
+                    const Text(
+                      'اختر المتجر',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.black87,
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 12),
-                  DropdownButtonFormField(
-                    value: viewModel.selectedStore,
-                    decoration: InputDecoration(
-                      border: OutlineInputBorder(
+                    const SizedBox(height: 12),
+                    DropdownButtonFormField(
+                      value: viewModel.selectedStore,
+                      decoration: InputDecoration(
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 12,
+                        ),
+                      ),
+                      items: viewModel.userStores.map((store) {
+                        return DropdownMenuItem(
+                          value: store,
+                          child: Text(store.name),
+                        );
+                      }).toList(),
+                      onChanged: (value) => viewModel.setSelectedStore(value),
+                      hint: const Text('اختر متجر'),
+                    ),
+                  ] else if (viewModel.isCraftsman) ...[
+                    const Text(
+                      'ملف الحرفي',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.black87,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: AppColors.mainColor.withOpacity(0.08),
                         borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: AppColors.mainColor.withOpacity(0.2),
+                        ),
                       ),
-                      contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 16,
-                        vertical: 12,
+                      child: Row(
+                        children: [
+                          Icon(Icons.handyman, color: AppColors.mainColor),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Text(
+                              viewModel.craftsmanProfile?.name ?? 'ملف الحرفي',
+                              style: const TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
                     ),
-                    items: viewModel.userStores.map((store) {
-                      return DropdownMenuItem(
-                        value: store,
-                        child: Text(store.name),
-                      );
-                    }).toList(),
-                    onChanged: (value) => viewModel.setSelectedStore(value),
-                    hint: const Text('اختر متجر'),
-                  ),
-
+                  ],
                   const SizedBox(height: 24),
-
-                  // عدد الأيام
                   const Text(
                     'عدد الأيام',
                     style: TextStyle(
@@ -200,10 +281,7 @@ class _RequestAdsViewState extends State<_RequestAdsView> {
                     'السعر: 70 جنيه في اليوم',
                     style: TextStyle(fontSize: 14, color: Colors.grey),
                   ),
-
                   const SizedBox(height: 24),
-
-                  // السعر النهائي
                   Container(
                     padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
@@ -234,10 +312,7 @@ class _RequestAdsViewState extends State<_RequestAdsView> {
                       ],
                     ),
                   ),
-
                   const SizedBox(height: 24),
-
-                  // رقم الهاتف
                   const Text(
                     'رقم الهاتف للتواصل',
                     style: TextStyle(
@@ -261,10 +336,7 @@ class _RequestAdsViewState extends State<_RequestAdsView> {
                       ),
                     ),
                   ),
-
                   const SizedBox(height: 32),
-
-                  // زر متابعة الدفع
                   SizedBox(
                     width: double.infinity,
                     height: 50,
@@ -311,7 +383,6 @@ class _RequestAdsViewState extends State<_RequestAdsView> {
   Future<void> _handleSubmitRequest(BuildContext context) async {
     final viewModel = context.read<RequestAdsViewModel>();
 
-    // Show confirmation dialog
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
@@ -347,14 +418,23 @@ class _RequestAdsViewState extends State<_RequestAdsView> {
         barrierDismissible: false,
         builder: (context) => AlertDialog(
           title: const Text('تم الإرسال بنجاح'),
-          content: const Text('تم إرسال الطلب وسوف يتم عرض إعلانك خلال دقائق'),
+          content: const Text(
+            'تم إرسال الطلب وسوف يتم عرض إعلانك خلال دقائق',
+          ),
           actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.pop(context);
+                context.go('/my-ads');
+              },
+              child: const Text('عرض إعلاناتي'),
+            ),
             TextButton(
               onPressed: () {
                 Navigator.pop(context);
                 context.go('/HomePage');
               },
-              child: const Text('حسناً'),
+              child: const Text('الرئيسية'),
             ),
           ],
         ),

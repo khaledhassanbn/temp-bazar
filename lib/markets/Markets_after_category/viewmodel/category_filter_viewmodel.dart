@@ -294,6 +294,14 @@ class CategoryFilterViewModel extends ChangeNotifier {
     }
   }
 
+  String? subCategoryNameForStore(String storeId) {
+    for (final sub in subCategories) {
+      final ids = _storesBySubCategory[sub.id] ?? const <String>[];
+      if (ids.contains(storeId)) return sub.name;
+    }
+    return null;
+  }
+
   void clearCategoryFilter() {
     selectedCategoryId = null;
     selectedSubCategoryId = null;

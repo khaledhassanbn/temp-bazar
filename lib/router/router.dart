@@ -24,6 +24,7 @@ bool _requiresAuth(String path) {
     '/create-store',
     '/pricingpage',
     '/request-ads',
+    '/my-ads',
     '/wallet',
     '/deposit-request',
     '/myorder',

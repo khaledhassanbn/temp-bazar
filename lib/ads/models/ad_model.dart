@@ -1,5 +1,19 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
+/// أنواع التوجيه عند النقر على الإعلان
+class AdTargetType {
+  static const String store = 'store';
+  static const String craftsman = 'craftsman';
+  static const String imageOnly = 'image_only';
+}
+
+/// من أنشأ الإعلان
+class AdCreatedBy {
+  static const String admin = 'admin';
+  static const String merchant = 'merchant';
+  static const String craftsman = 'craftsman';
+}
+
 class AdModel {
   final int slotId;
   final String? imageUrl;
@@ -7,6 +21,13 @@ class AdModel {
   final DateTime? startTime;
   final int durationHours;
   final bool isActive;
+  final String? createdBy;
+  final String? ownerUid;
+  final String? ownerName;
+  final bool isPaused;
+  final String? targetType;
+  final double price;
+  final String? requestId;
 
   AdModel({
     required this.slotId,
@@ -15,9 +36,15 @@ class AdModel {
     this.startTime,
     this.durationHours = 24,
     this.isActive = false,
+    this.createdBy,
+    this.ownerUid,
+    this.ownerName,
+    this.isPaused = false,
+    this.targetType,
+    this.price = 0,
+    this.requestId,
   });
 
-  // تحويل من Firestore
   factory AdModel.fromMap(Map<String, dynamic> map) {
     return AdModel(
       slotId: map['slotId'] ?? 0,
@@ -28,10 +55,16 @@ class AdModel {
           : null,
       durationHours: map['durationHours'] ?? 24,
       isActive: map['isActive'] ?? false,
+      createdBy: map['createdBy'],
+      ownerUid: map['ownerUid'],
+      ownerName: map['ownerName'],
+      isPaused: map['isPaused'] ?? false,
+      targetType: map['targetType'] ?? AdTargetType.store,
+      price: (map['price'] ?? 0.0).toDouble(),
+      requestId: map['requestId'],
     );
   }
 
-  // تحويل إلى Firestore
   Map<String, dynamic> toMap() {
     return {
       'slotId': slotId,
@@ -40,12 +73,19 @@ class AdModel {
       'startTime': startTime != null ? Timestamp.fromDate(startTime!) : null,
       'durationHours': durationHours,
       'isActive': isActive,
+      if (createdBy != null) 'createdBy': createdBy,
+      if (ownerUid != null) 'ownerUid': ownerUid,
+      if (ownerName != null) 'ownerName': ownerName,
+      'isPaused': isPaused,
+      if (targetType != null) 'targetType': targetType,
+      'price': price,
+      if (requestId != null) 'requestId': requestId,
     };
   }
 
-  // التحقق من صلاحية الإعلان
   bool get isValid {
     if (!isActive ||
+        isPaused ||
         imageUrl == null ||
         imageUrl!.isEmpty ||
         startTime == null) {
@@ -56,7 +96,18 @@ class AdModel {
     return DateTime.now().isBefore(expiryTime);
   }
 
-  // حساب الوقت المتبقي للإعلان بالساعات
+  bool get isExpired {
+    if (startTime == null) return false;
+    return DateTime.now().isAfter(
+      startTime!.add(Duration(hours: durationHours)),
+    );
+  }
+
+  bool get isScheduled {
+    if (!isActive || isPaused || startTime == null) return false;
+    return DateTime.now().isBefore(startTime!);
+  }
+
   double get remainingHours {
     if (!isActive || startTime == null) return 0;
 
@@ -65,17 +116,16 @@ class AdModel {
 
     if (now.isAfter(expiryTime)) return 0;
 
-    final difference = expiryTime.difference(now);
-    return difference.inMinutes / 60.0;
+    return expiryTime.difference(now).inMinutes / 60.0;
   }
 
-  // تاريخ انتهاء الإعلان
   DateTime? get expiryDate {
     if (startTime == null) return null;
     return startTime!.add(Duration(hours: durationHours));
   }
 
-  // نسخ مع تعديل
+  String get effectiveTargetType => targetType ?? AdTargetType.store;
+
   AdModel copyWith({
     int? slotId,
     String? imageUrl,
@@ -83,6 +133,13 @@ class AdModel {
     DateTime? startTime,
     int? durationHours,
     bool? isActive,
+    String? createdBy,
+    String? ownerUid,
+    String? ownerName,
+    bool? isPaused,
+    String? targetType,
+    double? price,
+    String? requestId,
   }) {
     return AdModel(
       slotId: slotId ?? this.slotId,
@@ -91,6 +148,13 @@ class AdModel {
       startTime: startTime ?? this.startTime,
       durationHours: durationHours ?? this.durationHours,
       isActive: isActive ?? this.isActive,
+      createdBy: createdBy ?? this.createdBy,
+      ownerUid: ownerUid ?? this.ownerUid,
+      ownerName: ownerName ?? this.ownerName,
+      isPaused: isPaused ?? this.isPaused,
+      targetType: targetType ?? this.targetType,
+      price: price ?? this.price,
+      requestId: requestId ?? this.requestId,
     );
   }
 }

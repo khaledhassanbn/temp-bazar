@@ -2,12 +2,18 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_database/firebase_database.dart';
 
 import '../../../../services/delivery_fee/delivery_fee_service.dart';
+import '../../../../services/independent_courier/independent_courier_settings_service.dart';
 
 class IndependentCourierDispatchService {
   final FirebaseFirestore _firestore;
+  final IndependentCourierSettingsService _courierSettingsService;
 
-  IndependentCourierDispatchService({FirebaseFirestore? firestore})
-      : _firestore = firestore ?? FirebaseFirestore.instance;
+  IndependentCourierDispatchService({
+    FirebaseFirestore? firestore,
+    IndependentCourierSettingsService? courierSettingsService,
+  })  : _firestore = firestore ?? FirebaseFirestore.instance,
+        _courierSettingsService =
+            courierSettingsService ?? IndependentCourierSettingsService();
 
   DocumentReference<Map<String, dynamic>> orderRef(String orderId) {
     return _firestore.collection('orders').doc(orderId);
@@ -31,6 +37,14 @@ class IndependentCourierDispatchService {
     }
     if (courierUids.length > 3) {
       throw ArgumentError('Maximum 3 couriers allowed');
+    }
+
+    final isEnabled = await _courierSettingsService
+        .isIndependentCourierEnabledForStore(storeId);
+    if (!isEnabled) {
+      throw StateError(
+        IndependentCourierSettingsService.serviceUnavailableMessage,
+      );
     }
 
     final customerInfo =

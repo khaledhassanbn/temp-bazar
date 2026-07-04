@@ -175,6 +175,18 @@ class _AccountPageState extends State<AccountPage> {
         title: 'حسابي',
         tiles: [
           _MenuTileData(
+            icon: Icons.campaign_outlined,
+            label: 'إعلاناتي',
+            subtitle: 'متابعة طلباتك وإعلاناتك النشطة',
+            onTap: () => context.push('/my-ads'),
+          ),
+          _MenuTileData(
+            icon: Icons.add_circle_outline,
+            label: 'طلب إعلان',
+            subtitle: 'أعلن عن متجرك في الصفحة الرئيسية',
+            onTap: () => context.push('/request-ads'),
+          ),
+          _MenuTileData(
             icon: Icons.account_balance_wallet_outlined,
             label: 'المحفظة',
             subtitle: 'إدارة رصيدك وعملياتك',
@@ -282,6 +294,26 @@ class _AccountPageState extends State<AccountPage> {
                 context,
                 '/craftsmen/dashboard',
                 message: 'سجّل دخولك للوصول للوحة الصنايعي',
+              ),
+            ),
+            _MenuTileData(
+              icon: Icons.campaign_outlined,
+              label: 'إعلاناتي',
+              subtitle: 'متابعة طلباتك وإعلاناتك',
+              onTap: () => pushIfAuthed(
+                context,
+                '/my-ads',
+                message: 'سجّل دخولك لمتابعة إعلاناتك',
+              ),
+            ),
+            _MenuTileData(
+              icon: Icons.add_circle_outline,
+              label: 'طلب إعلان',
+              subtitle: 'أعلن عن خدماتك في الصفحة الرئيسية',
+              onTap: () => pushIfAuthed(
+                context,
+                '/request-ads',
+                message: 'سجّل دخولك لطلب إعلان',
               ),
             ),
             _MenuTileData(

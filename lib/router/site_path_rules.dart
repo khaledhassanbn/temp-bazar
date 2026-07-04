@@ -14,6 +14,7 @@ final Set<String> _reservedStoreSlugSegments = {
   'market-dashboard',
   'pricingpage',
   'request-ads',
+  'my-ads',
   'wallet',
   'deposit-request',
   'productdetails',
