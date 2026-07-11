@@ -1,0 +1,644 @@
+{
+  "version": 1,
+  "governorates": [
+    "السويس"
+  ],
+  "districts": [
+    "حي السويس",
+    "حي الأربعين",
+    "حي فيصل",
+    "حي عتاقة",
+    "حي الجناين"
+  ],
+  "zones": [
+    {
+      "governorate": "السويس",
+      "district": "حي فيصل",
+      "name": "الصباح",
+      "aliases": [
+        "مدينة الصباح"
+      ],
+      "keywords": [
+        "الصباح",
+        "مساكن الصباح"
+      ],
+      "center": {
+        "lat": 29.9859427,
+        "lng": 32.5222665
+      },
+      "radius": 400,
+      "id": "zone_1"
+    },
+    {
+      "governorate": "السويس",
+      "district": "حي فيصل",
+      "name": "الحرفيين",
+      "aliases": [],
+      "keywords": [],
+      "center": {
+        "lat": 29.98463184997694,
+        "lng": 32.51117462023351
+      },
+      "radius": 300,
+      "id": "zone_2"
+    },
+    {
+      "governorate": "السويس",
+      "district": "حي فيصل",
+      "name": "فيصل",
+      "aliases": [],
+      "keywords": [],
+      "center": {
+        "lat": 29.991164709045037,
+        "lng": 32.51646207260666
+      },
+      "radius": 400,
+      "id": "zone_3"
+    },
+    {
+      "governorate": "السويس",
+      "district": "حي فيصل",
+      "name": "تعاونيات الدلتا",
+      "aliases": [],
+      "keywords": [],
+      "center": {
+        "lat": 29.988514925691376,
+        "lng": 32.50942096758594
+      },
+      "radius": 200,
+      "id": "zone_4"
+    },
+    {
+      "governorate": "السويس",
+      "district": "حي فيصل",
+      "name": "ابراج المرور",
+      "aliases": [],
+      "keywords": [],
+      "center": {
+        "lat": 29.973805914392628,
+        "lng": 32.51839538395846
+      },
+      "radius": 200,
+      "id": "zone_5"
+    },
+    {
+      "governorate": "السويس",
+      "district": "حي فيصل",
+      "name": "24 اكتوبر",
+      "aliases": [],
+      "keywords": [],
+      "center": {
+        "lat": 29.97012354786662,
+        "lng": 32.514436928791966
+      },
+      "radius": 300,
+      "id": "zone_6"
+    },
+    {
+      "governorate": "السويس",
+      "district": "حي فيصل",
+      "name": "الأمل",
+      "aliases": [],
+      "keywords": [],
+      "center": {
+        "lat": 29.97764819917448,
+        "lng": 32.51243940093101
+      },
+      "radius": 400,
+      "id": "zone_7"
+    },
+    {
+      "governorate": "السويس",
+      "district": "حي فيصل",
+      "name": "مبارك",
+      "aliases": [],
+      "keywords": [],
+      "center": {
+        "lat": 29.992757723525557,
+        "lng": 32.50261813360164
+      },
+      "radius": 200,
+      "id": "zone_8"
+    },
+    {
+      "governorate": "السويس",
+      "district": "حي فيصل",
+      "name": "ابراج السحاب",
+      "aliases": [],
+      "keywords": [],
+      "center": {
+        "lat": 29.98455294927128,
+        "lng": 32.51830621157434
+      },
+      "radius": 200,
+      "id": "zone_9"
+    },
+    {
+      "governorate": "السويس",
+      "district": "حي فيصل",
+      "name": "الصفا والمروة",
+      "aliases": [],
+      "keywords": [],
+      "center": {
+        "lat": 29.97359731103717,
+        "lng": 32.51378837123155
+      },
+      "radius": 200,
+      "id": "zone_10"
+    },
+    {
+      "governorate": "السويس",
+      "district": "حي فيصل",
+      "name": "الامل بنى",
+      "aliases": [],
+      "keywords": [],
+      "center": {
+        "lat": 29.975482626805057,
+        "lng": 32.510842757719004
+      },
+      "radius": 200,
+      "id": "zone_11"
+    },
+    {
+      "governorate": "السويس",
+      "district": "حي السويس",
+      "name": "مبارك 1",
+      "aliases": [],
+      "keywords": [],
+      "center": {
+        "lat": 29.98855327396244,
+        "lng": 32.501327176569134
+      },
+      "radius": 200,
+      "id": "zone_12"
+    },
+    {
+      "governorate": "السويس",
+      "district": "حي الأربعين",
+      "name": "المثلث",
+      "aliases": [],
+      "keywords": [],
+      "center": {
+        "lat": 29.981383737870612,
+        "lng": 32.53111913674032
+      },
+      "radius": 600,
+      "id": "zone_13"
+    },
+    {
+      "governorate": "السويس",
+      "district": "حي فيصل",
+      "name": "شارع ناصر",
+      "aliases": [],
+      "keywords": [],
+      "center": {
+        "lat": 29.96699827255405,
+        "lng": 32.526770149103115
+      },
+      "radius": 300,
+      "id": "zone_14"
+    },
+    {
+      "governorate": "السويس",
+      "district": "حي عتاقة",
+      "name": "عرب المعمل",
+      "aliases": [],
+      "keywords": [],
+      "center": {
+        "lat": 29.96484386275231,
+        "lng": 32.50506809366219
+      },
+      "radius": 800,
+      "id": "zone_15"
+    },
+    {
+      "governorate": "السويس",
+      "district": "حي عتاقة",
+      "name": "الصفا",
+      "aliases": [],
+      "keywords": [],
+      "center": {
+        "lat": 29.952184723855904,
+        "lng": 32.47913373594719
+      },
+      "radius": 800,
+      "id": "zone_16"
+    },
+    {
+      "governorate": "السويس",
+      "district": "حي الأربعين",
+      "name": "الشيخ زايد",
+      "aliases": [],
+      "keywords": [],
+      "center": {
+        "lat": 29.947423591928537,
+        "lng": 32.48260344758056
+      },
+      "radius": 200,
+      "id": "zone_17"
+    },
+    {
+      "governorate": "السويس",
+      "district": "حي السويس",
+      "name": "الكبانون",
+      "aliases": [],
+      "keywords": [],
+      "center": {
+        "lat": 29.943602908785426,
+        "lng": 32.484288755431066
+      },
+      "radius": 300,
+      "id": "zone_18"
+    },
+    {
+      "governorate": "السويس",
+      "district": "حي عتاقة",
+      "name": "السماد",
+      "aliases": [],
+      "keywords": [],
+      "center": {
+        "lat": 29.942897981115525,
+        "lng": 32.46166053689697
+      },
+      "radius": 600,
+      "id": "zone_19"
+    },
+    {
+      "governorate": "السويس",
+      "district": "حي عتاقة",
+      "name": "مساكن النور",
+      "aliases": [],
+      "keywords": [],
+      "center": {
+        "lat": 29.987112904561453,
+        "lng": 32.4900129553664
+      },
+      "radius": 300,
+      "id": "zone_20"
+    },
+    {
+      "governorate": "السويس",
+      "district": "حي عتاقة",
+      "name": "التوفيقيه الحمراء",
+      "aliases": [],
+      "keywords": [],
+      "center": {
+        "lat": 29.980133677484694,
+        "lng": 32.489786075461936
+      },
+      "radius": 300,
+      "id": "zone_21"
+    },
+    {
+      "governorate": "السويس",
+      "district": "حي عتاقة",
+      "name": "الفردوس",
+      "aliases": [],
+      "keywords": [],
+      "center": {
+        "lat": 29.97551826293491,
+        "lng": 32.495237070529505
+      },
+      "radius": 300,
+      "id": "zone_22"
+    },
+    {
+      "governorate": "السويس",
+      "district": "حي عتاقة",
+      "name": "الرحاب",
+      "aliases": [],
+      "keywords": [],
+      "center": {
+        "lat": 29.972228645468892,
+        "lng": 32.49698660153957
+      },
+      "radius": 300,
+      "id": "zone_23"
+    },
+    {
+      "governorate": "السويس",
+      "district": "حي عتاقة",
+      "name": "مساكن الانابيب",
+      "aliases": [],
+      "keywords": [],
+      "center": {
+        "lat": 29.96090249423738,
+        "lng": 32.495888823235546
+      },
+      "radius": 300,
+      "id": "zone_24"
+    },
+    {
+      "governorate": "السويس",
+      "district": "حي عتاقة",
+      "name": "الادبيه",
+      "aliases": [],
+      "keywords": [],
+      "center": {
+        "lat": 29.900336888563878,
+        "lng": 32.45513008648857
+      },
+      "radius": 1000,
+      "id": "zone_25"
+    },
+    {
+      "governorate": "السويس",
+      "district": "حي فيصل",
+      "name": "السلام 2",
+      "aliases": [],
+      "keywords": [],
+      "center": {
+        "lat": 29.99398394604407,
+        "lng": 32.4823742391785
+      },
+      "radius": 1000,
+      "id": "zone_26"
+    },
+    {
+      "governorate": "السويس",
+      "district": "حي فيصل",
+      "name": "السلام 1",
+      "aliases": [],
+      "keywords": [],
+      "center": {
+        "lat": 30.005128721392435,
+        "lng": 32.491934099404055
+      },
+      "radius": 1000,
+      "id": "zone_27"
+    },
+    {
+      "governorate": "السويس",
+      "district": "حي عتاقة",
+      "name": "احمد زويل",
+      "aliases": [],
+      "keywords": [],
+      "center": {
+        "lat": 29.963586527438483,
+        "lng": 32.48103370747098
+      },
+      "radius": 400,
+      "id": "zone_28"
+    },
+    {
+      "governorate": "السويس",
+      "district": "حي عتاقة",
+      "name": "الملك عبدالله",
+      "aliases": [],
+      "keywords": [],
+      "center": {
+        "lat": 29.96972994192902,
+        "lng": 32.476467395592
+      },
+      "radius": 300,
+      "id": "zone_29"
+    },
+    {
+      "governorate": "السويس",
+      "district": "حي عتاقة",
+      "name": "النهضه",
+      "aliases": [],
+      "keywords": [],
+      "center": {
+        "lat": 29.97135527450592,
+        "lng": 32.48389859999259
+      },
+      "radius": 400,
+      "id": "zone_30"
+    },
+    {
+      "governorate": "السويس",
+      "district": "حي الأربعين",
+      "name": "العبور",
+      "aliases": [],
+      "keywords": [],
+      "center": {
+        "lat": 29.9700912,
+        "lng": 32.5309922
+      },
+      "radius": 400,
+      "id": "zone_31"
+    },
+    {
+      "governorate": "السويس",
+      "district": "حي الأربعين",
+      "name": "حى الكويت",
+      "aliases": [],
+      "keywords": [],
+      "center": {
+        "lat": 29.977570681816655,
+        "lng": 32.53352277543157
+      },
+      "radius": 900,
+      "id": "zone_32"
+    },
+    {
+      "governorate": "السويس",
+      "district": "حي الأربعين",
+      "name": "الملاحة القديمة",
+      "aliases": [],
+      "keywords": [],
+      "center": {
+        "lat": 29.963547918605155,
+        "lng": 32.54488809464928
+      },
+      "radius": 400,
+      "id": "zone_33"
+    },
+    {
+      "governorate": "السويس",
+      "district": "حي الأربعين",
+      "name": "الملاحة الجديده",
+      "aliases": [],
+      "keywords": [],
+      "center": {
+        "lat": 29.969749272600957,
+        "lng": 32.54289729339715
+      },
+      "radius": 1000,
+      "id": "zone_34"
+    },
+    {
+      "governorate": "السويس",
+      "district": "حي السويس",
+      "name": "الغريب",
+      "aliases": [],
+      "keywords": [],
+      "center": {
+        "lat": 29.965937049703403,
+        "lng": 32.55919995022333
+      },
+      "radius": 400,
+      "id": "zone_35"
+    },
+    {
+      "governorate": "السويس",
+      "district": "حي السويس",
+      "name": "السويس",
+      "aliases": [],
+      "keywords": [],
+      "center": {
+        "lat": 29.96656143601281,
+        "lng": 32.555484071398055
+      },
+      "radius": 900,
+      "id": "zone_36"
+    },
+    {
+      "governorate": "السويس",
+      "district": "حي السويس",
+      "name": "حوض الدرس",
+      "aliases": [],
+      "keywords": [],
+      "center": {
+        "lat": 29.962975969038602,
+        "lng": 32.57809454685398
+      },
+      "radius": 1000,
+      "id": "zone_37"
+    },
+    {
+      "governorate": "السويس",
+      "district": "حي السويس",
+      "name": "بورتوفيق",
+      "aliases": [],
+      "keywords": [],
+      "center": {
+        "lat": 29.94156901597164,
+        "lng": 32.56574608182879
+      },
+      "radius": 1000,
+      "id": "zone_38"
+    },
+    {
+      "governorate": "السويس",
+      "district": "حي السويس",
+      "name": "الكورنيش",
+      "aliases": [],
+      "keywords": [],
+      "center": {
+        "lat": 29.957817235064734,
+        "lng": 32.548925288890146
+      },
+      "radius": 1000,
+      "id": "zone_39"
+    },
+    {
+      "governorate": "السويس",
+      "district": "حي السويس",
+      "name": "الممشى الجديد",
+      "aliases": [],
+      "keywords": [],
+      "center": {
+        "lat": 29.95545338908555,
+        "lng": 32.56355538120453
+      },
+      "radius": 1000,
+      "id": "zone_40"
+    },
+    {
+      "governorate": "السويس",
+      "district": "حي الأربعين",
+      "name": "الالبان",
+      "aliases": [],
+      "keywords": [],
+      "center": {
+        "lat": 29.984095458157174,
+        "lng": 32.54346914382432
+      },
+      "radius": 1000,
+      "id": "zone_41"
+    },
+    {
+      "governorate": "السويس",
+      "district": "حي الجناين",
+      "name": "الهيشه",
+      "aliases": [],
+      "keywords": [],
+      "center": {
+        "lat": 29.985146614023673,
+        "lng": 32.55874241340123
+      },
+      "radius": 200,
+      "id": "zone_42"
+    },
+    {
+      "governorate": "السويس",
+      "district": "حي الجناين",
+      "name": "السيد هاشم",
+      "aliases": [],
+      "keywords": [],
+      "center": {
+        "lat": 29.98911818819331,
+        "lng": 32.558488536236375
+      },
+      "radius": 300,
+      "id": "zone_43"
+    },
+    {
+      "governorate": "السويس",
+      "district": "حي السويس",
+      "name": "جبلاية الفار",
+      "aliases": [],
+      "keywords": [],
+      "center": {
+        "lat": 29.998249936423452,
+        "lng": 32.558231044170945
+      },
+      "radius": 300,
+      "id": "zone_44"
+    },
+    {
+      "governorate": "السويس",
+      "district": "حي السويس",
+      "name": "ابو عارف",
+      "aliases": [],
+      "keywords": [],
+      "center": {
+        "lat": 29.996719712863747,
+        "lng": 32.55699756330022
+      },
+      "radius": 1000,
+      "id": "zone_45"
+    },
+    {
+      "governorate": "السويس",
+      "district": "حي فيصل",
+      "name": "المستقبل1",
+      "aliases": [],
+      "keywords": [],
+      "center": {
+        "lat": 29.996913,
+        "lng": 32.5089567
+      },
+      "radius": 500,
+      "id": "zone_46"
+    },
+    {
+      "governorate": "السويس",
+      "district": "حي فيصل",
+      "name": "المستقبل 2",
+      "aliases": [],
+      "keywords": [],
+      "center": {
+        "lat": 29.9953236,
+        "lng": 32.505498
+      },
+      "radius": 500,
+      "id": "zone_47"
+    },
+    {
+      "governorate": "السويس",
+      "district": "حي الجناين",
+      "name": "الهويس",
+      "aliases": [],
+      "keywords": [],
+      "center": {
+        "lat": 29.989807020098656,
+        "lng": 32.56978455397497
+      },
+      "radius": 1000,
+      "id": "zone_48"
+    }
+  ]
+}

@@ -277,6 +277,19 @@ class CategoryModel {
     return false;
   }
 
+  /// الفئات المخفية عن شبكة الصفحة الرئيسية فقط (تبقى في صفحة كل الفئات).
+  static bool isVisibleOnHomePage(String name) {
+    final n = name.trim();
+    if (n == 'خدمات' || n == 'ورود') return false;
+    if (n.contains('سياحة') ||
+        n.contains('سياح') ||
+        n.contains('السفر') ||
+        n.contains('سفر')) {
+      return false;
+    }
+    return true;
+  }
+
   factory CategoryModel.fromFirestore(Map<String, dynamic> data, String docId) {
     final String resolvedName =
         (data['name_ar'] ?? data['name'] ?? data['name_en'] ?? '') as String;

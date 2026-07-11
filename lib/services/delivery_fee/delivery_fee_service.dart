@@ -5,7 +5,7 @@ import 'delivery_fee_settings.dart';
 /// خدمة مركزية لحساب وإدارة رسوم التوصيل
 class DeliveryFeeService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
-  
+
   /// كاش للإعدادات لتجنب القراءة المتكررة من Firestore
   DeliveryFeeSettings? _cachedSettings;
   DateTime? _cacheTime;
@@ -27,7 +27,7 @@ class DeliveryFeeService {
 
     try {
       final doc = await _firestore.collection(_settingsPath).doc(_settingsDoc).get();
-      
+
       if (doc.exists && doc.data() != null) {
         _cachedSettings = DeliveryFeeSettings.fromMap(doc.data()!);
       } else {
@@ -62,43 +62,22 @@ class DeliveryFeeService {
     }
   }
 
-  /// حساب رسوم التوصيل بناءً على المسافة
-  /// 
-  /// النظام المتدرج:
-  /// - 0 إلى baseDistance كم: baseFee جنيه
-  /// - baseDistance إلى tier1MaxDistance كم: baseFee + (كم إضافية × tier1FeePerKm)
-  /// - tier1MaxDistance إلى tier2MaxDistance كم: الرسوم السابقة + (كم إضافية × tier2FeePerKm)
+  /// حساب رسوم التوصيل بناءً على المسافة ونطاقات التسعير
   double calculateDeliveryFee(double distanceKm, DeliveryFeeSettings settings) {
-    // إذا كانت المسافة ضمن المسافة الأساسية
-    if (distanceKm <= settings.baseDistance) {
-      return settings.baseFee;
-    }
+    final zones = settings.sortedZones;
+    if (zones.isEmpty) return 0;
 
-    double totalFee = settings.baseFee;
-
-    // حساب رسوم المستوى الأول (من baseDistance إلى tier1MaxDistance)
-    if (distanceKm > settings.baseDistance) {
-      final tier1Distance = math.min(
-        distanceKm - settings.baseDistance,
-        settings.tier1MaxDistance - settings.baseDistance,
-      );
-      if (tier1Distance > 0) {
-        totalFee += tier1Distance * settings.tier1FeePerKm;
+    for (final zone in zones) {
+      if (distanceKm > zone.from && distanceKm <= zone.to) {
+        return zone.fee;
       }
     }
 
-    // حساب رسوم المستوى الثاني (من tier1MaxDistance إلى tier2MaxDistance)
-    if (distanceKm > settings.tier1MaxDistance) {
-      final tier2Distance = math.min(
-        distanceKm - settings.tier1MaxDistance,
-        settings.tier2MaxDistance - settings.tier1MaxDistance,
-      );
-      if (tier2Distance > 0) {
-        totalFee += tier2Distance * settings.tier2FeePerKm;
-      }
+    if (distanceKm <= zones.first.to) {
+      return zones.first.fee;
     }
 
-    return totalFee;
+    return zones.last.fee;
   }
 
   /// حساب رسوم التوصيل مع جلب الإعدادات تلقائياً

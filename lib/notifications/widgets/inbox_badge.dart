@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
-import '../../theme/app_color.dart';
 import '../viewmodels/inbox_viewmodel.dart';
 
 class InboxBadge extends StatelessWidget {
@@ -20,7 +19,7 @@ class InboxBadge extends StatelessWidget {
             vm.unreadCount > 99 ? '99+' : '${vm.unreadCount}',
             style: const TextStyle(fontSize: 10),
           ),
-          backgroundColor: AppColors.mainColor,
+          backgroundColor: Colors.red,
           child: child,
         );
       },

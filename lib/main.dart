@@ -1,6 +1,13 @@
 import 'package:bazar_suez/core/network/connection_service.dart';
 import 'package:bazar_suez/core/network/connectivity_listener.dart';
 import 'package:bazar_suez/router/router.dart';
+import 'package:bazar_suez/router/app_navigation.dart';
+import 'package:bazar_suez/router/routes_config/auth_routes.dart';
+import 'package:bazar_suez/router/routes_config/shared_routes.dart';
+import 'package:bazar_suez/router/routes_config/user_routes.dart';
+import 'package:bazar_suez/router/routes_config/market_routes.dart';
+import 'package:bazar_suez/Layouts/market_layout.dart';
+import 'package:bazar_suez/Layouts/user_layout.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:provider/provider.dart';
@@ -31,6 +38,8 @@ import 'services/hive_adapters_setup.dart';
 // 🔔 FCM Notifications
 import 'services/fcm_service.dart';
 import 'services/order_notifications/local_notification_service.dart';
+import 'services/zones/zone_repository.dart';
+import 'package:bazar_suez/splash_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -39,17 +48,38 @@ void main() async {
     print('🔥 Initializing Firebase...');
     await Firebase.initializeApp(
       options: DefaultFirebaseOptions.currentPlatform,
-    );
+    ).timeout(const Duration(seconds: 10));
     print('✅ Firebase initialized successfully');
 
     print('📦 Initializing Hive...');
-    await HiveAdaptersSetup.initializeHive();
+    await HiveAdaptersSetup.initializeHive().timeout(
+      const Duration(seconds: 5),
+    );
     print('✅ Hive initialized successfully');
 
+    // الإشعارات والـ Zones مش حرجة - لو فشلوا التطبيق لازم يفتح برضو
     print('🔔 Initializing local notifications + FCM...');
-    await LocalNotificationService.instance.initialize();
-    await FcmService().initialize();
-    print('✅ FCM Service initialized successfully');
+    try {
+      await LocalNotificationService.instance.initialize().timeout(
+        const Duration(seconds: 5),
+      );
+      await FcmService().initialize().timeout(
+        const Duration(seconds: 5),
+      );
+      print('✅ FCM Service initialized successfully');
+    } catch (e) {
+      print('⚠️ FCM init failed (non-critical): $e');
+    }
+
+    print('🗺️ Initializing zones...');
+    try {
+      await ZoneRepository.instance.initialize().timeout(
+        const Duration(seconds: 5),
+      );
+      print('✅ Zones initialized successfully');
+    } catch (e) {
+      print('⚠️ Zones init failed (non-critical): $e');
+    }
 
     print('🚀 Starting app...');
     runApp(const MyApp());
@@ -70,7 +100,7 @@ class MyApp extends StatefulWidget {
 class _MyAppState extends State<MyApp> {
   late final AuthGuard _authGuard;
   late final ConnectionService _connectionService;
-  late Future<GoRouter> _routerFuture;
+  late final Future<GoRouter> _routerFuture;
 
   @override
   void initState() {
@@ -78,7 +108,38 @@ class _MyAppState extends State<MyApp> {
     _authGuard = AuthGuard();
     _connectionService = ConnectionService();
     _connectionService.initialize();
-    _routerFuture = createRouter(_authGuard);
+    // إضافة timeout للراوتر عشان لو الاتصال بطيء أو مفيش نت، التطبيق ميقفش
+    _routerFuture = createRouter(_authGuard).timeout(
+      const Duration(seconds: 10),
+      onTimeout: () {
+        print('⚠️ Router creation timed out, creating fallback router');
+        return _createFallbackRouter();
+      },
+    );
+  }
+
+  /// راوتر احتياطي في حالة timeout أو خطأ
+  GoRouter _createFallbackRouter() {
+    final router = GoRouter(
+      navigatorKey: rootNavigatorKey,
+      initialLocation: '/',
+      refreshListenable: _authGuard,
+      routes: [
+        ...authRoutes,
+        ShellRoute(
+          builder: (context, state, child) {
+            if (_authGuard.isMarketOwner) {
+              return MarketLayout(child: child);
+            } else {
+              return UserLayout(child: child);
+            }
+          },
+          routes: [...sharedRoutes, ...userRoutes, ...marketRoutes],
+        ),
+      ],
+    );
+    registerAppRouter(router);
+    return router;
   }
 
   @override
@@ -89,9 +150,17 @@ class _MyAppState extends State<MyApp> {
 
   @override
   Widget build(BuildContext context) {
+    return _AppBootstrap(
+      routerFuture: _routerFuture,
+      buildApp: _buildApp,
+      createFallbackRouter: _createFallbackRouter,
+    );
+  }
+
+  Widget _buildApp(GoRouter router) {
     return MultiProvider(
       providers: [
-        ChangeNotifierProvider(create: (_) => _authGuard),
+        ChangeNotifierProvider.value(value: _authGuard),
         ChangeNotifierProvider(create: (_) => AuthViewModel()),
         ChangeNotifierProvider(create: (_) => AddProductViewModel()),
         ChangeNotifierProvider(create: (_) => CategoryViewModel()),
@@ -99,14 +168,14 @@ class _MyAppState extends State<MyApp> {
         ChangeNotifierProvider(
           create: (_) {
             final cartViewModel = CartViewModel();
-            cartViewModel.initialize();
+            Future.microtask(cartViewModel.initialize);
             return cartViewModel;
           },
         ),
         ChangeNotifierProvider(
           create: (_) {
             final savedLocationsViewModel = SavedLocationsViewModel();
-            savedLocationsViewModel.initialize();
+            Future.microtask(savedLocationsViewModel.initialize);
             return savedLocationsViewModel;
           },
         ),
@@ -117,52 +186,100 @@ class _MyAppState extends State<MyApp> {
           value: _connectionService,
         ),
       ],
-      child: FutureBuilder<GoRouter>(
-        future: _routerFuture,
-        builder: (context, snapshot) {
-          if (!snapshot.hasData) {
-            return const MaterialApp(
-              home: Scaffold(body: Center(child: CircularProgressIndicator())),
-            );
-          }
-
-          return MaterialApp.router(
-            debugShowCheckedModeBanner: false,
-            locale: const Locale("ar"),
-            localizationsDelegates: const [
-              GlobalMaterialLocalizations.delegate,
-              GlobalWidgetsLocalizations.delegate,
-              GlobalCupertinoLocalizations.delegate,
-            ],
-            supportedLocales: const [Locale("ar"), Locale("en")],
-            routerConfig: snapshot.data!,
-            builder: (context, child) =>
-                ConnectivityListener(child: child ?? const SizedBox.shrink()),
-            theme: ThemeData(
+      child: MaterialApp.router(
+        debugShowCheckedModeBanner: false,
+        locale: const Locale("ar"),
+        localizationsDelegates: const [
+          GlobalMaterialLocalizations.delegate,
+          GlobalWidgetsLocalizations.delegate,
+          GlobalCupertinoLocalizations.delegate,
+        ],
+        supportedLocales: const [Locale("ar"), Locale("en")],
+        routerConfig: router,
+        builder: (context, child) =>
+            ConnectivityListener(child: child ?? const SizedBox.shrink()),
+        theme: ThemeData(
+          fontFamily: "NotoSansArabic",
+          textTheme: const TextTheme(
+            bodyMedium: TextStyle(fontSize: 16, fontFamily: "NotoSansArabic"),
+            bodyLarge: TextStyle(fontSize: 18, fontFamily: "NotoSansArabic"),
+            headlineSmall: TextStyle(
+              fontSize: 20,
+              fontWeight: FontWeight.bold,
               fontFamily: "NotoSansArabic",
-              textTheme: const TextTheme(
-                bodyMedium: TextStyle(fontSize: 16, fontFamily: "NotoSansArabic"),
-                bodyLarge: TextStyle(fontSize: 18, fontFamily: "NotoSansArabic"),
-                headlineSmall: TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
-                  fontFamily: "NotoSansArabic",
-                ),
-                headlineMedium: TextStyle(
-                  fontSize: 24,
-                  fontWeight: FontWeight.bold,
-                  fontFamily: "NotoSansArabic",
-                ),
-                titleLarge: TextStyle(
-                  fontSize: 22,
-                  fontWeight: FontWeight.bold,
-                  fontFamily: "NotoSansArabic",
-                ),
-              ),
             ),
-          );
-        },
+            headlineMedium: TextStyle(
+              fontSize: 24,
+              fontWeight: FontWeight.bold,
+              fontFamily: "NotoSansArabic",
+            ),
+            titleLarge: TextStyle(
+              fontSize: 22,
+              fontWeight: FontWeight.bold,
+              fontFamily: "NotoSansArabic",
+            ),
+          ),
+        ),
       ),
     );
+  }
+}
+
+/// يعرض شاشة الـ Splash حتى تكتمل الأنيميشن ويصبح الراوتر جاهزاً.
+class _AppBootstrap extends StatefulWidget {
+  const _AppBootstrap({
+    required this.routerFuture,
+    required this.buildApp,
+    required this.createFallbackRouter,
+  });
+
+  final Future<GoRouter> routerFuture;
+  final Widget Function(GoRouter router) buildApp;
+  final GoRouter Function() createFallbackRouter;
+
+  @override
+  State<_AppBootstrap> createState() => _AppBootstrapState();
+}
+
+class _AppBootstrapState extends State<_AppBootstrap> {
+  GoRouter? _router;
+  bool _splashDone = false;
+  bool _routerFailed = false;
+
+  @override
+  void initState() {
+    super.initState();
+    widget.routerFuture
+        .then((router) {
+          if (mounted) setState(() => _router = router);
+        })
+        .catchError((Object error) {
+          print('❌ Router error: $error');
+          if (mounted) {
+            setState(() {
+              _router = widget.createFallbackRouter();
+              _routerFailed = true;
+            });
+          }
+        });
+  }
+
+  bool get _readyToShowApp =>
+      _splashDone && (_router != null || _routerFailed);
+
+  @override
+  Widget build(BuildContext context) {
+    if (!_readyToShowApp) {
+      return MaterialApp(
+        debugShowCheckedModeBanner: false,
+        home: SplashScreen(
+          onComplete: () {
+            if (mounted) setState(() => _splashDone = true);
+          },
+        ),
+      );
+    }
+
+    return widget.buildApp(_router!);
   }
 }

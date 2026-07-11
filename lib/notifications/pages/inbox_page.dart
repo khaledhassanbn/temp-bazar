@@ -6,6 +6,7 @@ import 'package:provider/provider.dart';
 
 import '../../authentication/guards/AuthGuard.dart';
 import '../../theme/app_color.dart';
+import '../models/inbox_message_model.dart';
 import '../viewmodels/inbox_viewmodel.dart';
 
 class InboxPage extends StatefulWidget {
@@ -64,7 +65,7 @@ class _InboxPageState extends State<InboxPage> {
                         vertical: 2,
                       ),
                       decoration: BoxDecoration(
-                        color: AppColors.mainColor,
+                        color: Colors.red,
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: Text(
@@ -81,6 +82,36 @@ class _InboxPageState extends State<InboxPage> {
               );
             },
           ),
+          actions: [
+            Consumer<InboxViewModel>(
+              builder: (context, vm, _) {
+                if (vm.unreadCount == 0) return const SizedBox.shrink();
+
+                return TextButton.icon(
+                  onPressed: vm.markAllAsRead,
+                  style: TextButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(horizontal: 10),
+                    minimumSize: Size.zero,
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  ),
+                  icon: const Icon(
+                    Icons.done_all,
+                    size: 16,
+                    color: AppColors.mainColor,
+                  ),
+                  label: const Text(
+                    'الكل مقروء',
+                    style: TextStyle(
+                      fontFamily: 'NotoSansArabic',
+                      fontSize: 12,
+                      color: AppColors.mainColor,
+                    ),
+                  ),
+                );
+              },
+            ),
+            const SizedBox(width: 4),
+          ],
         ),
         body: Consumer<InboxViewModel>(
           builder: (context, vm, _) {
@@ -134,8 +165,12 @@ class _InboxPageState extends State<InboxPage> {
                   return _InboxTile(
                     message: message,
                     onTap: () async {
+                      final vm = context.read<InboxViewModel>();
+                      if (!message.isRead) {
+                        await vm.markAsRead(message.id);
+                      }
+                      if (!context.mounted) return;
                       await context.push('/inbox/${message.id}');
-                      if (context.mounted) await _initInbox();
                     },
                   );
                 },
@@ -149,7 +184,7 @@ class _InboxPageState extends State<InboxPage> {
 }
 
 class _InboxTile extends StatelessWidget {
-  final dynamic message;
+  final InboxMessageModel message;
   final VoidCallback onTap;
 
   const _InboxTile({required this.message, required this.onTap});

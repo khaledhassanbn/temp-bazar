@@ -1,84 +1,101 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
+import 'delivery_fee_zone.dart';
 
 /// نموذج إعدادات رسوم التوصيل
 /// يتم تخزينه في Firestore في settings/delivery_fee
 class DeliveryFeeSettings {
-  /// المسافة الأساسية (افتراضي 2 كم)
-  final double baseDistance;
-  
-  /// الرسوم الأساسية للمسافة الأساسية (افتراضي 30 جنيه)
-  final double baseFee;
-  
-  /// الحد الأقصى للمستوى الأول (افتراضي 5 كم)
-  final double tier1MaxDistance;
-  
-  /// سعر الكيلومتر في المستوى الأول (افتراضي 1 جنيه)
-  final double tier1FeePerKm;
-  
-  /// الحد الأقصى للمستوى الثاني (افتراضي 100 كم)
-  final double tier2MaxDistance;
-  
-  /// سعر الكيلومتر في المستوى الثاني (افتراضي 3 جنيه)
-  final double tier2FeePerKm;
+  final List<DeliveryFeeZone> zones;
 
   DeliveryFeeSettings({
-    this.baseDistance = 2.0,
-    this.baseFee = 30.0,
-    this.tier1MaxDistance = 5.0,
-    this.tier1FeePerKm = 1.0,
-    this.tier2MaxDistance = 100.0,
-    this.tier2FeePerKm = 3.0,
-  });
+    List<DeliveryFeeZone>? zones,
+  }) : zones = zones ?? _defaultZones;
+
+  static const List<DeliveryFeeZone> _defaultZones = [
+    DeliveryFeeZone(from: 0, to: 2, fee: 25),
+    DeliveryFeeZone(from: 2, to: 5, fee: 35),
+    DeliveryFeeZone(from: 5, to: 8, fee: 50),
+  ];
 
   /// القيم الافتراضية
   factory DeliveryFeeSettings.defaults() => DeliveryFeeSettings();
 
   /// إنشاء من Map (Firestore)
   factory DeliveryFeeSettings.fromMap(Map<String, dynamic> map) {
-    return DeliveryFeeSettings(
-      baseDistance: (map['baseDistance'] ?? 2.0).toDouble(),
-      baseFee: (map['baseFee'] ?? 30.0).toDouble(),
-      tier1MaxDistance: (map['tier1MaxDistance'] ?? 5.0).toDouble(),
-      tier1FeePerKm: (map['tier1FeePerKm'] ?? 1.0).toDouble(),
-      tier2MaxDistance: (map['tier2MaxDistance'] ?? 100.0).toDouble(),
-      tier2FeePerKm: (map['tier2FeePerKm'] ?? 3.0).toDouble(),
-    );
+    final zonesData = map['zones'];
+    if (zonesData is List && zonesData.isNotEmpty) {
+      return DeliveryFeeSettings(
+        zones: zonesData
+            .whereType<Map>()
+            .map((zone) => DeliveryFeeZone.fromMap(Map<String, dynamic>.from(zone)))
+            .toList(),
+      );
+    }
+    return DeliveryFeeSettings.defaults();
   }
 
   /// تحويل إلى Map للحفظ في Firestore
   Map<String, dynamic> toMap() {
     return {
-      'baseDistance': baseDistance,
-      'baseFee': baseFee,
-      'tier1MaxDistance': tier1MaxDistance,
-      'tier1FeePerKm': tier1FeePerKm,
-      'tier2MaxDistance': tier2MaxDistance,
-      'tier2FeePerKm': tier2FeePerKm,
-      'updatedAt': FieldValue.serverTimestamp(),
+      'zones': sortedZones.map((zone) => zone.toMap()).toList(),
     };
+  }
+
+  List<DeliveryFeeZone> get sortedZones {
+    final sorted = List<DeliveryFeeZone>.from(zones);
+    sorted.sort((a, b) => a.from.compareTo(b.from));
+    return sorted;
+  }
+
+  /// رسوم افتراضية عند عدم توفر المسافة
+  double get fallbackFee {
+    final sorted = sortedZones;
+    if (sorted.isEmpty) return 0;
+    return sorted.first.fee;
+  }
+
+  /// التحقق من صحة النطاقات قبل الحفظ
+  static String? validateZones(List<DeliveryFeeZone> zones) {
+    if (zones.isEmpty) {
+      return 'يجب إضافة منطقة واحدة على الأقل';
+    }
+
+    for (var i = 0; i < zones.length; i++) {
+      final zone = zones[i];
+      if (zone.from >= zone.to) {
+        return 'في المنطقة ${i + 1}: قيمة "من" يجب أن تكون أقل من "إلى"';
+      }
+      if (zone.fee <= 0) {
+        return 'في المنطقة ${i + 1}: الرسوم يجب أن تكون أكبر من صفر';
+      }
+    }
+
+    final sorted = List<DeliveryFeeZone>.from(zones)
+      ..sort((a, b) => a.from.compareTo(b.from));
+
+    for (var i = 0; i < sorted.length; i++) {
+      for (var j = i + 1; j < sorted.length; j++) {
+        if (sorted[i].from == sorted[j].from && sorted[i].to == sorted[j].to) {
+          return 'يوجد نطاقات مكررة (${sorted[i].from} - ${sorted[i].to} كم)';
+        }
+      }
+      if (i > 0 && sorted[i].from < sorted[i - 1].to) {
+        return 'النطاقات متداخلة بين ${sorted[i - 1].from}-${sorted[i - 1].to} و ${sorted[i].from}-${sorted[i].to} كم';
+      }
+    }
+
+    return null;
   }
 
   /// نسخ مع تعديل
   DeliveryFeeSettings copyWith({
-    double? baseDistance,
-    double? baseFee,
-    double? tier1MaxDistance,
-    double? tier1FeePerKm,
-    double? tier2MaxDistance,
-    double? tier2FeePerKm,
+    List<DeliveryFeeZone>? zones,
   }) {
     return DeliveryFeeSettings(
-      baseDistance: baseDistance ?? this.baseDistance,
-      baseFee: baseFee ?? this.baseFee,
-      tier1MaxDistance: tier1MaxDistance ?? this.tier1MaxDistance,
-      tier1FeePerKm: tier1FeePerKm ?? this.tier1FeePerKm,
-      tier2MaxDistance: tier2MaxDistance ?? this.tier2MaxDistance,
-      tier2FeePerKm: tier2FeePerKm ?? this.tier2FeePerKm,
+      zones: zones ?? this.zones,
     );
   }
 
   @override
   String toString() {
-    return 'DeliveryFeeSettings(baseDistance: $baseDistance, baseFee: $baseFee, tier1MaxDistance: $tier1MaxDistance, tier1FeePerKm: $tier1FeePerKm, tier2MaxDistance: $tier2MaxDistance, tier2FeePerKm: $tier2FeePerKm)';
+    return 'DeliveryFeeSettings(zones: $zones)';
   }
 }

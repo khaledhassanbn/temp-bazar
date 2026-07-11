@@ -71,11 +71,20 @@ bool _isPublicPath(String path) {
 
 Future<GoRouter> createRouter(AuthGuard authGuard) async {
   try {
-    await authGuard.loadUserStatus();
+    // إضافة timeout لتحميل حالة المستخدم عشان لو مفيش نت ميقفش
+    await authGuard.loadUserStatus().timeout(
+      const Duration(seconds: 8),
+      onTimeout: () {
+        print('⚠️ loadUserStatus timed out, continuing with defaults');
+      },
+    );
     authGuard.startStatusListener();
 
     // التحقق من حالة الأونبوردينج
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = await SharedPreferences.getInstance().timeout(
+      const Duration(seconds: 5),
+      onTimeout: () => throw Exception('SharedPreferences timeout'),
+    );
     final onboardingCompleted = prefs.getBool('onboarding_completed') ?? false;
 
     final router = GoRouter(

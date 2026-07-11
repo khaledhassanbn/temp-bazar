@@ -6,6 +6,7 @@ import 'package:google_places_flutter/model/prediction.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:bazar_suez/services/zones/zone_repository.dart';
 
 class MapPickerPage extends StatefulWidget {
   final LatLng? initial;
@@ -54,8 +55,7 @@ class _MapPickerPageState extends State<MapPickerPage> {
     super.dispose();
   }
 
-  /// 🔍 جلب العنوان بدقة باستخدام Google Geocoding API (مع اللغة العربية)
-  /// 🔍 جلب العنوان بدقة باستخدام Google Geocoding API (مع اللغة العربية)
+  /// تحديد اسم المنطقة من ZoneRepository
   Future<void> _updateAddress(LatLng pos) async {
     if (!mounted) return;
 
@@ -72,56 +72,10 @@ class _MapPickerPageState extends State<MapPickerPage> {
       return;
     }
 
-    final url =
-        "https://maps.googleapis.com/maps/api/geocode/json?latlng=${pos.latitude},${pos.longitude}&language=ar&key=$apiKey";
-    try {
-      final res = await http.get(Uri.parse(url));
-      final data = json.decode(res.body);
-
-      if (data["status"] == "OK" && data["results"].isNotEmpty) {
-        final results = data["results"] as List;
-
-        // 🔍 نحاول نلاقي النتيجة اللي فيها نوع "neighborhood"
-        Map<String, dynamic>? neighborhoodResult;
-        for (var r in results) {
-          final types = (r["types"] as List?)?.cast<String>() ?? [];
-          if (types.contains("neighborhood")) {
-            neighborhoodResult = r;
-            break;
-          }
-        }
-
-        String? neighborhoodName;
-
-        if (neighborhoodResult != null) {
-          // نبحث داخل address_components
-          final comps = (neighborhoodResult["address_components"] as List)
-              .cast<Map<String, dynamic>>();
-          for (var c in comps) {
-            final types = (c["types"] as List?)?.cast<String>() ?? [];
-            if (types.contains("neighborhood")) {
-              neighborhoodName = c["short_name"] ?? c["long_name"];
-              break;
-            }
-          }
-        }
-
-        // لو لاقينا اسم الحي نعرضه، غير كده نعرض أول عنوان عادي
-        setState(() {
-          _isInsideSuez = true;
-          _address =
-              neighborhoodName ?? data["results"][0]["formatted_address"];
-        });
-      } else {
-        setState(() {
-          _address = "تعذر تحديد العنوان";
-        });
-      }
-    } catch (e) {
-      setState(() {
-        _address = "حدث خطأ أثناء جلب العنوان";
-      });
-    }
+    setState(() {
+      _isInsideSuez = true;
+      _address = ZoneRepository.instance.getZoneName(pos.latitude, pos.longitude);
+    });
   }
 
   LatLng _clampToBounds(LatLng pos) {

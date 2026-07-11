@@ -1,0 +1,230 @@
+# نظام إدارة المناطق (Zone Management System)
+
+## الهدف
+إنشاء نظام احترافي يجعل ملف المناطق (zones JSON) هو **المصدر الوحيد (Single Source of Truth)** لجميع أسماء المناطق، مع استبدال كل استخدامات Google Reverse Geocoding و Placemark بالكامل.
+
+---
+
+## User Review Required
+
+> [!IMPORTANT]
+> **ملف zones_v1.json الحالي لا يحتوي على `id` لكل منطقة.** هيكل المنطقة الحالي يحتوي فقط على `name`, `center`, `radius`, `district`, `governorate`. هل تريدني أن أضيف `id` تلقائي (مثل `zone_1`, `zone_2`...) أو أنشئ ID من الاسم (مثل `al_sabah`, `al_herfyeen`)؟ سأستخدم UUID قصير تلقائي كقيمة افتراضية.
+
+> [!IMPORTANT]
+> **تطبيق الأدمن في مسار مختلف** (`D:\project\suezadmin\suez_admin`) وهو خارج workspace المشروع الحالي. سأقوم بالتعديل على كلا المشروعين.
+
+> [!WARNING]
+> **الملف الحالي `zones_v1.json` موجود في root المشروع** وليس في `assets/`. سيتم نقل نسخة منه إلى `assets/zones/` كملف fallback افتراضي.
+
+---
+
+## Open Questions
+
+> [!IMPORTANT]
+> 1. **هل تريد حفظ `zoneName` في Firestore عند إنشاء الطلب؟** حالياً العنوان (`address`) يُحفظ كنص. هل تريد إضافة حقل `zoneName` منفصل في بيانات الطلب/العنوان؟
+> 2. **هل file_picker مُثبت في تطبيق الأدمن؟** سأحتاج إضافته لاختيار ملف JSON. الأدمن يعمل على الهاتف أم الويب؟
+
+---
+
+## Proposed Changes
+
+### المكون 1: نموذج البيانات (Zone Model) — تطبيق المتاجر
+
+#### [NEW] [zone_model.dart](file:///d:/project/bazarsuez/bazar_suez/temp_bazar/lib/services/zones/zone_model.dart)
+- نموذج `Zone` يحتوي على: `id`, `name`, `district`, `governorate`, `center` (lat/lng), `radius`
+- نموذج `ZoneResult` يحتوي على: `zone`, `distance`, `isInsideRadius`
+- Factory methods: `fromJson()`, `toJson()`
+
+#### [NEW] [zones_data.dart](file:///d:/project/bazarsuez/bazar_suez/temp_bazar/lib/services/zones/zones_data.dart)
+- نموذج `ZonesData` يحتوي على: `version`, `zones` (List), `governorates`, `districts`
+- التحقق من صحة البيانات
+- Factory: `fromJson()`
+
+---
+
+### المكون 2: ZoneRepository — تطبيق المتاجر
+
+#### [NEW] [zone_repository.dart](file:///d:/project/bazarsuez/bazar_suez/temp_bazar/lib/services/zones/zone_repository.dart)
+- **Singleton** pattern
+- `initialize()`: تحميل الملف عند تشغيل التطبيق
+- `findNearestZone(double lat, double lng)` → `ZoneResult`
+  - إذا كانت النقطة داخل radius → إرجاع تلك المنطقة
+  - إذا لم تكن → إرجاع أقرب center
+- `getZoneName(double lat, double lng)` → `String`
+- `getAllZones()` → `List<Zone>`
+- `_haversineDistance()`: حساب المسافة
+- **Cache في الذاكرة**: تحميل مرة واحدة فقط
+
+---
+
+### المكون 3: تحديث الملف تلقائياً — تطبيق المتاجر
+
+#### [NEW] [zone_update_service.dart](file:///d:/project/bazarsuez/bazar_suez/temp_bazar/lib/services/zones/zone_update_service.dart)
+- عند تشغيل التطبيق:
+  1. قراءة `currentZonesVersion` من Firestore (`system/config`)
+  2. مقارنة مع النسخة المحلية (SharedPreferences)
+  3. إذا كانت Firebase أحدث → تنزيل من Firebase Storage
+  4. حفظ محلياً في `getApplicationDocumentsDirectory()`
+  5. تحديث النسخة المحلية
+- Fallback: استخدام `assets/zones/zones_v1.json` كنسخة افتراضية
+- عدم crash عند فشل التحميل
+
+#### [MODIFY] [main.dart](file:///d:/project/bazarsuez/bazar_suez/temp_bazar/lib/main.dart)
+- إضافة `await ZoneRepository.instance.initialize()` في `main()` قبل `runApp()`
+- ضمان تهيئة المناطق قبل عرض أي شاشة
+
+---
+
+### المكون 4: استبدال Reverse Geocoding — تطبيق المتاجر
+
+#### [MODIFY] [saved_locations_viewmodel.dart](file:///d:/project/bazarsuez/bazar_suez/temp_bazar/lib/markets/saved_locations/viewmodels/saved_locations_viewmodel.dart)
+**أهم ملف — يحتوي على كل منطق Reverse Geocoding**
+- **حذف**: `_apiKey`, `_fetchAddressFromCoordinates()`, `_extractNeighborhood()`
+- **استبدال**: استخدام `ZoneRepository.instance.getZoneName(lat, lng)` بدلاً من Google Geocoding API
+- **حذف**: `import 'package:http/http.dart'` و `import 'dart:convert'`
+- `_fetchAddressInBackground()` → `_resolveZoneName(GeoPoint location)`
+- `_saveToCache()` و `_loadFromCache()` تبقى كما هي لكن تحفظ zone name
+
+#### [MODIFY] [MapPickerPage.dart](file:///d:/project/bazarsuez/bazar_suez/temp_bazar/lib/markets/cart/pages/MapPickerPage.dart)
+**صفحة اختيار الموقع في سلة التسوق**
+- **حذف**: كل كود Google Geocoding API (السطور 57-124)
+- **استبدال**: `_updateAddress()` تستخدم `ZoneRepository.instance.getZoneName()`
+- **حذف**: `import 'package:http/http.dart'` و `import 'dart:convert'`
+- إزالة neighborhood extraction logic بالكامل
+
+#### [MODIFY] [map_picker_page.dart](file:///d:/project/bazarsuez/bazar_suez/temp_bazar/lib/markets/create_market/pages/map_picker_page.dart)
+**صفحة اختيار موقع المتجر الجديد**
+- **حذف**: Google Geocoding API call (السطور 51-73)
+- **استبدال**: `_updateAddress()` تستخدم `ZoneRepository`
+- **حذف**: `import 'package:http/http.dart'` و `import 'dart:convert'`
+
+#### الملفات التي تعرض `displayAddress` (لا تحتاج تعديل مباشر)
+هذه الملفات تعتمد على `SavedLocationsViewModel.displayAddress` الذي سيُعدَّل تلقائياً:
+- [home_page.dart](file:///d:/project/bazarsuez/bazar_suez/temp_bazar/lib/markets/home_page/pages/home_page.dart) (سطر 260)
+- [location_app_bar_widget.dart](file:///d:/project/bazarsuez/bazar_suez/temp_bazar/lib/markets/saved_locations/widgets/location_app_bar_widget.dart) (سطر 56)
+- [category_market_page.dart](file:///d:/project/bazarsuez/bazar_suez/temp_bazar/lib/markets/Markets_after_category/pages/category_market_page.dart) (سطر 295)
+- [craftsmen_home_page.dart](file:///d:/project/bazarsuez/bazar_suez/temp_bazar/lib/craftsmen/pages/craftsmen_home_page.dart) (سطر 372)
+
+---
+
+### المكون 5: أصول التطبيق — تطبيق المتاجر
+
+#### [NEW] zones_v1.json → [zones_v1.json](file:///d:/project/bazarsuez/bazar_suez/temp_bazar/assets/zones/zones_v1.json)
+- نسخة من الملف الحالي مع إضافة `id` لكل منطقة
+- يُستخدم كـ fallback عند عدم وجود إنترنت
+
+#### [MODIFY] [pubspec.yaml](file:///d:/project/bazarsuez/bazar_suez/temp_bazar/pubspec.yaml)
+- إضافة `- assets/zones/` في قسم assets
+- إضافة `path_provider` dependency (لحفظ الملف محلياً)
+
+---
+
+### المكون 6: تطبيق الأدمن — صفحة إدارة المناطق
+
+#### [NEW] [zone_management_page.dart](file:///d:/project/suezadmin/suez_admin/lib/zones/pages/zone_management_page.dart)
+**صفحة كاملة تحتوي على:**
+- عرض النسخة الحالية (`currentZonesVersion`, `fileName`, `updatedAt`)
+- زر اختيار ملف JSON (file picker)
+- التحقق التلقائي:
+  - اسم الملف يطابق `zones_vX.json`
+  - استخراج رقم النسخة من الاسم
+  - قراءة وتحليل JSON
+  - التأكد من وجود `version`, `zones`
+  - التأكد من كل منطقة تحتوي على `id`, `name`, `center.lat`, `center.lng`, `radius`
+  - كشف Duplicate IDs و Duplicate zone names
+  - التأكد من تطابق version داخل الملف مع الاسم
+- شاشة Preview:
+  - رقم الإصدار
+  - عدد المناطق
+  - أسماء جميع المناطق
+  - حجم الملف
+  - حالة الصلاحية (✔/❌) مع تفاصيل الأخطاء
+- التحقق من أن النسخة الجديدة > الحالية
+- رفع الملف إلى Firebase Storage
+- تحديث Firestore (`system/config`)
+
+#### [NEW] [zone_management_service.dart](file:///d:/project/suezadmin/suez_admin/lib/zones/services/zone_management_service.dart)
+- `getCurrentConfig()` → قراءة config من Firestore
+- `validateZoneFile()` → تحقق شامل
+- `uploadZoneFile()` → رفع إلى Storage + تحديث Firestore
+- `getPreviewData()` → بيانات المعاينة
+
+#### [MODIFY] [admin_routes.dart](file:///d:/project/suezadmin/suez_admin/lib/router/routes_config/admin_routes.dart)
+- إضافة route: `/admin/zone-management`
+
+#### [MODIFY] [dashboard_page.dart](file:///d:/project/suezadmin/suez_admin/lib/dashboard/dashboard_page.dart)
+- إضافة عنصر "إدارة المناطق" في قسم "إدارة النظام والأمان"
+
+#### [MODIFY] [pubspec.yaml](file:///d:/project/suezadmin/suez_admin/pubspec.yaml)
+- إضافة `file_picker` dependency لاختيار الملف
+
+---
+
+## ملخص الملفات
+
+### ملفات جديدة (7 ملفات)
+| # | الملف | المشروع | الوصف |
+|---|-------|---------|-------|
+| 1 | `lib/services/zones/zone_model.dart` | المتاجر | نموذج Zone |
+| 2 | `lib/services/zones/zones_data.dart` | المتاجر | نموذج ZonesData |
+| 3 | `lib/services/zones/zone_repository.dart` | المتاجر | الخدمة الرئيسية (Singleton) |
+| 4 | `lib/services/zones/zone_update_service.dart` | المتاجر | تحديث تلقائي من Firebase |
+| 5 | `assets/zones/zones_v1.json` | المتاجر | ملف المناطق الافتراضي |
+| 6 | `lib/zones/pages/zone_management_page.dart` | الأدمن | صفحة إدارة المناطق |
+| 7 | `lib/zones/services/zone_management_service.dart` | الأدمن | خدمة إدارة المناطق |
+
+### ملفات معدّلة (8 ملفات)
+| # | الملف | المشروع | نوع التعديل |
+|---|-------|---------|-------------|
+| 1 | `saved_locations_viewmodel.dart` | المتاجر | استبدال Geocoding بـ ZoneRepository |
+| 2 | `MapPickerPage.dart` (cart) | المتاجر | استبدال Geocoding بـ ZoneRepository |
+| 3 | `map_picker_page.dart` (create_market) | المتاجر | استبدال Geocoding بـ ZoneRepository |
+| 4 | `main.dart` | المتاجر | إضافة تهيئة ZoneRepository |
+| 5 | `pubspec.yaml` | المتاجر | إضافة assets و path_provider |
+| 6 | `admin_routes.dart` | الأدمن | إضافة route جديد |
+| 7 | `dashboard_page.dart` | الأدمن | إضافة عنصر في القائمة |
+| 8 | `pubspec.yaml` | الأدمن | إضافة file_picker |
+
+---
+
+## Verification Plan
+
+### Automated Tests
+- التحقق من بناء المشروعين بدون أخطاء: `flutter analyze`
+
+### Manual Verification
+1. **تطبيق المتاجر:**
+   - فتح التطبيق → يجب أن يعرض اسم المنطقة من الملف المحلي
+   - فتح صفحة الخريطة → تحريك المؤشر → يعرض اسم المنطقة الصحيح
+   - إضافة عنوان جديد → يحفظ اسم المنطقة (وليس عنوان Google)
+   - إيقاف الإنترنت → يعمل بالملف المحلي بدون crash
+
+2. **تطبيق الأدمن:**
+   - فتح صفحة إدارة المناطق → تعرض النسخة الحالية
+   - اختيار ملف JSON صالح → تظهر المعاينة
+   - اختيار ملف JSON غير صالح → تظهر الأخطاء ويُمنع الرفع
+   - رفع ملف جديد → يتم التحديث في Firestore و Storage
+
+---
+
+## الرسم التوضيحي للنظام
+
+```mermaid
+graph TD
+    A["تطبيق الأدمن"] -->|"رفع zones_vX.json"| B["Firebase Storage"]
+    A -->|"تحديث version"| C["Firestore system/config"]
+    
+    D["تطبيق المتاجر - عند التشغيل"] -->|"قراءة version"| C
+    D -->|"مقارنة مع النسخة المحلية"| E{"أحدث؟"}
+    E -->|"نعم"| F["تنزيل الملف الجديد"]
+    E -->|"لا"| G["استخدام النسخة المحلية"]
+    F --> H["حفظ محلياً + تحميل في الذاكرة"]
+    G --> H
+    
+    H --> I["ZoneRepository (Cache)"]
+    
+    J["SavedLocationsViewModel"] -->|"getZoneName(lat, lng)"| I
+    K["MapPickerPage - Cart"] -->|"getZoneName(lat, lng)"| I
+    L["MapPickerPage - Create Market"] -->|"getZoneName(lat, lng)"| I
+    M["Home Page / AppBar"] -->|"displayAddress"| J
+```

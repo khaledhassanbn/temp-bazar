@@ -208,6 +208,7 @@ class _MarketAnimatedPageState extends State<MarketAnimatedPage>
     final old = _tabController;
     _tabController = TabController(length: desiredLength, vsync: this);
     WidgetsBinding.instance.addPostFrameCallback((_) => old.dispose());
+    if (mounted) setState(() {});
   }
 
   /// حساب الترتيب مرة واحدة حتى لا يُعاد عند كل notify

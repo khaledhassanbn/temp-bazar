@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../models/inbox_message_model.dart';
@@ -15,6 +16,80 @@ class InboxService {
 
   static const _readIdsKey = 'read_announcements';
   static const _readDatesKey = 'read_announcement_dates';
+  static const _dateEntrySeparator = '|';
+
+  Set<String>? _readIdsCache;
+  String? _readIdsCacheUserId;
+
+  String _scopedKey(String baseKey) {
+    final userId = FirebaseAuth.instance.currentUser?.uid;
+    return userId != null ? '${baseKey}_$userId' : baseKey;
+  }
+
+  /// id|iso8601 — الفاصل | لأن تواريخ ISO8601 تحتوي على :
+  static (String id, DateTime date)? _parseDateEntry(String entry) {
+    final trimmed = entry.trim();
+    if (trimmed.isEmpty) return null;
+
+    if (trimmed.contains(_dateEntrySeparator)) {
+      final sepIndex = trimmed.indexOf(_dateEntrySeparator);
+      final id = trimmed.substring(0, sepIndex);
+      final date = DateTime.tryParse(trimmed.substring(sepIndex + 1));
+      if (id.isNotEmpty && date != null) return (id, date);
+      return null;
+    }
+
+    // دعم الإدخالات القديمة: أول : فقط يفصل بين المعرّف والتاريخ
+    final colonIndex = trimmed.indexOf(':');
+    if (colonIndex <= 0) return null;
+    final id = trimmed.substring(0, colonIndex);
+    final date = DateTime.tryParse(trimmed.substring(colonIndex + 1));
+    if (id.isEmpty || date == null) return null;
+    return (id, date);
+  }
+
+  static String _formatDateEntry(String id, DateTime date) {
+    return '$id$_dateEntrySeparator${date.toIso8601String()}';
+  }
+
+  Future<Set<String>> _getReadIds() async {
+    final userId = FirebaseAuth.instance.currentUser?.uid;
+    if (_readIdsCache != null && _readIdsCacheUserId == userId) {
+      return Set<String>.from(_readIdsCache!);
+    }
+
+    final prefs = await SharedPreferences.getInstance();
+    final scopedKey = _scopedKey(_readIdsKey);
+    var ids = (prefs.getStringList(scopedKey) ?? []).toSet();
+
+    // ترحيل البيانات القديمة (مفتاح عام بدون userId)
+    if (ids.isEmpty && userId != null) {
+      final legacyIds = (prefs.getStringList(_readIdsKey) ?? []).toSet();
+      if (legacyIds.isNotEmpty) {
+        ids = legacyIds;
+        await prefs.setStringList(scopedKey, ids.toList());
+      }
+    }
+
+    _readIdsCache = ids;
+    _readIdsCacheUserId = userId;
+    return Set<String>.from(ids);
+  }
+
+  Future<void> _saveReadIds(Set<String> ids) async {
+    final userId = FirebaseAuth.instance.currentUser?.uid;
+    _readIdsCache = Set<String>.from(ids);
+    _readIdsCacheUserId = userId;
+
+    final prefs = await SharedPreferences.getInstance();
+    final saved = await prefs.setStringList(
+      _scopedKey(_readIdsKey),
+      ids.toList(),
+    );
+    if (!saved) {
+      debugPrint('InboxService: failed to persist read announcement ids');
+    }
+  }
 
   static String audienceForUserStatus(String status, {bool isCraftsman = false}) {
     if (status == 'market_owner') return 'merchants';
@@ -22,14 +97,39 @@ class InboxService {
     return 'customers';
   }
 
-  Future<Set<String>> _getReadIds() async {
-    final prefs = await SharedPreferences.getInstance();
-    return (prefs.getStringList(_readIdsKey) ?? []).toSet();
+  Future<List<String>> _loadDateEntries(SharedPreferences prefs) async {
+    final scopedDatesKey = _scopedKey(_readDatesKey);
+    var entries = prefs.getStringList(scopedDatesKey) ?? [];
+
+    if (entries.isEmpty) {
+      final legacyEntries = prefs.getStringList(_readDatesKey) ?? [];
+      if (legacyEntries.isNotEmpty) {
+        entries = legacyEntries;
+        await prefs.setStringList(scopedDatesKey, entries);
+      }
+    }
+
+    return entries;
   }
 
-  Future<void> _saveReadIds(Set<String> ids) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setStringList(_readIdsKey, ids.toList());
+  Future<Map<String, DateTime>> _loadReadDates(SharedPreferences prefs) async {
+    final dates = <String, DateTime>{};
+    for (final entry in await _loadDateEntries(prefs)) {
+      final parsed = _parseDateEntry(entry);
+      if (parsed != null) {
+        dates[parsed.$1] = parsed.$2;
+      }
+    }
+    return dates;
+  }
+
+  Future<void> _saveReadDates(
+    SharedPreferences prefs,
+    Map<String, DateTime> dates,
+  ) async {
+    final entries =
+        dates.entries.map((e) => _formatDateEntry(e.key, e.value)).toList();
+    await prefs.setStringList(_scopedKey(_readDatesKey), entries);
   }
 
   bool _matchesAudience(Map<String, dynamic> data, String audience, String userId) {
@@ -135,35 +235,33 @@ class InboxService {
     }
   }
 
-  Future<void> markAsRead(String announcementId) async {
+  /// حفظ معرفات الرسائل المقروءة محلياً فقط (SharedPreferences).
+  Future<void> _appendReadIds(Iterable<String> ids) async {
     final readIds = await _getReadIds();
-    if (readIds.contains(announcementId)) return;
-
-    readIds.add(announcementId);
-    await _saveReadIds(readIds);
-
     final prefs = await SharedPreferences.getInstance();
-    final dates = Map<String, String>.from(
-      (prefs.getStringList(_readDatesKey) ?? []).fold<Map<String, String>>(
-        {},
-        (map, entry) {
-          final parts = entry.split(':');
-          if (parts.length == 2) map[parts[0]] = parts[1];
-          return map;
-        },
-      ),
-    );
-    dates[announcementId] = DateTime.now().toIso8601String();
-    await prefs.setStringList(
-      _readDatesKey,
-      dates.entries.map((e) => '${e.key}:${e.value}').toList(),
-    );
+    final dates = await _loadReadDates(prefs);
+    final now = DateTime.now();
+    var changed = false;
 
-    try {
-      await _firestore.collection('announcements').doc(announcementId).update({
-        'stats.inAppReadCount': FieldValue.increment(1),
-      });
-    } catch (_) {}
+    for (final id in ids) {
+      if (readIds.add(id)) {
+        dates[id] = now;
+        changed = true;
+      }
+    }
+
+    if (!changed) return;
+
+    await _saveReadIds(readIds);
+    await _saveReadDates(prefs, dates);
+  }
+
+  Future<void> markAsRead(String announcementId) async {
+    await _appendReadIds([announcementId]);
+  }
+
+  Future<void> markAllAsRead(Iterable<String> announcementIds) async {
+    await _appendReadIds(announcementIds);
   }
 
   Future<InboxMessageModel?> getMessage(String announcementId) async {
@@ -174,29 +272,41 @@ class InboxService {
     return _mapDoc(doc, readIds);
   }
 
+  /// يحذف فقط السجلات الأقدم من 90 يوماً — لا يمسح كل القراءات عند فشل التحليل.
   Future<void> cleanupOldReadIds() async {
     final prefs = await SharedPreferences.getInstance();
     final cutoff = DateTime.now().subtract(const Duration(days: 90));
-    final readIds = (prefs.getStringList(_readIdsKey) ?? []).toSet();
-    final dateEntries = prefs.getStringList(_readDatesKey) ?? [];
+    final readIds = await _getReadIds();
+    final dateEntries = await _loadDateEntries(prefs);
 
     final keptDates = <String>[];
-    final keptIds = <String>{};
+    final expiredIds = <String>{};
 
     for (final entry in dateEntries) {
-      final parts = entry.split(':');
-      if (parts.length != 2) continue;
-      final id = parts[0];
-      final date = DateTime.tryParse(parts[1]);
-      if (date != null && date.isAfter(cutoff)) {
+      final parsed = _parseDateEntry(entry);
+      if (parsed == null) {
         keptDates.add(entry);
-        keptIds.add(id);
+        continue;
+      }
+
+      final (id, date) = parsed;
+      if (date.isAfter(cutoff)) {
+        keptDates.add(_formatDateEntry(id, date));
+      } else {
+        expiredIds.add(id);
       }
     }
 
-    final prunedIds = readIds.intersection(keptIds);
-    await prefs.setStringList(_readIdsKey, prunedIds.toList());
-    await prefs.setStringList(_readDatesKey, keptDates);
+    if (expiredIds.isEmpty && keptDates.length == dateEntries.length) {
+      return;
+    }
+
+    if (expiredIds.isNotEmpty) {
+      readIds.removeAll(expiredIds);
+      await _saveReadIds(readIds);
+    }
+
+    await prefs.setStringList(_scopedKey(_readDatesKey), keptDates);
   }
 
   String? get currentUserId => FirebaseAuth.instance.currentUser?.uid;

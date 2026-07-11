@@ -1,4 +1,3 @@
-// lib/markets/pages/create_store/map_picker_page.dart
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
@@ -6,6 +5,7 @@ import 'package:geolocator/geolocator.dart';
 import 'package:http/http.dart' as http;
 import 'package:google_places_flutter/google_places_flutter.dart';
 import 'package:google_places_flutter/model/prediction.dart';
+import 'package:bazar_suez/services/zones/zone_repository.dart';
 
 class MapPickerPage extends StatefulWidget {
   final LatLng? initial;
@@ -48,29 +48,11 @@ class _MapPickerPageState extends State<MapPickerPage> {
     super.dispose();
   }
 
-  /// 🔍 جلب العنوان من Google Geocoding API
+  /// تحديد اسم المنطقة من ZoneRepository
   Future<void> _updateAddress(LatLng pos) async {
-    final url =
-        "https://maps.googleapis.com/maps/api/geocode/json?latlng=${pos.latitude},${pos.longitude}&language=ar&key=$apiKey";
-
-    try {
-      final res = await http.get(Uri.parse(url));
-      final data = json.decode(res.body);
-
-      if (data["status"] == "OK" && data["results"].isNotEmpty) {
-        setState(() {
-          _address = data["results"][0]["formatted_address"];
-        });
-      } else {
-        setState(() {
-          _address = "تعذر تحديد العنوان";
-        });
-      }
-    } catch (e) {
-      setState(() {
-        _address = "حدث خطأ أثناء جلب العنوان";
-      });
-    }
+    setState(() {
+      _address = ZoneRepository.instance.getZoneName(pos.latitude, pos.longitude);
+    });
   }
 
   /// 🔁 ضمان بقاء النقطة داخل حدود السويس

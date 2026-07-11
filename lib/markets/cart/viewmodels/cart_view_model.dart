@@ -6,10 +6,10 @@ import '../models/cart_item_model.dart';
 /// Handles all cart-related business logic and Hive local storage
 class CartViewModel extends ChangeNotifier {
   static const String _cartBoxName = 'cart_box';
-  late Box<CartItemModel> _cartBox;
 
   List<CartItemModel> _cartItems = [];
   bool _isLoading = false;
+  bool _initialized = false;
   String? _error;
 
   /// رسوم التوصيل المحسوبة ديناميكياً
@@ -28,10 +28,18 @@ class CartViewModel extends ChangeNotifier {
     }
   }
 
+  Box<CartItemModel> get _cartBox {
+    if (!Hive.isBoxOpen(_cartBoxName)) {
+      throw StateError(
+        'Cart box is not open. Ensure HiveAdaptersSetup.initializeHive() runs in main().',
+      );
+    }
+    return Hive.box<CartItemModel>(_cartBoxName);
+  }
+
   @override
   void dispose() {
     _isDisposed = true;
-    _cartBox.close(); // Moving close here to ensure it happens on dispose
     super.dispose();
   }
 
@@ -93,18 +101,21 @@ class CartViewModel extends ChangeNotifier {
   String get currentMarketName =>
       _cartItems.isNotEmpty ? "المتجر الحالي" : "لا يوجد منتجات";
 
-  /// Initialize the cart ViewModel and load existing cart data
+  /// Initialize the cart ViewModel and load existing cart data.
+  /// The cart box is opened once in [HiveAdaptersSetup.initializeHive].
   Future<void> initialize() async {
+    if (_initialized) return;
+
     try {
       _isLoading = true;
       _error = null;
-      _safeNotifyListeners();
 
-      // Open the cart box
-      _cartBox = await Hive.openBox<CartItemModel>(_cartBoxName);
+      if (!Hive.isBoxOpen(_cartBoxName)) {
+        await Hive.openBox<CartItemModel>(_cartBoxName);
+      }
 
-      // Load existing cart items
       await _loadCartItems();
+      _initialized = true;
     } catch (e) {
       _error = 'فشل في تحميل بيانات السلة: ${e.toString()}';
       debugPrint('CartViewModel initialization error: $e');

@@ -177,11 +177,11 @@ class _CartPageState extends State<CartPage> {
         cartViewModel.setDeliveryFee(deliveryFee);
       } else {
         // لا يوجد بعد نقطة توصيل أو موقع المتجر: رسوم أساسية من الإعدادات (ليست ثابتة 30 برمجياً)
-        cartViewModel.setDeliveryFee(settings.baseFee);
+        cartViewModel.setDeliveryFee(settings.fallbackFee);
       }
     } catch (e) {
       debugPrint('خطأ في حساب رسوم التوصيل: $e');
-      cartViewModel.setDeliveryFee(DeliveryFeeSettings.defaults().baseFee);
+      cartViewModel.setDeliveryFee(DeliveryFeeSettings.defaults().fallbackFee);
     }
   }
 

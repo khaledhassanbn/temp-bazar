@@ -1,17 +1,15 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
 import 'package:geolocator/geolocator.dart';
-import 'package:http/http.dart' as http;
-import 'dart:convert';
 import 'dart:async';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../models/saved_location_model.dart';
 import '../../../services/saved_locations_service.dart';
+import '../../../services/zones/zone_repository.dart';
 
 /// ViewModel لإدارة العناوين المحفوظة
 class SavedLocationsViewModel extends ChangeNotifier {
   final SavedLocationsService _service = SavedLocationsService();
-  final String _apiKey = "AIzaSyA9bJxVt4G17WqaUeIHmpaHfmcOhsJddYA";
 
   List<SavedLocation> _savedLocations = [];
   SavedLocation? _selectedLocation;
@@ -82,7 +80,6 @@ class SavedLocationsViewModel extends ChangeNotifier {
   /// تهيئة الـ ViewModel
   Future<void> initialize() async {
     _isInitializing = true;
-    _safeNotifyListeners();
 
     try {
       await loadSavedLocations();
@@ -122,7 +119,7 @@ class SavedLocationsViewModel extends ChangeNotifier {
         _safeNotifyListeners(); // ✅ عرض سريع
         
         // جلب العنوان والتحسين في الخلفية
-        _fetchAddressInBackground(_currentLocation!);
+        _resolveZoneName(_currentLocation!);
         _refreshLocationInBackground();
         return;
       }
@@ -154,7 +151,7 @@ class SavedLocationsViewModel extends ChangeNotifier {
       _safeNotifyListeners();
 
       // جلب العنوان في الخلفية
-      _fetchAddressInBackground(_currentLocation!);
+      _resolveZoneName(_currentLocation!);
 
       // تحسين الدقة لاحقاً في الخلفية
       _improveAccuracyInBackground();
@@ -217,62 +214,30 @@ Future<bool> _checkAndRequestPermission() async {
         _hasLocation = true;
         _safeNotifyListeners();
         
-        _fetchAddressInBackground(_currentLocation!);
+        _resolveZoneName(_currentLocation!);
       } catch (_) {}
     });
   }
 
-  void _fetchAddressInBackground(GeoPoint location) {
+  void _resolveZoneName(GeoPoint location) {
     Future.microtask(() async {
-      await _fetchAddressFromCoordinates(
-        location.latitude,
-        location.longitude,
-      );
-    });
-  }
-
-  Future<void> _fetchAddressFromCoordinates(double lat, double lng) async {
-    try {
-      final url = "https://maps.googleapis.com/maps/api/geocode/json?latlng=$lat,$lng&language=ar&key=$_apiKey";
-      
-      final res = await http.get(Uri.parse(url)).timeout(const Duration(seconds: 4)); // ✅ timeout ضروري
-
-      final data = json.decode(res.body);
-      if (data["status"] == "OK" && data["results"].isNotEmpty) {
-        _currentAddress = _extractNeighborhood(data["results"]);
+      try {
+        final zoneName = ZoneRepository.instance.getZoneName(
+          location.latitude,
+          location.longitude,
+        );
+        _currentAddress = zoneName;
         _safeNotifyListeners();
-        
-        if (_currentLocation != null) {
-          await _saveToCache(_currentLocation!, _currentAddress!); // حفظ للمرة الجاية
-        }
-      }
-    } on TimeoutException {
-      if (_currentAddress == null) _currentAddress = 'موقعك الحالي';
-      _safeNotifyListeners();
-    } catch (e) {
-      debugPrint('خطأ في جلب العنوان: $e');
-      if (_currentAddress == null) _currentAddress = 'موقعك الحالي';
-      _safeNotifyListeners();
-    }
-  }
 
-  String _extractNeighborhood(List<dynamic> results) {
-    String? neighborhoodName;
-    for (var r in results) {
-      final types = (r["types"] as List?)?.cast<String>() ?? [];
-      if (types.contains("neighborhood")) {
-        final comps = (r["address_components"] as List).cast<Map<String, dynamic>>();
-        for (var c in comps) {
-          final cTypes = (c["types"] as List?)?.cast<String>() ?? [];
-          if (cTypes.contains("neighborhood")) {
-            neighborhoodName = c["short_name"] ?? c["long_name"];
-            break;
-          }
+        if (_currentLocation != null) {
+          await _saveToCache(_currentLocation!, zoneName);
         }
-        break;
+      } catch (e) {
+        debugPrint('خطأ في تحديد المنطقة: $e');
+        if (_currentAddress == null) _currentAddress = 'موقعك الحالي';
+        _safeNotifyListeners();
       }
-    }
-    return neighborhoodName ?? results[0]["formatted_address"] ?? 'موقعك الحالي';
+    });
   }
 
   Future<Map<String, dynamic>?> _loadFromCache() async {

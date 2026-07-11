@@ -44,7 +44,7 @@ class MarketAppBar extends StatelessWidget {
           height:
               kToolbarHeight +
               MediaQuery.of(context).padding.top +
-              (isMerged ? tabBarHeight : 0),
+              (isMerged && tabs.isNotEmpty ? tabBarHeight : 0),
           decoration: BoxDecoration(
             color: Colors.white.withOpacity(opacity),
             boxShadow: isMerged

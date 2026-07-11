@@ -71,11 +71,24 @@ class InboxViewModel extends ChangeNotifier {
   }
 
   Future<void> markAsRead(String announcementId) async {
+    if (_messages.any((m) => m.id == announcementId && m.isRead)) return;
+
     await _service.markAsRead(announcementId);
     _messages = _messages
         .map((m) => m.id == announcementId ? m.copyWith(isRead: true) : m)
         .toList();
     _unreadCount = _messages.where((m) => !m.isRead).length;
+    notifyListeners();
+  }
+
+  Future<void> markAllAsRead() async {
+    final unreadIds =
+        _messages.where((m) => !m.isRead).map((m) => m.id).toList();
+    if (unreadIds.isEmpty) return;
+
+    await _service.markAllAsRead(unreadIds);
+    _messages = _messages.map((m) => m.copyWith(isRead: true)).toList();
+    _unreadCount = 0;
     notifyListeners();
   }
 

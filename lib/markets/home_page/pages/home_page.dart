@@ -19,6 +19,7 @@ import '../../saved_locations/viewmodels/saved_locations_viewmodel.dart';
 import '../../saved_locations/widgets/saved_locations_sheet.dart';
 import '../../../authentication/guards/AuthGuard.dart';
 import '../../../ads/models/ad_model.dart';
+import '../../../notifications/widgets/inbox_badge.dart';
 
 class HomeAppColors {
   static const primary = Color(0xFF4E99B4);
@@ -640,23 +641,25 @@ class _SearchBar extends StatelessWidget {
           ),
         ),
         const SizedBox(width: 10),
-        GestureDetector(
-          onTap: () => context.push('/craftsmen'),
-          child: Container(
-            width: 50,
-            height: 50,
-            decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.15),
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(
-                color: Colors.white.withOpacity(0.3),
-                width: 1,
+        InboxBadge(
+          child: GestureDetector(
+            onTap: () => context.push('/inbox'),
+            child: Container(
+              width: 50,
+              height: 50,
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.15),
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(
+                  color: Colors.white.withOpacity(0.3),
+                  width: 1,
+                ),
               ),
-            ),
-            child: const Icon(
-              Icons.handyman_outlined,
-              color: Colors.white,
-              size: 22,
+              child: const Icon(
+                Icons.notifications_outlined,
+                color: Colors.white,
+                size: 22,
+              ),
             ),
           ),
         ),
@@ -965,7 +968,9 @@ class ModernCategoriesSection extends StatelessWidget {
                 )
               else
                 _CategoriesGridWithScroll(
-                  categories: vm.categories,
+                  categories: vm.categories
+                      .where((cat) => CategoryModel.isVisibleOnHomePage(cat.name))
+                      .toList(),
                   selectedCategoryId: selectedCategoryId,
                   onCategorySelected: onCategorySelected,
                 ),
