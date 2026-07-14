@@ -19,7 +19,7 @@ class ZoneRepository {
   bool get isInitialized => _initialized;
 
   Future<void> initialize() async {
-    if (_initialized) return;
+    if (_initialized && _data != null) return;
 
     try {
       final jsonString = await _updateService.loadZonesJson();
@@ -35,6 +35,12 @@ class ZoneRepository {
         _initialized = false;
       }
     }
+  }
+
+  /// يضمن تحميل بيانات المناطق قبل الاستخدام (مثلاً عند فتح الخريطة).
+  Future<void> ensureInitialized() async {
+    if (_initialized && _data != null) return;
+    await initialize();
   }
 
   void _loadFromJsonString(String jsonString) {

@@ -73,17 +73,37 @@ class WalletLedgerEntry {
       storeId: json['storeId'] ?? '',
       userId: json['userId'] ?? '',
       type: json['type'] ?? '',
-      amount: (json['amount'] ?? 0.0).toDouble(),
-      balanceBefore: (json['balanceBefore'] ?? 0.0).toDouble(),
-      balanceAfter: (json['balanceAfter'] ?? 0.0).toDouble(),
+      amount: _toDouble(json['amount']),
+      balanceBefore: _toDouble(json['balanceBefore']),
+      balanceAfter: _toDouble(json['balanceAfter']),
       referenceId: json['referenceId'],
       referenceType: json['referenceType'],
       description: json['description'] ?? '',
-      createdAt: json['createdAt'] != null
-          ? (json['createdAt'] as Timestamp).toDate()
-          : DateTime.now(),
+      createdAt: _parseCreatedAt(json['createdAt']),
       metadata: json['metadata'] as Map<String, dynamic>?,
     );
+  }
+
+  static double _toDouble(dynamic value) {
+    if (value == null) return 0.0;
+    if (value is num) return value.toDouble();
+    if (value is String) return double.tryParse(value) ?? 0.0;
+    return 0.0;
+  }
+
+  static DateTime _parseCreatedAt(dynamic value) {
+    if (value is Timestamp) return value.toDate();
+    if (value is DateTime) return value;
+    if (value is int) {
+      return value > 9999999999
+          ? DateTime.fromMillisecondsSinceEpoch(value)
+          : DateTime.fromMillisecondsSinceEpoch(value * 1000);
+    }
+    if (value is String) {
+      final parsed = DateTime.tryParse(value);
+      if (parsed != null) return parsed;
+    }
+    return DateTime.now();
   }
 
   Map<String, dynamic> toJson() {

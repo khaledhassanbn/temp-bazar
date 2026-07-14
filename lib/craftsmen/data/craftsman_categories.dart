@@ -175,3 +175,26 @@ String? findGroupNameById(String? groupId) {
   }
   return null;
 }
+
+CraftsmanCategoryGroup? findGroupById(String? groupId) {
+  if (groupId == null) return null;
+  for (final g in kCraftsmanCategoryGroups) {
+    if (g.id == groupId) return g;
+  }
+  return null;
+}
+
+/// ربط اختصارات الصفحة الرئيسية بمعرّفات المهن الفعلية.
+String? resolveProfessionIdFromShortcut(String shortcutId) {
+  const mapping = {
+    'plumber': 'plumber',
+    'electric': 'electrician',
+    'satellite': 'satellite_net',
+    'teacher': 'tutor',
+    'painter': 'painting_trade',
+    'ac': 'ac',
+    'carpenter': 'carpenter',
+    'cleaning': 'cleaning',
+  };
+  return mapping[shortcutId];
+}

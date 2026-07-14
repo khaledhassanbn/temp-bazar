@@ -222,6 +222,7 @@ Future<bool> _checkAndRequestPermission() async {
   void _resolveZoneName(GeoPoint location) {
     Future.microtask(() async {
       try {
+        await ZoneRepository.instance.ensureInitialized();
         final zoneName = ZoneRepository.instance.getZoneName(
           location.latitude,
           location.longitude,

@@ -98,12 +98,17 @@ class _CategoryCardState extends State<_CategoryCard> {
             alignment: Alignment.center,
             child: Text(group.emoji, style: const TextStyle(fontSize: 24)),
           ),
-          title: Text(
-            group.nameAr,
-            style: const TextStyle(
-              fontWeight: FontWeight.bold,
-              fontSize: 16,
-              color: Colors.black87,
+          title: InkWell(
+            onTap: () => context.push(
+              '/CraftsmenCategoryPage?groupId=${group.id}',
+            ),
+            child: Text(
+              group.nameAr,
+              style: const TextStyle(
+                fontWeight: FontWeight.bold,
+                fontSize: 16,
+                color: Colors.black87,
+              ),
             ),
           ),
           subtitle: Padding(
@@ -139,9 +144,12 @@ class _CategoryCardState extends State<_CategoryCard> {
             const Divider(height: 1, color: Color(0xFFF0F0F3)),
             ...group.professions.map<Widget>(
               (p) => InkWell(
-                onTap: () => context.push(
-                  '/craftsmen/browse?professionId=${p.id}',
-                ),
+                onTap: () {
+                  final profession = p;
+                  context.push(
+                    '/CraftsmenCategoryPage?groupId=${group.id}&professionId=${profession.id}',
+                  );
+                },
                 child: Padding(
                   padding: const EdgeInsets.symmetric(
                       horizontal: 16, vertical: 14),

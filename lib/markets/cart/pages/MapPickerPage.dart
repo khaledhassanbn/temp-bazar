@@ -59,6 +59,8 @@ class _MapPickerPageState extends State<MapPickerPage> {
   Future<void> _updateAddress(LatLng pos) async {
     if (!mounted) return;
 
+    await ZoneRepository.instance.ensureInitialized();
+
     if (pos.latitude < minLat ||
         pos.latitude > maxLat ||
         pos.longitude < minLng ||

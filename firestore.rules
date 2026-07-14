@@ -196,6 +196,25 @@ service cloud.firestore {
         // No updates or deletes allowed
         allow update, delete: if false;
       }
+
+      // إحصائيات المتجر — قراءة عامة، الكتابة للمالك أو الأدمن
+      match /statistics/{statId} {
+        allow read: if true;
+        allow write: if isStoreOwner(storeId) || isAdmin();
+      }
+
+      // مراجعات المتجر — قراءة عامة، الإنشاء لمستخدم مسجّل
+      match /reviews/{reviewId} {
+        allow read: if true;
+        allow create: if isAuthenticated();
+        allow update, delete: if isStoreOwner(storeId) || isAdmin();
+      }
+
+      // عناصر المنتجات (products/{categoryId}/items/{itemId})
+      match /products/{categoryId}/items/{itemId} {
+        allow read: if true;
+        allow write: if isStoreOwner(storeId) || isAdmin();
+      }
     }
     
     // ============================================================================
@@ -277,6 +296,16 @@ service cloud.firestore {
         isAdmin()
       );
       allow delete: if isSuperAdmin();
+
+      // المواقع المحفوظة — صاحب الحساب فقط
+      match /saved_locations/{locationId} {
+        allow read, write: if isAuthenticated() && request.auth.uid == userId;
+      }
+
+      // المتاجر المفضلة — صاحب الحساب فقط
+      match /favourite_markets/{marketId} {
+        allow read, write: if isAuthenticated() && request.auth.uid == userId;
+      }
     }
 
     // ============================================================================
@@ -432,13 +461,91 @@ service cloud.firestore {
       allow delete: if false;
     }
 
+    // wallet — إعدادات المحفظة (مثل رقم فودافون كاش للإيداع)
+    match /wallet/{docId} {
+      allow read: if isAuthenticated() ||
+        docId in [
+          'vodafonecachnummber',
+          'vodafonecashnumber',
+          'vodafonecachnumber',
+          'vodafone_cash_number'
+        ];
+      allow write: if isAdmin();
+    }
+
     // ============================================================================
-    // DEFAULT DENY
+    // CATEGORIES (فئات الصفحة الرئيسية) — قراءة عامة، الكتابة للأدمن
+    // تشمل subCategories و stores المتفرعة منها
     // ============================================================================
-    
-    // Deny all other collections by default
+
+    match /Categories/{document=**} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // ============================================================================
+    // APP SETTINGS (الإعلانات / home_ads) — قراءة عامة، الكتابة للأدمن
+    // ============================================================================
+
+    match /app_settings/{docId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // ============================================================================
+    // ANNOUNCEMENTS (صندوق الإشعارات) — قراءة عامة، الكتابة للأدمن
+    // ============================================================================
+
+    match /announcements/{docId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // ============================================================================
+    // PROMOTIONAL POPUPS — قراءة عامة، الكتابة للأدمن
+    // ============================================================================
+
+    match /promotional_popups/{docId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // ============================================================================
+    // ORDER NOTIFICATIONS — الإنشاء لمستخدم مسجّل، الإدارة للأدمن
+    // ============================================================================
+
+    match /order_notifications/{docId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated();
+      allow update, delete: if isAdmin();
+    }
+
+    // ============================================================================
+    // USER REPORTS (البلاغات) — الإنشاء لمستخدم مسجّل، الإدارة للمشرفين
+    // ============================================================================
+
+    match /user_reports/{docId} {
+      allow read: if isModeratorOrAbove();
+      allow create: if isAuthenticated();
+      allow update, delete: if isModeratorOrAbove();
+    }
+
+    // ============================================================================
+    // STORES (سجل مساعد يُكتب من خدمة الإشعارات) — الكتابة لمستخدم مسجّل
+    // ============================================================================
+
+    match /stores/{docId} {
+      allow read: if true;
+      allow write: if isAuthenticated();
+    }
+
+    // ============================================================================
+    // DEFAULT: قراءة مفتوحة للجميع، والكتابة محمية بالقواعد أعلاه فقط
+    // (اختيار المالك: افتح القراءة للكل مع حماية التعديل/الحذف)
+    // ============================================================================
+
     match /{document=**} {
-      allow read, write: if false;
+      allow read: if true;
     }
   }
 }

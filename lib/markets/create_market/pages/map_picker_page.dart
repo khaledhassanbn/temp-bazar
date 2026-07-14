@@ -50,6 +50,8 @@ class _MapPickerPageState extends State<MapPickerPage> {
 
   /// تحديد اسم المنطقة من ZoneRepository
   Future<void> _updateAddress(LatLng pos) async {
+    await ZoneRepository.instance.ensureInitialized();
+    if (!mounted) return;
     setState(() {
       _address = ZoneRepository.instance.getZoneName(pos.latitude, pos.longitude);
     });

@@ -13,6 +13,7 @@ import 'package:bazar_suez/markets/create_market/models/store_model.dart';
 import 'package:bazar_suez/services/delivery_fee/delivery_fee_service.dart';
 import 'package:bazar_suez/services/delivery_fee/delivery_fee_settings.dart';
 import 'package:bazar_suez/widgets/auth_gate.dart';
+import 'package:bazar_suez/craftsmen/data/craftsman_categories.dart';
 
 import '../../cart/viewmodels/cart_view_model.dart';
 import '../../saved_locations/viewmodels/saved_locations_viewmodel.dart';
@@ -1261,7 +1262,19 @@ class _ServiceProviderTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
-      onTap: () => context.push('/craftsmen?category=${service.id}'),
+      onTap: () {
+        final professionId = resolveProfessionIdFromShortcut(service.id);
+        if (professionId != null) {
+          final groupId = findProfessionById(professionId)?.groupId;
+          if (groupId != null) {
+            context.push(
+              '/CraftsmenCategoryPage?groupId=$groupId&professionId=$professionId',
+            );
+            return;
+          }
+        }
+        context.push('/craftsmen');
+      },
       child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.center,

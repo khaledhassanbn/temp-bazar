@@ -50,6 +50,7 @@ bool _isPublicPath(String path) {
   if (path.isEmpty || path == '/') return true;
   if (path == '/not-found') return true;
   if (path == '/CategoryMarketPage') return true;
+  if (path == '/CraftsmenCategoryPage') return true;
   if (path.startsWith('/market/')) return true;
   if (path.startsWith('/productdetails')) return true;
   if (path.startsWith('/craftsman/')) return true;

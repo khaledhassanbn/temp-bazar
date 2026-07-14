@@ -1,12 +1,36 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'dart:io';
+import 'package:flutter/foundation.dart';
 import '../models/wallet_transaction_model.dart';
 import '../models/wallet_ledger_model.dart';
+
+class DepositPhoneResult {
+  final String? phone;
+  final String? error;
+
+  const DepositPhoneResult({this.phone, this.error});
+
+  bool get isSuccess => phone != null && phone!.isNotEmpty;
+}
 
 class WalletService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final FirebaseStorage _storage = FirebaseStorage.instance;
+
+  static const _depositPhoneDocIds = [
+    'vodafonecachnumber', // المسار الفعلي في Firebase Console
+    'vodafonecachnummber',
+    'vodafonecashnumber',
+    'vodafone_cash_number',
+  ];
+
+  static const _depositSettingsDocIds = [
+    'wallet_deposit',
+    'wallet',
+    'deposit',
+    'vodafone_cash',
+  ];
 
   // Get user wallet balance
   Future<double> getWalletBalance(String userId) async {
@@ -25,31 +49,138 @@ class WalletService {
   // Get user phone number
   Future<String?> getUserPhoneNumber(String userId) async {
     try {
-      final doc = await _firestore.collection('users').doc(userId).get();
+      final doc = await _firestore
+          .collection('users')
+          .doc(userId)
+          .get(const GetOptions(source: Source.serverAndCache));
       final data = doc.data();
-      if (data != null && data['phone'] != null) {
-        return data['phone'] as String?;
-      }
-      return null;
+      if (data == null) return null;
+
+      return _extractPhoneFromData(data);
     } catch (e) {
+      debugPrint('getUserPhoneNumber error: $e');
       return null;
     }
   }
 
   // Get deposit phone number
-  Future<String?> getDepositPhoneNumber() async {
+  Future<DepositPhoneResult> getDepositPhoneNumber() async {
+    // قراءة مباشرة من المسار المعروف في قاعدة البيانات
     try {
       final doc = await _firestore
           .collection('wallet')
-          .doc('vodafonecachnummber')
+          .doc('vodafonecachnumber')
           .get();
-      if (doc.exists && doc.data() != null) {
-        return doc.data()!['number'] as String?;
+      if (doc.exists) {
+        final raw = doc.data()?['number'];
+        final phone = _readPhoneValue(raw);
+        if (phone != null) {
+          return DepositPhoneResult(phone: phone);
+        }
       }
-      return null;
     } catch (e) {
-      return null;
+      debugPrint('getDepositPhoneNumber direct read: $e');
     }
+
+    final errors = <String>[];
+
+    // 1) المستندات المعروفة في مجموعة wallet
+    for (final docId in _depositPhoneDocIds) {
+      try {
+        final doc = await _firestore.collection('wallet').doc(docId).get();
+        if (!doc.exists) continue;
+
+        final phone = _extractPhoneFromData(doc.data() ?? {});
+        if (phone != null) {
+          return DepositPhoneResult(phone: phone);
+        }
+      } catch (e) {
+        errors.add('wallet/$docId: $e');
+      }
+    }
+
+    // 2) بحث احتياطي في كامل مجموعة wallet (يعمل مهما تغيّر اسم المستند)
+    try {
+      final snapshot = await _firestore.collection('wallet').get();
+      for (final doc in snapshot.docs) {
+        final phone = _extractPhoneFromData(doc.data());
+        if (phone != null) {
+          return DepositPhoneResult(phone: phone);
+        }
+      }
+    } catch (e) {
+      errors.add('wallet (scan): $e');
+    }
+
+    // 3) مستندات الإعدادات كخيار أخير
+    for (final docId in _depositSettingsDocIds) {
+      try {
+        final doc = await _firestore.collection('settings').doc(docId).get();
+        if (!doc.exists) continue;
+
+        final phone = _extractPhoneFromData(doc.data() ?? {});
+        if (phone != null) {
+          return DepositPhoneResult(phone: phone);
+        }
+      } catch (e) {
+        errors.add('settings/$docId: $e');
+      }
+    }
+
+    return DepositPhoneResult(
+      error: errors.isEmpty
+          ? 'لم يُعثر على رقم فودافون كاش في قاعدة البيانات'
+          : errors.join(' | '),
+    );
+  }
+
+  static String? _readPhoneValue(dynamic value) {
+    if (value == null) return null;
+    final phone = value.toString().trim();
+    if (phone.isEmpty) return null;
+    final digitsOnly = phone.replaceAll(RegExp(r'\D'), '');
+    if (digitsOnly.length >= 10) return digitsOnly;
+    return phone;
+  }
+
+  static String? _extractPhoneFromData(Map<String, dynamic> data) {
+    const preferredKeys = [
+      'number',
+      'phone',
+      'phoneNumber',
+      'phone_number',
+      'vodafoneNumber',
+      'vodafoneCashNumber',
+      'depositNumber',
+      'value',
+    ];
+
+    for (final key in preferredKeys) {
+      final phone = _readPhoneValue(data[key]);
+      if (phone != null) return phone;
+    }
+
+    for (final entry in data.entries) {
+      final key = entry.key.toLowerCase();
+      if (key.contains('phone') ||
+          key.contains('number') ||
+          key.contains('vodafone') ||
+          key.contains('mobile')) {
+        final phone = _readPhoneValue(entry.value);
+        if (phone != null) return phone;
+      }
+    }
+
+    for (final entry in data.entries) {
+      if (entry.value is Map) {
+        final nested = _extractPhoneFromData(
+          Map<String, dynamic>.from(entry.value as Map),
+        );
+        if (nested != null) return nested;
+      }
+    }
+
+    return null;
   }
 
   // Create deposit request
@@ -103,13 +234,16 @@ class WalletService {
         .where('userId', isEqualTo: userId)
         .snapshots()
         .map((snapshot) {
-          final transactions = snapshot.docs
-              .map(
-                (doc) =>
-                    WalletTransaction.fromJson({'id': doc.id, ...doc.data()}),
-              )
-              .toList();
-          // Sort by createdAt descending
+          final transactions = <WalletTransaction>[];
+          for (final doc in snapshot.docs) {
+            try {
+              transactions.add(
+                WalletTransaction.fromJson({'id': doc.id, ...doc.data()}),
+              );
+            } catch (e) {
+              debugPrint('wallet_transactions parse error ${doc.id}: $e');
+            }
+          }
           transactions.sort((a, b) => b.createdAt.compareTo(a.createdAt));
           return transactions;
         });
@@ -146,16 +280,23 @@ class WalletService {
     return _firestore
         .collection('wallet_ledger')
         .where('userId', isEqualTo: userId)
-        .orderBy('createdAt', descending: true)
-        .limit(50)
         .snapshots()
-        .map(
-          (snapshot) => snapshot.docs
-              .map(
-                (doc) =>
-                    WalletLedgerEntry.fromJson({...doc.data(), 'id': doc.id}),
-              )
-              .toList(),
-        );
+        .map((snapshot) {
+          final entries = <WalletLedgerEntry>[];
+          for (final doc in snapshot.docs) {
+            try {
+              entries.add(
+                WalletLedgerEntry.fromJson({...doc.data(), 'id': doc.id}),
+              );
+            } catch (e) {
+              debugPrint('wallet_ledger parse error ${doc.id}: $e');
+            }
+          }
+          entries.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+          if (entries.length > 50) {
+            return entries.sublist(0, 50);
+          }
+          return entries;
+        });
   }
 }

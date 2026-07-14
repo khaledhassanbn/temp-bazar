@@ -1,6 +1,8 @@
 import 'dart:io';
-import 'package:flutter/services.dart';
+import 'dart:async';
+import 'dart:ui' as ui;
 
+import 'package:flutter/services.dart';
 import 'package:bazar_suez/markets/wallet/services/wallet_service.dart';
 import 'package:bazar_suez/theme/app_color.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -8,6 +10,18 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:bazar_suez/widgets/auth_gate.dart';
 import 'package:image_picker/image_picker.dart';
+
+class _DepositPageData {
+  const _DepositPageData({
+    this.depositNumber,
+    this.userPhone,
+    this.loadError,
+  });
+
+  final String? depositNumber;
+  final String? userPhone;
+  final String? loadError;
+}
 
 class DepositRequestPage extends StatefulWidget {
   const DepositRequestPage({super.key});
@@ -25,35 +39,65 @@ class _DepositRequestPageState extends State<DepositRequestPage> {
   final FirebaseAuth _auth = FirebaseAuth.instance;
   File? _selectedImage;
   bool _isSubmitting = false;
-  bool _isLoadingPhone = true;
-  String? _depositNumber;
+  late Future<_DepositPageData> _pageDataFuture;
+  bool _userPhoneApplied = false;
 
   @override
   void initState() {
     super.initState();
-    _loadInitialData();
+    _pageDataFuture = _fetchPageData();
   }
 
-  Future<void> _loadInitialData() async {
+  Future<_DepositPageData> _fetchPageData() async {
     final user = _auth.currentUser;
-    String? phone;
+    String? userPhone;
     String? depositPhone;
-    
-    if (user != null) {
-      phone = await _walletService.getUserPhoneNumber(user.uid);
-    }
-    
-    depositPhone = await _walletService.getDepositPhoneNumber();
+    String? loadError;
 
-    if (mounted) {
-      setState(() {
-        _phoneController.text = phone ?? '';
-        _depositNumber = depositPhone;
-        _isLoadingPhone = false;
-      });
+    try {
+      final depositResult = await _walletService
+          .getDepositPhoneNumber()
+          .timeout(const Duration(seconds: 20));
+      depositPhone = depositResult.phone;
+      if (!depositResult.isSuccess) {
+        loadError = depositResult.error;
+      }
+    } on TimeoutException {
+      loadError = 'انتهت مهلة تحميل البيانات. تحقق من الاتصال بالإنترنت.';
+    } catch (e) {
+      loadError = e.toString();
     }
+
+    if (user != null) {
+      try {
+        userPhone = await _walletService.getUserPhoneNumber(user.uid);
+        userPhone ??= user.phoneNumber;
+      } catch (_) {
+        userPhone ??= user.phoneNumber;
+      }
+    }
+
+    return _DepositPageData(
+      depositNumber: depositPhone,
+      userPhone: userPhone,
+      loadError: depositPhone != null ? null : loadError,
+    );
   }
 
+  void _retryLoad() {
+    setState(() {
+      _userPhoneApplied = false;
+      _pageDataFuture = _fetchPageData();
+    });
+  }
+
+  void _applyUserPhone(String? userPhone) {
+    if (_userPhoneApplied || userPhone == null || userPhone.trim().isEmpty) {
+      return;
+    }
+    _phoneController.text = userPhone.trim();
+    _userPhoneApplied = true;
+  }
   Future<void> _pickImage() async {
     try {
       final ImagePicker picker = ImagePicker();
@@ -155,7 +199,7 @@ class _DepositRequestPageState extends State<DepositRequestPage> {
   @override
   Widget build(BuildContext context) {
     return Directionality(
-      textDirection: TextDirection.rtl,
+      textDirection: ui.TextDirection.rtl,
       child: Scaffold(
         backgroundColor: const Color(0xFFF5F6FA),
         appBar: AppBar(
@@ -174,41 +218,92 @@ class _DepositRequestPageState extends State<DepositRequestPage> {
           ),
           centerTitle: true,
         ),
-        body: _isLoadingPhone
-            ? const Center(child: CircularProgressIndicator())
-            : SingleChildScrollView(
-                padding: const EdgeInsets.all(16),
-                child: Form(
-                  key: _formKey,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      // Deposit Info
-                      _buildDepositInfo(),
-                      // Amount Field
-                      _buildAmountField(),
-                      const SizedBox(height: 16),
-                      // Phone Field
-                      _buildPhoneField(),
-                      const SizedBox(height: 16),
-                      // Notes Field
-                      _buildNotesField(),
-                      const SizedBox(height: 24),
-                      // Image Picker
-                      _buildImagePicker(),
-                      const SizedBox(height: 32),
-                      // Submit Button
-                      _buildSubmitButton(),
-                    ],
-                  ),
+        body: FutureBuilder<_DepositPageData>(
+          future: _pageDataFuture,
+          builder: (context, snapshot) {
+            if (snapshot.connectionState == ConnectionState.waiting) {
+              return const Center(child: CircularProgressIndicator());
+            }
+
+            final data = snapshot.data ?? const _DepositPageData();
+            _applyUserPhone(data.userPhone);
+
+            return SingleChildScrollView(
+              padding: const EdgeInsets.all(16),
+              child: Form(
+                key: _formKey,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    _buildDepositInfo(
+                      depositNumber: data.depositNumber,
+                      loadError: data.loadError,
+                    ),
+                    _buildAmountField(),
+                    const SizedBox(height: 16),
+                    _buildPhoneField(),
+                    const SizedBox(height: 16),
+                    _buildNotesField(),
+                    const SizedBox(height: 24),
+                    _buildImagePicker(),
+                    const SizedBox(height: 32),
+                    _buildSubmitButton(),
+                  ],
                 ),
               ),
+            );
+          },
+        ),
       ),
     );
   }
 
-  Widget _buildDepositInfo() {
-    if (_depositNumber == null) return const SizedBox.shrink();
+  Widget _buildDepositInfo({
+    required String? depositNumber,
+    required String? loadError,
+  }) {
+    if (depositNumber == null) {
+      return Container(
+        margin: const EdgeInsets.only(bottom: 24),
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.orange.shade50,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: Colors.orange.shade200),
+        ),
+        child: Column(
+          children: [
+            const Text(
+              'رقم فودافون كاش غير متاح حالياً.',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: Color(0xFF92400E),
+                fontWeight: FontWeight.bold,
+                height: 1.5,
+              ),
+            ),
+            if (loadError != null) ...[
+              const SizedBox(height: 8),
+              Text(
+                loadError,
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  color: Color(0xFF92400E),
+                  fontSize: 12,
+                  height: 1.4,
+                ),
+              ),
+            ],
+            const SizedBox(height: 12),
+            OutlinedButton.icon(
+              onPressed: _retryLoad,
+              icon: const Icon(Icons.refresh),
+              label: const Text('إعادة المحاولة'),
+            ),
+          ],
+        ),
+      );
+    }
 
     return Container(
       margin: const EdgeInsets.only(bottom: 24),
@@ -235,7 +330,7 @@ class _DepositRequestPageState extends State<DepositRequestPage> {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Text(
-                  _depositNumber!,
+                  depositNumber,
                   style: const TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.bold,
@@ -245,7 +340,7 @@ class _DepositRequestPageState extends State<DepositRequestPage> {
                 ),
                 InkWell(
                   onTap: () async {
-                    await Clipboard.setData(ClipboardData(text: _depositNumber!));
+                    await Clipboard.setData(ClipboardData(text: depositNumber));
                     if (mounted) {
                       ScaffoldMessenger.of(context).showSnackBar(
                         const SnackBar(content: Text('تم نسخ الرقم')),

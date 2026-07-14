@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Bazaar Suez — Financial Capacity Plan</title>
+  <style>
+    :root { --bg:#0f1117; --card:#1a1d27; --text:#e8eaed; --muted:#9aa0a6; --accent:#6ea8fe; --border:#2d3142; }
+    * { box-sizing: border-box; }
+    body { font-family: 'Segoe UI', Tahoma, sans-serif; background: var(--bg); color: var(--text); margin: 0; padding: 24px; line-height: 1.6; }
+    h1 { font-size: 1.75rem; margin-bottom: 4px; }
+    h2 { font-size: 1.2rem; margin-top: 32px; border-bottom: 1px solid var(--border); padding-bottom: 8px; color: var(--accent); }
+    .subtitle { color: var(--muted); margin-bottom: 24px; }
+    .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; margin: 16px 0; }
+    .stat { background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 16px; }
+    .stat .label { font-size: 0.8rem; color: var(--muted); }
+    .stat .value { font-size: 1.4rem; font-weight: 600; margin-top: 4px; }
+    table { width: 100%; border-collapse: collapse; margin: 12px 0 24px; font-size: 0.9rem; }
+    th, td { border: 1px solid var(--border); padding: 8px 10px; text-align: right; }
+    th { background: var(--card); color: var(--accent); }
+    tr:nth-child(even) { background: rgba(255,255,255,0.02); }
+    .note { background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 16px; margin: 16px 0; color: var(--muted); font-size: 0.9rem; }
+    @media print { body { background: #fff; color: #000; } th { background: #eee; } .stat { border: 1px solid #ccc; } }
+  </style>
+</head>
+<body>
+  <h1>Bazaar Suez — Financial Capacity Plan</h1>
+  <p class="subtitle">تحليل تكلفة Firebase · Blaze Plan · 1 USD = 50 ج.م · يوليو 2026 · مبني على كود المشروع الفعلي</p>
+
+  <div class="stats">
+    <div class="stat"><div class="label">تكلفة المتجر/شهر (1000 متجر)</div><div class="value">9.3 ج.م</div></div>
+    <div class="stat"><div class="label">تكلفة الطلب</div><div class="value">0.03 ج.م</div></div>
+    <div class="stat"><div class="label">تكلفة العميل/شهر</div><div class="value">0.06 ج.م</div></div>
+    <div class="stat"><div class="label">فاتورة 1000 متجر</div><div class="value">$186 / 9,300 ج.م</div></div>
+    <div class="stat"><div class="label">بعد التحسين (-72%)</div><div class="value">$143 / 7,150 ج.م</div></div>
+    <div class="stat"><div class="label">FCM إشعارات</div><div class="value">مجاني</div></div>
+  </div>
+
+  <h2>المرحلة 1 — Firestore Collections (متجر · 300 طلب/شهر)</h2>
+  <table>
+    <tr><th>Collection</th><th>Reads K</th><th>Writes K</th><th>حجم Doc KB</th><th>USD</th></tr>
+    <tr><td>orders</td><td>5.4</td><td>2.7</td><td>8</td><td>0.42</td></tr>
+    <tr><td>present_order (projection)</td><td>1.5</td><td>1.8</td><td>9</td><td>0.22</td></tr>
+    <tr><td>markets/.../products/items</td><td>3.6</td><td>0.24</td><td>4</td><td>0.15</td></tr>
+    <tr><td>markets/.../statistics</td><td>0.6</td><td>0.9</td><td>15</td><td>0.09</td></tr>
+    <tr><td>markets</td><td>1.8</td><td>0.45</td><td>7</td><td>0.08</td></tr>
+    <tr><td>users</td><td>0.9</td><td>0.12</td><td>2.5</td><td>0.02</td></tr>
+  </table>
+
+  <h2>المرحلة 8 — Cost Model حسب المنتجات (متجر واحد · 300 طلب)</h2>
+  <table>
+    <tr><th>منتجات</th><th>Reads</th><th>Storage</th><th>USD Marginal</th><th>EGP</th></tr>
+    <tr><td>50</td><td>8,500</td><td>6 MB</td><td>$0.85</td><td>42 ج.م</td></tr>
+    <tr><td>100</td><td>9,400</td><td>12 MB</td><td>$0.92</td><td>46 ج.م</td></tr>
+    <tr><td>300</td><td>11,800</td><td>37 MB</td><td>$1.10</td><td>55 ج.م</td></tr>
+    <tr><td>500</td><td>14,200</td><td>62 MB</td><td>$1.28</td><td>64 ج.م</td></tr>
+    <tr><td>1,000</td><td>20,200</td><td>124 MB</td><td>$1.65</td><td>82 ج.م</td></tr>
+    <tr><td>5,000</td><td>68,200</td><td>620 MB</td><td>$5.80</td><td>290 ج.م</td></tr>
+  </table>
+
+  <h2>المرحلة 9 — Sales Simulation (طلبات/شهر)</h2>
+  <table>
+    <tr><th>طلبات</th><th>Reads</th><th>Writes</th><th>CF</th><th>USD</th><th>EGP</th></tr>
+    <tr><td>100</td><td>12K</td><td>4K</td><td>500</td><td>$0</td><td>0</td></tr>
+    <tr><td>300</td><td>18K</td><td>8K</td><td>1,500</td><td>$0</td><td>0</td></tr>
+    <tr><td>1,000</td><td>38K</td><td>20K</td><td>5K</td><td>$0</td><td>0</td></tr>
+    <tr><td>3,000</td><td>98K</td><td>55K</td><td>15K</td><td>$0.08</td><td>4</td></tr>
+    <tr><td>10,000</td><td>308K</td><td>175K</td><td>50K</td><td>$0.74</td><td>37</td></tr>
+  </table>
+
+  <h2>المرحلة 10 — Break Even (هامش 50% + فريق)</h2>
+  <table>
+    <tr><th>اشتراك</th><th>متاجر للتعادل</th><th>إيراد شهري</th></tr>
+    <tr><td>30 ج.م</td><td>14,035</td><td>$8,421</td></tr>
+    <tr><td>50 ج.م</td><td>5,096</td><td>$5,096</td></tr>
+    <tr><td>75 ج.م</td><td>2,837</td><td>$4,256</td></tr>
+    <tr><td>100 ج.م</td><td>1,965</td><td>$3,930</td></tr>
+    <tr><td>150 ج.م</td><td>1,218</td><td>$3,654</td></tr>
+    <tr><td>200 ج.م</td><td>882</td><td>$3,528</td></tr>
+  </table>
+
+  <h2>المرحلة 11 — مستويات الاشتراك</h2>
+  <table>
+    <tr><th>المستوى</th><th>منتجات</th><th>طلبات</th><th>السعر المقترح</th></tr>
+    <tr><td>Starter</td><td>50</td><td>100</td><td>99 ج.م</td></tr>
+    <tr><td>Basic</td><td>150</td><td>300</td><td>149 ج.م</td></tr>
+    <tr><td>Pro</td><td>500</td><td>1,000</td><td>249 ج.م</td></tr>
+    <tr><td>Business</td><td>1,500</td><td>3,000</td><td>399 ج.م</td></tr>
+    <tr><td>Enterprise</td><td>5,000</td><td>10,000</td><td>699 ج.م</td></tr>
+  </table>
+
+  <h2>المرحلة 12 — أقصى Capacity</h2>
+  <table>
+    <tr><th>متاجر</th><th>Reads M</th><th>Writes K</th><th>Storage GB</th><th>USD</th><th>بعد تحسين</th></tr>
+    <tr><td>100</td><td>0.5</td><td>50</td><td>1.8</td><td>$4</td><td>$0.16</td></tr>
+    <tr><td>500</td><td>8.2</td><td>420</td><td>9.3</td><td>$81</td><td>$59</td></tr>
+    <tr><td>1,000</td><td>18.5</td><td>900</td><td>18.6</td><td>$186</td><td>$143</td></tr>
+    <tr><td>3,000</td><td>58.5</td><td>2,800</td><td>55.8</td><td>$606</td><td>$478</td></tr>
+    <tr><td>5,000</td><td>99.5</td><td>4,700</td><td>93.0</td><td>$1,027</td><td>$813</td></tr>
+    <tr><td>10,000</td><td>201.5</td><td>9,500</td><td>186.0</td><td>$2,080</td><td>$1,650</td></tr>
+  </table>
+
+  <h2>المرحلة 15 — توصيات تقليل التكلفة 70%+</h2>
+  <ul>
+    <li>إزالة present_order/past_order projection — توفير 35% writes</li>
+    <li>Cursor Pagination للمنتجات — توفير 80% reads</li>
+    <li>إيقاف updateStoreOpenStatus لكل المتاجر — توفير 40% عند scale</li>
+    <li>Firestore Bundles للـ Categories + Home — توفير 60%</li>
+    <li>ضغط صور WebP 80KB — توفير 80% bandwidth</li>
+    <li>دمج listeners المكررة في MarketOrdersPage</li>
+    <li>Distributed Counters للإحصائيات</li>
+    <li>Batch Writes في Checkout</li>
+  </ul>
+
+  <div class="note">
+    <strong>ملاحظة:</strong> المتجر الواحد ضمن الحصة المجانية اليومية لـ Firebase (50K reads · 20K writes) — التكلفة الفعلية تظهر عند 500+ متجر.
+    للوحة تفاعلية: افتح <code>docs/bazaar-suez-financial-plan.canvas.tsx</code> في Cursor Canvas.
+    لحفظ PDF: Ctrl+P → Save as PDF.
+  </div>
+</body>
+</html>
